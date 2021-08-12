@@ -1,0 +1,14 @@
+.idea/
+.vscode/
+.vim/
+
+venv/
+__pycache__/
+.coverage
+.mypy_cache/
+.pytest_cache/
+.pytype/
+*.pyc
+.env*
+
+local*

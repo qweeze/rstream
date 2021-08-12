@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "rabbit-stream-client"
+version = "0.1.0"
+description = "A python client for RabbitMQ Streams"
+authors = ["George Fortunatov <qweeeze@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.dev-dependencies]
+ipython = "^7.13.0"
+flake8 = "^3.9.2"
+isort = "^5.9.3"
+mypy = "^0.910"
+pytest = "^6.2.4"
+pytest-asyncio = "^0.15.1"
