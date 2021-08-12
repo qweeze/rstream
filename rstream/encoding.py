@@ -2,8 +2,8 @@ import io
 import typing
 from dataclasses import fields, is_dataclass
 from typing import (
-    Any,
     Annotated,
+    Any,
     Literal,
     NamedTuple,
     Type,

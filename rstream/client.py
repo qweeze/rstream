@@ -6,8 +6,8 @@ import time
 from collections import defaultdict
 from contextlib import suppress
 from typing import (
-    Any,
     Annotated,
+    Any,
     Awaitable,
     Callable,
     Optional,

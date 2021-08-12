@@ -2,7 +2,6 @@ import pytest
 
 from rstream import Producer
 
-
 pytestmark = pytest.mark.asyncio
 
 

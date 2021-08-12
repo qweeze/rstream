@@ -1,8 +1,8 @@
-import pytest
 import asyncio
 
-from rstream import Producer, Consumer
+import pytest
 
+from rstream import Consumer, Producer
 
 pytestmark = pytest.mark.asyncio
 

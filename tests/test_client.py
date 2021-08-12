@@ -1,9 +1,9 @@
-import pytest
 from unittest.mock import ANY
+
+import pytest
 
 from rstream import schema
 from rstream.client import Client
-
 
 pytestmark = pytest.mark.asyncio
 

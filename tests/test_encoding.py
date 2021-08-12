@@ -1,8 +1,10 @@
-from rstream.encoding import encode_frame, decode_frame
-from rstream import schema, OffsetType
-
 import pytest
 
+from rstream import OffsetType, schema
+from rstream.encoding import (
+    decode_frame,
+    encode_frame,
+)
 
 frames = [
     schema.PeerProperties(correlation_id=1, properties=[schema.Property(key='product', value='rmq-streams-client')]),

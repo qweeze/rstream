@@ -1,11 +1,10 @@
+import logging
+
 import pytest
 
 import rstream.client
+from rstream import Consumer, Producer
 from rstream.client import Client
-from rstream import Producer, Consumer
-
-import logging
-
 
 logging.basicConfig(
     level=logging.INFO,
