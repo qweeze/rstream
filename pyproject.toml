@@ -3,6 +3,10 @@ name = "rstream"
 version = "0.1.0"
 description = "A python client for RabbitMQ Streams"
 authors = ["George Fortunatov <qweeeze@gmail.com>"]
+readme = "README.md"
+homepage = "https://github.com/qweeze/rstream"
+repository = "https://github.com/qweeze/rstream"
+license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.9"

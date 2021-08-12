@@ -3,6 +3,7 @@
 .vim/
 
 venv/
+dist/
 __pycache__/
 .coverage
 .mypy_cache/
