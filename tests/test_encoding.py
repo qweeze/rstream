@@ -43,7 +43,7 @@ frames = [
     schema.QueryOffsetResponse(correlation_id=6, response_code=1, offset=239),
     schema.Subscribe(
         correlation_id=7, subscription_id=1, stream='mystream',
-        offset_spec=schema.OffsetSpecification(offset_type=OffsetType.offset, offset=412),
+        offset_spec=schema.OffsetSpec(offset_type=OffsetType.FIRST),
         credit=10, properties=[],
     ),
     schema.SubscribeResponse(correlation_id=7, response_code=1),
@@ -70,8 +70,5 @@ def test_encoding(frame: schema.Frame) -> None:
         # if a frame is a response, first bit of a key must be switched to 1
         key = int.from_bytes(raw[:2], 'big', signed=False) | (1 << 15)
         raw[:2] = key.to_bytes(2, 'big', signed=False)
-
-    if frame.__class__ is schema.Subscribe:
-        pytest.skip('TODO: fix issue with offset_spec')
 
     assert decode_frame(raw) == frame

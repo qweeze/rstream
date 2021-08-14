@@ -4,7 +4,7 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Optional
+from typing import Any, Optional, Union, cast
 
 from . import exceptions, schema, utils
 from .client import Client, ClientPool
@@ -17,6 +17,12 @@ class _Publisher:
     stream: str
     sequence: utils.MonotonicSeq
     client: Client
+
+
+@dataclass
+class Message:
+    data: bytes
+    id: Optional[int] = None
 
 
 class Producer:
@@ -47,6 +53,7 @@ class Producer:
             str,
             dict[asyncio.Future[None], set[int]]
         ] = defaultdict(dict)
+        self._lock = asyncio.Lock()
 
     @property
     def default_client(self) -> Client:
@@ -134,18 +141,30 @@ class Producer:
     async def publish_batch(
         self,
         stream: str,
-        batch: list[bytes],
+        batch: Union[list[bytes], list[Message]],
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> list[int]:
-        publisher = await self._get_or_create_publisher(stream, publisher_name)
+        if len(batch) == 0:
+            raise ValueError('Empty batch')
 
-        messages = [
-            schema.Message(
-                publishing_id=publisher.sequence.next(),
-                data=data,
-            ) for data in batch
-        ]
+        async with self._lock:
+            publisher = await self._get_or_create_publisher(stream, publisher_name)
+
+        messages = []
+        for item in batch:
+            if isinstance(item, Message):
+                message = schema.Message(
+                    publishing_id=item.id or publisher.sequence.next(),
+                    data=item.data,
+                )
+            else:
+                message = schema.Message(
+                    publishing_id=publisher.sequence.next(),
+                    data=item,
+                )
+            messages.append(message)
+
         await publisher.client.send_frame(
             schema.Publish(
                 publisher_id=publisher.id,
@@ -164,13 +183,14 @@ class Producer:
     async def publish(
         self,
         stream: str,
-        data: bytes,
+        message: Union[Message, bytes],
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> int:
+        messages = cast(Union[list[bytes], list[Message]], [message])
         publishing_ids = await self.publish_batch(
             stream,
-            [data],
+            messages,
             sync=sync,
             publisher_name=publisher_name,
         )

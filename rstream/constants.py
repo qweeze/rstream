@@ -44,8 +44,8 @@ class Key(enum.Enum):
 
 
 class OffsetType(int, enum.Enum):
-    first = 1
-    last = 2
-    next = 3
-    offset = 4
-    timestamp = 5
+    FIRST = 1
+    LAST = 2
+    NEXT = 3
+    OFFSET = 4
+    TIMESTAMP = 5

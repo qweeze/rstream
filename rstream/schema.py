@@ -4,13 +4,7 @@ import sys
 import typing
 import zlib
 from dataclasses import dataclass, field
-from typing import (
-    ClassVar,
-    Optional,
-    Type,
-    Union,
-    cast,
-)
+from typing import ClassVar, Optional, Type, cast
 
 from .constants import Key, OffsetType, T
 from .exceptions import ServerError
@@ -294,17 +288,42 @@ class CloseResponse(Frame, is_response=True):
 
 
 @dataclass
-class OffsetSpecification(Struct):
+class OffsetSpec(Struct):
     offset_type: OffsetType = field(metadata={'type': T.uint16})
-    offset: Union[int, bytes] = field(metadata={'type': T.raw})
 
-    def __post_init__(self) -> None:
-        assert isinstance(self.offset, int)
-        # If offset value is a timestamp it should be encoded as int64, otherwise as uint64
-        if self.offset_type is OffsetType.timestamp:
-            self.offset = self.offset.to_bytes(8, 'big', signed=True)
+    @classmethod
+    def from_params(cls, offset_type: OffsetType, offset: Optional[int]) -> 'OffsetSpec':
+        if (
+            offset_type in (OffsetType.OFFSET, OffsetType.TIMESTAMP)
+            and offset is None
+        ):
+            raise ValueError(f'Offset parameter is required for {offset_type} offset type')
+        elif (
+            offset_type in (OffsetType.NEXT, OffsetType.FIRST, OffsetType.LAST)
+            and offset is not None
+        ):
+            raise ValueError(f'Offset parameter must be None for {offset_type} offset type')
+
+        if offset_type is OffsetType.OFFSET:
+            assert offset is not None
+            return OffsetSpecOffset(offset_type, offset)
+
+        elif offset_type is OffsetType.TIMESTAMP:
+            assert offset is not None
+            return OffsetSpecTimestamp(offset_type, offset)
         else:
-            self.offset = self.offset.to_bytes(8, 'big', signed=False)
+            assert offset is None
+            return OffsetSpec(offset_type)
+
+
+@dataclass
+class OffsetSpecOffset(OffsetSpec):
+    value: int = field(metadata={'type': T.uint64})
+
+
+@dataclass
+class OffsetSpecTimestamp(OffsetSpec):
+    value: int = field(metadata={'type': T.int64})
 
 
 @dataclass
@@ -313,7 +332,7 @@ class Subscribe(Frame):
     correlation_id: int = field(metadata={'type': T.uint32})
     subscription_id: int = field(metadata={'type': T.uint8})
     stream: str = field(metadata={'type': T.string})
-    offset_spec: OffsetSpecification
+    offset_spec: OffsetSpec
     credit: int = field(metadata={'type': T.uint16})
     properties: list[Property]
 

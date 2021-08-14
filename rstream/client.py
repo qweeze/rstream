@@ -356,8 +356,7 @@ class Client(BaseClient):
         self,
         stream: str,
         subscription_id: int,
-        offset: int = 0,
-        offset_type: constants.OffsetType = constants.OffsetType.offset,
+        offset_spec: schema.OffsetSpec = schema.OffsetSpec(constants.OffsetType.FIRST),
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
     ) -> None:
@@ -366,10 +365,7 @@ class Client(BaseClient):
                 self._corr_id_seq.next(),
                 subscription_id=subscription_id,
                 stream=stream,
-                offset_spec=schema.OffsetSpecification(
-                    offset_type=offset_type,
-                    offset=offset,
-                ),
+                offset_spec=offset_spec,
                 credit=initial_credit,
                 properties=[
                     schema.Property(key, str(value))

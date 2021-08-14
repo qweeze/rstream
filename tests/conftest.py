@@ -7,7 +7,7 @@ from rstream import Consumer, Producer
 from rstream.client import Client
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format='[%(asctime)s] %(levelname)s: %(message)s',
     handlers=[logging.StreamHandler()],
 )
