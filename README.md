@@ -45,3 +45,10 @@ await consumer.start()
 await consumer.subscribe('mystream', on_message)
 await consumer.run()
 ```
+
+## TODO
+
+- [ ] Documentation
+- [ ] Handle `MetadataUpdate` and reconnect to another broker on stream configuration changes
+- [ ] AsyncIterator protocol for consumer
+- [ ] Add frame size validation
