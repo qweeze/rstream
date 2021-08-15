@@ -14,36 +14,45 @@ pip install rstream
 Publishing messages:
 
 ```python
-from rstream import Producer, Consumer
+import asyncio
+from rstream import Producer
 
-async with Producer('localhost', username='guest', password='guest') as producer:
-    await producer.create_stream('mystream')
+async def publish():
+    async with Producer('localhost', username='guest', password='guest') as producer:
+        await producer.create_stream('mystream')
 
-    for i in range(100):
-        await producer.publish('mystream', f'msg: {i}'.encode())
+        for i in range(100):
+            await producer.publish('mystream', f'msg: {i}'.encode())
 
+asyncio.run(publish())
 ```
 
 Consuming messages:
 
 ```python
-consumer = Consumer(
-    host='localhost',
-    port=5552,
-    vhost='/',
-    username='guest',
-    password='guest',
-)
+import asyncio
+from rstream import Consumer
 
-loop = asyncio.get_event_loop()
-loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
+async def consume():
+    consumer = Consumer(
+        host='localhost',
+        port=5552,
+        vhost='/',
+        username='guest',
+        password='guest',
+    )
 
-def on_message(msg):
-    print('Got message:', msg)
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
 
-await consumer.start()
-await consumer.subscribe('mystream', on_message)
-await consumer.run()
+    def on_message(msg):
+        print('Got message:', msg)
+
+    await consumer.start()
+    await consumer.subscribe('mystream', on_message)
+    await consumer.run()
+
+asyncio.run(consume())
 ```
 
 ## TODO
