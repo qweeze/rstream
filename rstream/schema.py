@@ -1,7 +1,3 @@
-import dataclasses
-import inspect
-import sys
-import typing
 import zlib
 from dataclasses import dataclass, field
 from typing import ClassVar, Optional, Type, cast
@@ -436,26 +432,3 @@ class CreditResponse(Frame, is_response=True):
     key = Key.Credit
     response_code: int = field(metadata={'type': T.uint16})
     subscription_id: int = field(metadata={'type': T.uint8})
-
-
-def _validate_fields(struct: Struct) -> None:
-    for fld in dataclasses.fields(struct):
-        if fld.metadata.get('type'):
-            continue
-
-        if dataclasses.is_dataclass(fld.type):
-            continue
-
-        if typing.get_origin(fld.type) is list:
-            args = typing.get_args(fld.type)
-            if args and len(args) == 1 and dataclasses.is_dataclass(args[0]):
-                continue
-
-        raise ValueError(f'Cannot infer field type for {struct!r}.{fld.name}')
-
-
-for _, cls in inspect.getmembers(
-    sys.modules[__name__],
-    lambda m: inspect.isclass(m) and isinstance(m, Struct)
-):
-    _validate_fields(cls)
