@@ -7,7 +7,6 @@ from functools import partial
 from typing import (
     Annotated,
     Any,
-    AsyncIterator,
     Awaitable,
     Callable,
     Iterator,
@@ -174,29 +173,6 @@ class Consumer:
         )
         await subscriber.client.unsubscribe(subscriber.subscription_id)
         del self._subscribers[subscirber_name]
-
-    async def iterator(
-        self,
-        stream: str,
-        *,
-        offset: Optional[int] = None,
-        offset_type: OffsetType = OffsetType.FIRST,
-        initial_credit: int = 10,
-        properties: Optional[dict[str, Any]] = None,
-        subscirber_name: Optional[str] = None,
-    ) -> AsyncIterator[bytes]:
-        queue: asyncio.Queue[bytes] = asyncio.Queue()
-        await self.subscribe(
-            stream,
-            callback=queue.put_nowait,
-            offset_type=offset_type,
-            offset=offset,
-            initial_credit=initial_credit,
-            properties=properties,
-            subscirber_name=subscirber_name,
-        )
-        while not self._stop_event.is_set():
-            yield await queue.get()
 
     async def query_offset(self, stream: str, subscirber_name: str) -> int:
         return await self.default_client.query_offset(

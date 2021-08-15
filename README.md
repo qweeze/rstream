@@ -27,17 +27,6 @@ async with Producer('localhost', username='guest', password='guest') as producer
 Consuming messages:
 
 ```python
-async with Consumer('localhost', username='guest', password='guest') as consumer:
-    async for msg in consumer.iterator('mystream'):
-        print('Got message:', msg)
-
-        if msg.endswith(b'99'):
-            break
-```
-
-Or with a callback function:
-
-```python
 consumer = Consumer(
     host='localhost',
     port=5552,
