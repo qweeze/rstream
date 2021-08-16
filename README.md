@@ -31,6 +31,7 @@ Consuming messages:
 
 ```python
 import asyncio
+import signal
 from rstream import Consumer
 
 async def consume():
