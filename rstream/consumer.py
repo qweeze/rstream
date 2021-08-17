@@ -78,7 +78,12 @@ class Consumer:
     async def start(self) -> None:
         self._default_client = await self._pool.get()
 
+    def stop(self) -> None:
+        self._stop_event.set()
+
     async def close(self) -> None:
+        self.stop()
+
         for subscriber in list(self._subscribers.values()):
             await self.unsubscribe(subscriber.reference)
             await self.store_offset(subscriber.stream, subscriber.reference, subscriber.offset)
@@ -88,8 +93,6 @@ class Consumer:
         await self._pool.close()
         self._clients.clear()
         self._default_client = None
-
-        self._stop_event.set()
 
     async def run(self) -> None:
         await self._stop_event.wait()

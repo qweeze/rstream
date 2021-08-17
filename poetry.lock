@@ -37,6 +37,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "certifi"
+version = "2021.5.30"
+description = "Python package for providing Mozilla's CA Bundle."
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "colorama"
 version = "0.4.4"
 description = "Cross-platform colored terminal text."
@@ -334,6 +342,14 @@ pytest = ">=5.4.0"
 testing = ["coverage", "hypothesis (>=5.7.1)"]
 
 [[package]]
+name = "six"
+version = "1.16.0"
+description = "Python 2 and 3 compatibility utilities"
+category = "dev"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -364,6 +380,18 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "uamqp"
+version = "1.4.1"
+description = "AMQP 1.0 Client Library for Python"
+category = "dev"
+optional = false
+python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*"
+
+[package.dependencies]
+certifi = ">=2017.4.17"
+six = ">=1.0,<2.0"
+
+[[package]]
 name = "wcwidth"
 version = "0.2.5"
 description = "Measures the displayed width of unicode strings in a terminal"
@@ -374,7 +402,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "360acf7b2a6d779d7424d37982bdec6bf6386fb31113ed4523a4b7aeeff48615"
+content-hash = "d32cb9778ce92ec13f6263e1b75a35fec91cabbbce17bb24985f356da8798f16"
 
 [metadata.files]
 appnope = [
@@ -392,6 +420,10 @@ attrs = [
 backcall = [
     {file = "backcall-0.2.0-py2.py3-none-any.whl", hash = "sha256:fbbce6a29f263178a1f7915c1940bde0ec2b2a967566fe1c65c1dfb7422bd255"},
     {file = "backcall-0.2.0.tar.gz", hash = "sha256:5cbdbf27be5e7cfadb448baf0aa95508f91f2bbc6c6437cd9cd06e2a4c215e1e"},
+]
+certifi = [
+    {file = "certifi-2021.5.30-py2.py3-none-any.whl", hash = "sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8"},
+    {file = "certifi-2021.5.30.tar.gz", hash = "sha256:2bbf76fd432960138b3ef6dda3dde0544f27cbf8546c458e60baf371917ba9ee"},
 ]
 colorama = [
     {file = "colorama-0.4.4-py2.py3-none-any.whl", hash = "sha256:9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2"},
@@ -518,6 +550,10 @@ pytest-asyncio = [
     {file = "pytest-asyncio-0.15.1.tar.gz", hash = "sha256:2564ceb9612bbd560d19ca4b41347b54e7835c2f792c504f698e05395ed63f6f"},
     {file = "pytest_asyncio-0.15.1-py3-none-any.whl", hash = "sha256:3042bcdf1c5d978f6b74d96a151c4cfb9dcece65006198389ccd7e6c60eb1eea"},
 ]
+six = [
+    {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
+    {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
+]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
     {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
@@ -530,6 +566,36 @@ typing-extensions = [
     {file = "typing_extensions-3.10.0.0-py2-none-any.whl", hash = "sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497"},
     {file = "typing_extensions-3.10.0.0-py3-none-any.whl", hash = "sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84"},
     {file = "typing_extensions-3.10.0.0.tar.gz", hash = "sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342"},
+]
+uamqp = [
+    {file = "uamqp-1.4.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:cc98b0869ec2334a6e68a76ccdec8d42e6c983e41a7b69016ded3d2d787ccb7b"},
+    {file = "uamqp-1.4.1-cp27-cp27m-manylinux1_x86_64.whl", hash = "sha256:e77d8544c3dd0ccb324b16600809db4c76e66a1c99315a0358a84ae4b8ef8dbe"},
+    {file = "uamqp-1.4.1-cp27-cp27m-manylinux2010_x86_64.whl", hash = "sha256:ff551fd745c3ccbbf5a2ac69228462e532c4c396e403056020bd6d39cc984906"},
+    {file = "uamqp-1.4.1-cp27-cp27m-win32.whl", hash = "sha256:e402e1c578121245912bf33e805581714a54e32b40e4b6a22a0a513ee8965797"},
+    {file = "uamqp-1.4.1-cp27-cp27m-win_amd64.whl", hash = "sha256:55cea81e1fbe2f4bdb3dc20a96467e55cb3ba5fff56b20a7664bd52a616b405f"},
+    {file = "uamqp-1.4.1-cp27-cp27mu-manylinux1_x86_64.whl", hash = "sha256:ab3be8a3df2ec0dc90a4d2fbf370baaa0651732f6ee958c69c4c7eb2a46d874f"},
+    {file = "uamqp-1.4.1-cp27-cp27mu-manylinux2010_x86_64.whl", hash = "sha256:b37569e1ccd6b1d21ea9eb462e8f4096bbdf37b35566380ba5fc7e6f57728157"},
+    {file = "uamqp-1.4.1-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:3fc90444ad2802a859c52d36c386ab536f823cb20792c1da10dcf2565f319ed0"},
+    {file = "uamqp-1.4.1-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:1741835a5ca59bb5a964b7435244d05780554a59741c4aabcab9a468eaaa45a9"},
+    {file = "uamqp-1.4.1-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:5b294f672c31df9cbf1fbc4a3190608e4572af536c2421e5fad7692f6e2f717d"},
+    {file = "uamqp-1.4.1-cp36-cp36m-win32.whl", hash = "sha256:c0d55faf9161ea0fce8f7dea650f9e40deaf704020a67fd42907e7b94d9acbe7"},
+    {file = "uamqp-1.4.1-cp36-cp36m-win_amd64.whl", hash = "sha256:8dacd02024fe5d80e66350bfb87f46df5eb6e8ecf44473efad04a56e5c951571"},
+    {file = "uamqp-1.4.1-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:66cecb4997ad88958c9869dc00aa2c218fd75026e003f86fc0988708b9f6e283"},
+    {file = "uamqp-1.4.1-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:df4f467632e0e71c395e34468b8318e2ba3286dd7a4eb6e18775ca40455e76af"},
+    {file = "uamqp-1.4.1-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:3d5eebdde6e8e818f0095f1f38e3ce89d6c8e515d08ea11797a37789befaf44f"},
+    {file = "uamqp-1.4.1-cp37-cp37m-win32.whl", hash = "sha256:d36d2a70950c7415febb8b2cd17142773feff8f20e92b24723864e7072e14700"},
+    {file = "uamqp-1.4.1-cp37-cp37m-win_amd64.whl", hash = "sha256:4055db2bed47eefcd06e1be7d9b135f39d2c016acf2387de194a08f3baf9347e"},
+    {file = "uamqp-1.4.1-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:3ca63e88e2b5881cb7201a63a95d85ce5018dc9c42bc31e20ce375dfcac4c178"},
+    {file = "uamqp-1.4.1-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:7733a304939c00ad385affd325d63a080ba18e1e5f58593086dfb7002056aee0"},
+    {file = "uamqp-1.4.1-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:38f7d5c53149a7604833ffe3d6ccc7f8b968a914d0fcbd1545c2e64930ca52c6"},
+    {file = "uamqp-1.4.1-cp38-cp38-win32.whl", hash = "sha256:286c54b84525a0c12cb1fd65634bdf0767c04dcf0c8e2c099eb0f427856a7161"},
+    {file = "uamqp-1.4.1-cp38-cp38-win_amd64.whl", hash = "sha256:45407f5c126b04f817b43462235cf13b129949f0c383221bcd53bf82dceb2f9e"},
+    {file = "uamqp-1.4.1-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:6648c6b39f0af22967cb68f14b56abc7b8097f802aab3155d4baa31a1c39bfcf"},
+    {file = "uamqp-1.4.1-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:fc7f54c9495ff79a1c555e660e4284944c2550be513000fea5084826d6dde869"},
+    {file = "uamqp-1.4.1-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:7658a70bc6f3049a67e33dda3b01f90dc96a401cb549166bea28cd5db5d67352"},
+    {file = "uamqp-1.4.1-cp39-cp39-win32.whl", hash = "sha256:ab32db91529eb5bde13ae015396a285a1fa236694536a53f18f1d2b6351d1307"},
+    {file = "uamqp-1.4.1-cp39-cp39-win_amd64.whl", hash = "sha256:a083c8166945559a0334f5615c45fdd331bf4b4e47fa684ae24ec16076843d75"},
+    {file = "uamqp-1.4.1.tar.gz", hash = "sha256:24d1a5a6ed87bf04c657bed69c0405caf2489877ac13647e6703009619729365"},
 ]
 wcwidth = [
     {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},

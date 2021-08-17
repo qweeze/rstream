@@ -24,6 +24,9 @@ class Message:
     data: bytes
     id: Optional[int] = None
 
+    def __bytes__(self) -> bytes:
+        return self.data
+
 
 class Producer:
     def __init__(
@@ -141,7 +144,7 @@ class Producer:
     async def publish_batch(
         self,
         stream: str,
-        batch: Union[list[bytes], list[Message]],
+        batch: Union[list[Message], list[bytes]],
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> list[int]:
@@ -153,17 +156,17 @@ class Producer:
 
         messages = []
         for item in batch:
-            if isinstance(item, Message):
-                message = schema.Message(
-                    publishing_id=item.id or publisher.sequence.next(),
-                    data=item.data,
-                )
+            if isinstance(item, Message) and item.id is not None:
+                publishing_id = item.id
             else:
-                message = schema.Message(
-                    publishing_id=publisher.sequence.next(),
-                    data=item,
+                publishing_id = publisher.sequence.next()
+
+            messages.append(
+                schema.Message(
+                    publishing_id=publishing_id,
+                    data=bytes(item),
                 )
-            messages.append(message)
+            )
 
         await publisher.client.send_frame(
             schema.Publish(

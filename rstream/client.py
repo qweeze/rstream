@@ -17,10 +17,7 @@ from typing import (
 )
 
 from . import constants, exceptions, schema, utils
-from .connection import (
-    Connection,
-    ConnectionClosed,
-)
+from .connection import Connection, ConnectionClosed
 
 FT = TypeVar('FT', bound=schema.Frame)
 HT = Annotated[
