@@ -4,11 +4,13 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypeVar
 
 from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
 from .client import Client, ClientPool
+
+MessageT = TypeVar('MessageT', _MessageProtocol, bytes)
 
 
 @dataclass
@@ -145,7 +147,7 @@ class Producer:
     async def publish_batch(
         self,
         stream: str,
-        batch: Union[list[_MessageProtocol], list[bytes]],
+        batch: list[MessageT],
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> list[int]:
@@ -157,14 +159,15 @@ class Producer:
 
         messages = []
         for item in batch:
-            publishing_id = getattr(item, 'publishing_id', None)
-            if publishing_id is None:
-                publishing_id = publisher.sequence.next()
+            msg = RawMessage(item) if isinstance(item, bytes) else item
+
+            if msg.publishing_id is None:
+                msg.publishing_id = publisher.sequence.next()
 
             messages.append(
                 schema.Message(
-                    publishing_id=publishing_id,
-                    data=bytes(item),
+                    publishing_id=msg.publishing_id,
+                    data=bytes(msg),
                 )
             )
 
@@ -186,14 +189,13 @@ class Producer:
     async def publish(
         self,
         stream: str,
-        message: Union[_MessageProtocol, bytes],
+        message: MessageT,
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> int:
-        messages = cast(Union[list[_MessageProtocol], list[bytes]], [message])
         publishing_ids = await self.publish_batch(
             stream,
-            messages,
+            [message],
             sync=sync,
             publisher_name=publisher_name,
         )
