@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rstream"
-version = "0.2.1"
+version = "0.3.0"
 description = "A python client for RabbitMQ Streams"
 authors = ["George Fortunatov <qweeeze@gmail.com>"]
 readme = "README.md"
@@ -10,6 +10,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.9"
+python-qpid-proton = "^0.35.0"
 
 [tool.poetry.dev-dependencies]
 ipython = "^7.13.0"
@@ -18,4 +19,3 @@ isort = "^5.9.3"
 mypy = "^0.910"
 pytest = "^6.2.4"
 pytest-asyncio = "^0.15.1"
-uamqp = "^1.4.1"

@@ -11,6 +11,7 @@ from typing import (
     Callable,
     Iterator,
     Optional,
+    TypeVar,
     Union,
 )
 
@@ -18,9 +19,10 @@ from . import schema
 from .client import Client, ClientPool
 from .constants import OffsetType
 
+MT = TypeVar('MT')
 CB = Annotated[
-    Callable[[bytes], Union[None, Awaitable[None]]],
-    'Raw message callback type'
+    Callable[[MT], Union[None, Awaitable[None]]],
+    'Message callback type'
 ]
 
 
@@ -30,7 +32,8 @@ class _Subscriber:
     subscription_id: int
     reference: str
     client: Client
-    callback: CB
+    callback: CB[Any]
+    decoder: Callable[[bytes], Any]
     offset_type: OffsetType
     offset: int
 
@@ -109,7 +112,8 @@ class Consumer:
         self,
         stream: str,
         subscirber_name: Optional[str],
-        callback: CB,
+        callback: CB[MT],
+        decoder: Optional[Callable[[bytes], Any]],
         offset_type: OffsetType,
         offset: Optional[int],
     ) -> _Subscriber:
@@ -118,6 +122,7 @@ class Consumer:
         # We can have multiple subscribers sharing same connection, so their ids must be distinct
         subscription_id = len([s for s in self._subscribers.values() if s.client is client]) + 1
         reference = subscirber_name or f'{stream}_subscriber_{subscription_id}'
+        decoder = decoder or (lambda x: x)
 
         if offset_type in (OffsetType.LAST, OffsetType.NEXT):
             offset = await self.query_offset(stream, reference)
@@ -128,6 +133,7 @@ class Consumer:
             client=client,
             reference=reference,
             callback=callback,
+            decoder=decoder,
             offset_type=offset_type,
             offset=offset or 0,
         )
@@ -136,8 +142,9 @@ class Consumer:
     async def subscribe(
         self,
         stream: str,
-        callback: CB,
+        callback: CB[MT],
         *,
+        decoder: Optional[Callable[[bytes], MT]] = None,
         offset: Optional[int] = None,
         offset_type: OffsetType = OffsetType.FIRST,
         initial_credit: int = 10,
@@ -149,6 +156,7 @@ class Consumer:
                 stream=stream,
                 subscirber_name=subscirber_name,
                 callback=callback,
+                decoder=decoder,
                 offset_type=offset_type,
                 offset=offset,
             )
@@ -217,7 +225,7 @@ class Consumer:
         await subscriber.client.credit(subscriber.subscription_id, 1)
 
         for message in self._filter_messages(frame, subscriber):
-            maybe_coro = subscriber.callback(message)
+            maybe_coro = subscriber.callback(subscriber.decoder(message))
             if maybe_coro is not None:
                 await maybe_coro
 

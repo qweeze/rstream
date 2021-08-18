@@ -7,6 +7,7 @@ from functools import partial
 from typing import Any, Optional, Union, cast
 
 from . import exceptions, schema, utils
+from .amqp import _MessageProtocol
 from .client import Client, ClientPool
 
 
@@ -20,9 +21,9 @@ class _Publisher:
 
 
 @dataclass
-class Message:
+class RawMessage(_MessageProtocol):
     data: bytes
-    id: Optional[int] = None
+    publishing_id: Optional[int] = None
 
     def __bytes__(self) -> bytes:
         return self.data
@@ -144,7 +145,7 @@ class Producer:
     async def publish_batch(
         self,
         stream: str,
-        batch: Union[list[Message], list[bytes]],
+        batch: Union[list[_MessageProtocol], list[bytes]],
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> list[int]:
@@ -156,9 +157,8 @@ class Producer:
 
         messages = []
         for item in batch:
-            if isinstance(item, Message) and item.id is not None:
-                publishing_id = item.id
-            else:
+            publishing_id = getattr(item, 'publishing_id', None)
+            if publishing_id is None:
                 publishing_id = publisher.sequence.next()
 
             messages.append(
@@ -186,11 +186,11 @@ class Producer:
     async def publish(
         self,
         stream: str,
-        message: Union[Message, bytes],
+        message: Union[_MessageProtocol, bytes],
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> int:
-        messages = cast(Union[list[bytes], list[Message]], [message])
+        messages = cast(Union[list[_MessageProtocol], list[bytes]], [message])
         publishing_ids = await self.publish_batch(
             stream,
             messages,

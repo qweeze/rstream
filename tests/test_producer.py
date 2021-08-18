@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from rstream import Consumer, Message, Producer
+from rstream import Consumer, Producer, RawMessage
 
 from .util import wait_for
 
@@ -28,7 +28,7 @@ async def test_publish_deduplication(stream: str, producer: Producer, consumer: 
         for publishing_id in ids:
             await producer.publish(
                 stream,
-                Message(f'test_{publishing_id}'.encode(), publishing_id),
+                RawMessage(f'test_{publishing_id}'.encode(), publishing_id),
             )
 
     await publish_with_ids(1, 2, 3)
@@ -50,7 +50,7 @@ async def test_concurrent_publish(stream: str, producer: Producer, consumer: Con
     await asyncio.gather(*(
         producer.publish(
             stream,
-            Message(b'test', publishing_id),
+            RawMessage(b'test', publishing_id),
         ) for publishing_id in range(1, 11)
     ))
 

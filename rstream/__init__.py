@@ -1,12 +1,13 @@
+from .amqp import AMQPMessage, amqp_decoder
 from .constants import OffsetType
 from .consumer import Consumer
-from .producer import Message, Producer
-
-__version__ = '0.1.0'
+from .producer import Producer, RawMessage
 
 __all__ = [
+    'AMQPMessage',
+    'amqp_decoder',
     'Consumer',
-    'Message',
+    'RawMessage',
     'Producer',
     'OffsetType',
 ]
