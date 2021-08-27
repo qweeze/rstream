@@ -15,14 +15,17 @@ Publishing messages:
 
 ```python
 import asyncio
-from rstream import Producer
+from rstream import Producer, AMQPMessage
 
 async def publish():
     async with Producer('localhost', username='guest', password='guest') as producer:
         await producer.create_stream('mystream')
 
         for i in range(100):
-            await producer.publish('mystream', f'msg: {i}'.encode())
+            amqp_message = AMQPMessage(
+                body='hello: {}'.format(i),
+            )
+            await producer.publish('mystream', amqp_message)
 
 asyncio.run(publish())
 ```
@@ -32,7 +35,7 @@ Consuming messages:
 ```python
 import asyncio
 import signal
-from rstream import Consumer
+from rstream import Consumer, amqp_decoder, AMQPMessage
 
 async def consume():
     consumer = Consumer(
@@ -46,11 +49,11 @@ async def consume():
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
 
-    def on_message(msg):
-        print('Got message:', msg)
+    def on_message(msg: AMQPMessage):
+        print('Got message: {}'.format(msg.body))
 
     await consumer.start()
-    await consumer.subscribe('mystream', on_message)
+    await consumer.subscribe('mystream', on_message, decoder=amqp_decoder)
     await consumer.run()
 
 asyncio.run(consume())
