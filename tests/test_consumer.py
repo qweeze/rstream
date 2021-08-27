@@ -56,7 +56,7 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
         stream,
         callback=captured.append,
         offset_type=OffsetType.LAST,
-        subscirber_name='test-subscriber',
+        subscriber_name='test-subscriber',
     )
 
     messages = [str(i).encode() for i in range(1, 11)]
@@ -73,7 +73,7 @@ async def test_offset_type_next(stream: str, consumer: Consumer, producer: Produ
         stream,
         callback=captured.append,
         offset_type=OffsetType.NEXT,
-        subscirber_name='test-subscriber',
+        subscriber_name='test-subscriber',
     )
 
     messages = [str(i).encode() for i in range(1, 11)]

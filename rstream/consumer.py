@@ -111,7 +111,7 @@ class Consumer:
     async def _create_subscriber(
         self,
         stream: str,
-        subscirber_name: Optional[str],
+        subscriber_name: Optional[str],
         callback: CB[MT],
         decoder: Optional[Callable[[bytes], Any]],
         offset_type: OffsetType,
@@ -121,7 +121,7 @@ class Consumer:
 
         # We can have multiple subscribers sharing same connection, so their ids must be distinct
         subscription_id = len([s for s in self._subscribers.values() if s.client is client]) + 1
-        reference = subscirber_name or f'{stream}_subscriber_{subscription_id}'
+        reference = subscriber_name or f'{stream}_subscriber_{subscription_id}'
         decoder = decoder or (lambda x: x)
 
         if offset_type in (OffsetType.LAST, OffsetType.NEXT):
@@ -149,12 +149,12 @@ class Consumer:
         offset_type: OffsetType = OffsetType.FIRST,
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
-        subscirber_name: Optional[str] = None,
+        subscriber_name: Optional[str] = None,
     ) -> str:
         async with self._lock:
             subscriber = await self._create_subscriber(
                 stream=stream,
-                subscirber_name=subscirber_name,
+                subscriber_name=subscriber_name,
                 callback=callback,
                 decoder=decoder,
                 offset_type=offset_type,
@@ -176,25 +176,25 @@ class Consumer:
 
         return subscriber.reference
 
-    async def unsubscribe(self, subscirber_name: str) -> None:
-        subscriber = self._subscribers[subscirber_name]
+    async def unsubscribe(self, subscriber_name: str) -> None:
+        subscriber = self._subscribers[subscriber_name]
         subscriber.client.remove_handler(
             schema.Deliver,
             name=subscriber.reference,
         )
         await subscriber.client.unsubscribe(subscriber.subscription_id)
-        del self._subscribers[subscirber_name]
+        del self._subscribers[subscriber_name]
 
-    async def query_offset(self, stream: str, subscirber_name: str) -> int:
+    async def query_offset(self, stream: str, subscriber_name: str) -> int:
         return await self.default_client.query_offset(
                 stream,
-                subscirber_name,
+                subscriber_name,
             )
 
-    async def store_offset(self, stream: str, subscirber_name: str, offset: int) -> None:
+    async def store_offset(self, stream: str, subscriber_name: str, offset: int) -> None:
         await self.default_client.store_offset(
             stream=stream,
-            reference=subscirber_name,
+            reference=subscriber_name,
             offset=offset,
         )
 
