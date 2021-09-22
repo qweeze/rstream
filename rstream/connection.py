@@ -1,4 +1,5 @@
 import asyncio
+import ssl
 from typing import Optional
 
 from . import schema
@@ -13,9 +14,15 @@ class ConnectionClosed(Exception):
 
 
 class Connection:
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        ssl_context: Optional[ssl.SSLContext] = None,
+    ) -> None:
         self.host = host
         self.port = port
+        self._ssl_context = ssl_context
 
         self._buffer = bytearray()
         self._reader: Optional[asyncio.StreamReader] = None
@@ -27,6 +34,7 @@ class Connection:
                 asyncio.open_connection(
                     host=self.host,
                     port=self.port,
+                    ssl=self._ssl_context,
                 ),
                 timeout=CONNECT_TIMEOUT,
             )

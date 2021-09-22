@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import ssl
 from dataclasses import dataclass
 from functools import partial
 from typing import (
@@ -44,6 +45,7 @@ class Consumer:
         host: str,
         port: int = 5552,
         *,
+        ssl_context: Optional[ssl.SSLContext] = None,
         vhost: str = '/',
         username: str,
         password: str,
@@ -53,6 +55,7 @@ class Consumer:
         self._pool = ClientPool(
             host,
             port,
+            ssl_context=ssl_context,
             vhost=vhost,
             username=username,
             password=password,

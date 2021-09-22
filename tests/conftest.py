@@ -1,4 +1,5 @@
 import logging
+import ssl
 
 import pytest
 
@@ -21,19 +22,29 @@ def configure():
 def pytest_addoption(parser):
     parser.addoption('--rmq-host', action='store', default='localhost')
     parser.addoption('--rmq-port', action='store', default=5552)
+    parser.addoption('--rmq-ssl', action='store', type=bool, default=False)
     parser.addoption('--rmq-vhost', action='store', default='/')
     parser.addoption('--rmq-username', action='store', default='guest')
     parser.addoption('--rmq-password', action='store', default='guest')
 
 
 @pytest.fixture()
-async def no_auth_client(pytestconfig):
+def ssl_context(pytestconfig):
+    if pytestconfig.getoption('rmq_ssl'):
+        return ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    else:
+        return None
+
+
+@pytest.fixture()
+async def no_auth_client(pytestconfig, ssl_context):
     rstream.client.DEFAULT_REQUEST_TIMEOUT = 1
     client = Client(
         host=pytestconfig.getoption('rmq_host'),
         port=pytestconfig.getoption('rmq_port'),
         frame_max=1024 * 1024,
         heartbeat=60,
+        ssl_context=ssl_context,
     )
     await client.start()
     try:
@@ -62,10 +73,11 @@ async def stream(client: Client):
 
 
 @pytest.fixture()
-async def consumer(pytestconfig):
+async def consumer(pytestconfig, ssl_context):
     consumer = Consumer(
         host=pytestconfig.getoption('rmq_host'),
         port=pytestconfig.getoption('rmq_port'),
+        ssl_context=ssl_context,
         username=pytestconfig.getoption('rmq_username'),
         password=pytestconfig.getoption('rmq_password'),
         frame_max=1024 * 1024,
@@ -79,10 +91,11 @@ async def consumer(pytestconfig):
 
 
 @pytest.fixture()
-async def producer(pytestconfig):
+async def producer(pytestconfig, ssl_context):
     producer = Producer(
         host=pytestconfig.getoption('rmq_host'),
         port=pytestconfig.getoption('rmq_port'),
+        ssl_context=ssl_context,
         username=pytestconfig.getoption('rmq_username'),
         password=pytestconfig.getoption('rmq_password'),
         frame_max=1024 * 1024,
