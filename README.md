@@ -59,6 +59,23 @@ async def consume():
 asyncio.run(consume())
 ```
 
+Connecting with SSL:
+
+```python
+import ssl
+
+ssl_context = ssl.SSLContext()
+ssl_context.load_cert_chain('/path/to/certificate.pem', '/path/to/key.pem')
+
+producer = Producer(
+    host='localhost',
+    port=5551,
+    ssl_context=ssl_context,
+    username='guest',
+    password='guest',
+)
+```
+
 ## TODO
 
 - [ ] Documentation

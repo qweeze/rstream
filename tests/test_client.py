@@ -53,4 +53,4 @@ async def test_deliver(client: Client, stream: str) -> None:
 
 async def test_query_leader(client: Client, stream: str) -> None:
     leader, _ = await client.query_leader_and_replicas(stream)
-    assert (leader.host, leader.port) == (client.host, client.port)
+    assert (leader.host, int(leader.port)) == (client.host, int(client.port))

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import ssl
 import time
 from collections import defaultdict
 from contextlib import suppress
@@ -37,11 +38,13 @@ class BaseClient:
         host: str,
         port: int,
         *,
+        ssl_context: Optional[ssl.SSLContext] = None,
         frame_max: int,
         heartbeat: int,
     ):
         self.host = host
         self.port = port
+        self._ssl_context = ssl_context
 
         self._frame_max = frame_max
         self._heartbeat = heartbeat
@@ -130,7 +133,7 @@ class BaseClient:
     async def start(self) -> None:
         logger.info('Starting client %s:%s', self.host, self.port)
         assert self._conn is None
-        self._conn = Connection(self.host, self.port)
+        self._conn = Connection(self.host, self.port, self._ssl_context)
         await self._conn.open()
         self.start_task('listener', self._listener())
         self.add_handler(schema.Heartbeat, self._on_heartbeat)
@@ -458,6 +461,7 @@ class ClientPool:
         host: str,
         port: int,
         *,
+        ssl_context: Optional[ssl.SSLContext] = None,
         vhost: str,
         username: str,
         password: str,
@@ -465,6 +469,7 @@ class ClientPool:
         heartbeat: int,
     ):
         self.addr: Addr = host, port
+        self.ssl_context = ssl_context
         self.vhost = vhost
         self.username = username
         self.password = password
@@ -488,6 +493,7 @@ class ClientPool:
         client = Client(
             host=host,
             port=port,
+            ssl_context=self.ssl_context,
             frame_max=self._frame_max,
             heartbeat=self._heartbeat,
         )

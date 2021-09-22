@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ssl
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
@@ -36,6 +37,7 @@ class Producer:
         self,
         host: str,
         port: int = 5552,
+        ssl_context: Optional[ssl.SSLContext] = None,
         *,
         vhost: str = '/',
         username: str,
@@ -46,6 +48,7 @@ class Producer:
         self._pool = ClientPool(
             host,
             port,
+            ssl_context=ssl_context,
             vhost=vhost,
             username=username,
             password=password,
