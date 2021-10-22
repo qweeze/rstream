@@ -11,7 +11,7 @@ from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
 from .client import Client, ClientPool
 
-MessageT = TypeVar('MessageT', _MessageProtocol, bytes)
+MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 
 
 @dataclass
@@ -39,7 +39,7 @@ class Producer:
         port: int = 5552,
         ssl_context: Optional[ssl.SSLContext] = None,
         *,
-        vhost: str = '/',
+        vhost: str = "/",
         username: str,
         password: str,
         frame_max: int = 1 * 1024 * 1024,
@@ -58,16 +58,13 @@ class Producer:
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}
         self._publishers: dict[str, _Publisher] = {}
-        self._waiting_for_confirm: dict[
-            str,
-            dict[asyncio.Future[None], set[int]]
-        ] = defaultdict(dict)
+        self._waiting_for_confirm: dict[str, dict[asyncio.Future[None], set[int]]] = defaultdict(dict)
         self._lock = asyncio.Lock()
 
     @property
     def default_client(self) -> Client:
         if self._default_client is None:
-            raise ValueError('Producer is not started')
+            raise ValueError("Producer is not started")
         return self._default_client
 
     async def __aenter__(self) -> Producer:
@@ -116,7 +113,7 @@ class Producer:
 
         # We can have multiple publishers sharing same connection, so their ids must be distinct
         publisher_id = len([p for p in self._publishers.values() if p.client is client]) + 1
-        reference = publisher_name or f'{stream}_publisher_{publisher_id}'
+        reference = publisher_name or f"{stream}_publisher_{publisher_id}"
         publisher = self._publishers[stream] = _Publisher(
             id=publisher_id,
             stream=stream,
@@ -155,7 +152,7 @@ class Producer:
         publisher_name: Optional[str] = None,
     ) -> list[int]:
         if len(batch) == 0:
-            raise ValueError('Empty batch')
+            raise ValueError("Empty batch")
 
         async with self._lock:
             publisher = await self._get_or_create_publisher(stream, publisher_name)
@@ -229,10 +226,19 @@ class Producer:
                     fut.set_exception(exc)
                     del waiting[fut]
 
-    async def create_stream(self, stream: str, arguments: Optional[dict[str, Any]] = None) -> None:
-        await self.default_client.create_stream(stream, arguments)
+    async def create_stream(
+        self,
+        stream: str,
+        arguments: Optional[dict[str, Any]] = None,
+        exists_ok: bool = False,
+    ) -> None:
+        try:
+            await self.default_client.create_stream(stream, arguments)
+        except exceptions.StreamAlreadyExists:
+            if not exists_ok:
+                raise
 
-    async def delete_stream(self, stream: str) -> None:
+    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
         if stream in self._publishers:
             publisher = self._publishers[stream]
             await publisher.client.delete_publisher(publisher.id)
@@ -240,7 +246,11 @@ class Producer:
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
             del self._publishers[stream]
 
-        await self.default_client.delete_stream(stream)
+        try:
+            await self.default_client.delete_stream(stream)
+        except exceptions.StreamDoesNotExist:
+            if not missing_ok:
+                raise
 
     async def stream_exists(self, stream: str) -> bool:
         return await self.default_client.stream_exists(stream)

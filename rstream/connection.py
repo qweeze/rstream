@@ -39,7 +39,7 @@ class Connection:
                 timeout=CONNECT_TIMEOUT,
             )
         except asyncio.TimeoutError:
-            raise ConnectionError(f'Could not connect to {self.host}:{self.port}')
+            raise ConnectionError(f"Could not connect to {self.host}:{self.port}")
 
     async def close(self) -> None:
         assert self._writer is not None
@@ -63,7 +63,7 @@ class Connection:
         await self._writer.drain()
 
     async def _read_frame_raw(self) -> bytearray:
-        length = int.from_bytes(await self._read(4), 'big')
+        length = int.from_bytes(await self._read(4), "big")
         return await self._read(length)
 
     async def write_frame(self, frame: schema.Frame) -> None:

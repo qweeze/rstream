@@ -14,31 +14,31 @@ from typing import (
 from .constants import Key, T
 from .schema import Frame, Struct, registry
 
-__all__ = ['encode_frame', 'decode_frame']
+__all__ = ["encode_frame", "decode_frame"]
 
 
 class IntSpec(NamedTuple):
     length: int
-    byteorder: Literal['little', 'big']
+    byteorder: Literal["little", "big"]
     signed: bool
 
 
 int_specs = {
-    T.int8: IntSpec(length=1, byteorder='big', signed=True),
-    T.int16: IntSpec(length=2, byteorder='big', signed=True),
-    T.int32: IntSpec(length=4, byteorder='big', signed=True),
-    T.int64: IntSpec(length=8, byteorder='big', signed=True),
-    T.uint8: IntSpec(length=1, byteorder='big', signed=False),
-    T.uint16: IntSpec(length=2, byteorder='big', signed=False),
-    T.uint32: IntSpec(length=4, byteorder='big', signed=False),
-    T.uint64: IntSpec(length=8, byteorder='big', signed=False),
+    T.int8: IntSpec(length=1, byteorder="big", signed=True),
+    T.int16: IntSpec(length=2, byteorder="big", signed=True),
+    T.int32: IntSpec(length=4, byteorder="big", signed=True),
+    T.int64: IntSpec(length=8, byteorder="big", signed=True),
+    T.uint8: IntSpec(length=1, byteorder="big", signed=False),
+    T.uint16: IntSpec(length=2, byteorder="big", signed=False),
+    T.uint32: IntSpec(length=4, byteorder="big", signed=False),
+    T.uint64: IntSpec(length=8, byteorder="big", signed=False),
 }
 
 _VT = Union[int, str, bytes, Struct]
-VT = Annotated[Union[_VT, list[_VT]], 'Field value']
+VT = Annotated[Union[_VT, list[_VT]], "Field value"]
 
 _TT = Union[T, Struct, None]
-TT = Annotated[Union[_TT, list[_TT]], 'Field type metadata']
+TT = Annotated[Union[_TT, list[_TT]], "Field type metadata"]
 
 
 def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
@@ -49,14 +49,14 @@ def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
     elif tp is T.string:
         assert isinstance(value, str)
         buffer = bytearray()
-        buffer += len(value).to_bytes(2, 'big', signed=False)
-        buffer += value.encode('utf-8')
+        buffer += len(value).to_bytes(2, "big", signed=False)
+        buffer += value.encode("utf-8")
         return buffer
 
     elif tp is T.bytes:
         assert isinstance(value, bytes)
         buffer = bytearray()
-        buffer += len(value).to_bytes(4, 'big', signed=False)
+        buffer += len(value).to_bytes(4, "big", signed=False)
         buffer += value
         return buffer
 
@@ -71,7 +71,7 @@ def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
     elif isinstance(value, list):
         assert tp is None or isinstance(tp, list)
         buffer = bytearray()
-        buffer += len(value).to_bytes(4, 'big', signed=False)
+        buffer += len(value).to_bytes(4, "big", signed=False)
         if tp is None:
             for item in value:
                 assert isinstance(item, Struct)
@@ -87,14 +87,14 @@ def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
         return buffer
 
     else:
-        raise NotImplementedError(f'Unexpected type {tp}, value: {value!r}')
+        raise NotImplementedError(f"Unexpected type {tp}, value: {value!r}")
 
 
 def _encode_struct(struct: Struct) -> bytearray:
     buffer = bytearray()
     for fld in fields(struct):
         value = getattr(struct, fld.name)
-        tp = fld.metadata.get('type')
+        tp = fld.metadata.get("type")
         buffer += _encode_field(value, tp)
     return buffer
 
@@ -103,31 +103,31 @@ def encode_frame(frame: Frame) -> bytearray:
     try:
         payload = _encode_struct(frame)
     except Exception as e:
-        raise ValueError(f'Could not encode frame {frame!r}') from e
+        raise ValueError(f"Could not encode frame {frame!r}") from e
 
     length = len(payload) + 2 + 2
     buffer = bytearray()
-    buffer += length.to_bytes(4, 'big', signed=False)
-    buffer += frame.key.value.to_bytes(2, 'big', signed=False)
-    buffer += frame.version.to_bytes(2, 'big', signed=False)
+    buffer += length.to_bytes(4, "big", signed=False)
+    buffer += frame.key.value.to_bytes(2, "big", signed=False)
+    buffer += frame.version.to_bytes(2, "big", signed=False)
     buffer += payload
     return buffer
 
 
 def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
     if tp is T.string:
-        length = int.from_bytes(buf.read(2), 'big', signed=False)
-        return buf.read(length).decode('utf-8')
+        length = int.from_bytes(buf.read(2), "big", signed=False)
+        return buf.read(length).decode("utf-8")
 
     elif tp is T.bytes:
-        length = int.from_bytes(buf.read(4), 'big', signed=False)
+        length = int.from_bytes(buf.read(4), "big", signed=False)
         return buf.read(length)
 
     elif tp is T.raw:
         return buf.read()
 
     elif isinstance(tp, list):
-        length = int.from_bytes(buf.read(4), 'big', signed=False)
+        length = int.from_bytes(buf.read(4), "big", signed=False)
         result = []
         if len(tp) == 1:
             for _ in range(length):
@@ -150,13 +150,13 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
         return _decode_struct(buf, tp)
 
     else:
-        raise NotImplementedError(f'Unexpected type {tp}')
+        raise NotImplementedError(f"Unexpected type {tp}")
 
 
 def _decode_struct(buf: io.BytesIO, tp: Type[Struct]) -> Struct:
     data = {}
     for f in fields(tp):
-        fld_tp = f.metadata.get('type')
+        fld_tp = f.metadata.get("type")
         if fld_tp is None:
             if typing.get_origin(f.type) is list:
                 fld_tp = list(typing.get_args(f.type))
@@ -170,19 +170,19 @@ def _decode_struct(buf: io.BytesIO, tp: Type[Struct]) -> Struct:
 
 def decode_frame(data: bytes) -> Frame:
     buf = io.BytesIO(data)
-    key = int.from_bytes(buf.read(2), 'big', signed=False)
-    version = int.from_bytes(buf.read(2), 'big', signed=False)
+    key = int.from_bytes(buf.read(2), "big", signed=False)
+    version = int.from_bytes(buf.read(2), "big", signed=False)
 
-    is_response = (key >> 15 & 1 == 1)
+    is_response = key >> 15 & 1 == 1
     key &= ~(1 << 15)
     cls: Type[Frame] = registry[(is_response, Key(key))]
     if version != cls.version:
-        raise ValueError(f'Version mismatch, got version: {version}')
+        raise ValueError(f"Version mismatch, got version: {version}")
 
     try:
         frame = _decode_struct(buf, cls)
-        assert (extra := buf.read()) == b'', f'Got extra bytes: {extra!r}'
+        assert (extra := buf.read()) == b"", f"Got extra bytes: {extra!r}"
     except Exception as e:
-        raise ValueError(f'Could not decode {cls!r}') from e
+        raise ValueError(f"Could not decode {cls!r}") from e
 
     return cast(Frame, frame)

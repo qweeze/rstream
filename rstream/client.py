@@ -20,10 +20,10 @@ from typing import (
 from . import constants, exceptions, schema, utils
 from .connection import Connection, ConnectionClosed
 
-FT = TypeVar('FT', bound=schema.Frame)
+FT = TypeVar("FT", bound=schema.Frame)
 HT = Annotated[
     Callable[[FT], Union[None, Awaitable[None]]],
-    'Frame handler type',
+    "Frame handler type",
 ]
 
 DEFAULT_REQUEST_TIMEOUT = 10
@@ -53,14 +53,13 @@ class BaseClient:
 
         self._server_properties: Optional[dict[str, str]] = None
         self._client_properties = {
-            'product': 'rmq-streams-client',
-            'platform': 'Python',
+            "product": "rmq-streams-client",
+            "platform": "Python",
         }
 
         self._corr_id_seq = utils.MonotonicSeq()
         self._waiters: dict[
-            tuple[constants.Key, Optional[int]],
-            set[asyncio.Future[schema.Frame]]
+            tuple[constants.Key, Optional[int]], set[asyncio.Future[schema.Frame]]
         ] = defaultdict(set)
 
         self._tasks: dict[str, asyncio.Task[None]] = {}
@@ -77,10 +76,10 @@ class BaseClient:
                 task.result()
 
         task.add_done_callback(on_task_done)
-        logger.debug('Started task %s', name)
+        logger.debug("Started task %s", name)
 
     async def stop_task(self, name: str) -> None:
-        logger.debug('Stopping task %s', name)
+        logger.debug("Stopping task %s", name)
         task = self._tasks.pop(name, None)
         if task is not None:
             task.cancel()
@@ -104,7 +103,7 @@ class BaseClient:
             self._handlers[frame_cls].clear()
 
     async def send_frame(self, frame: schema.Frame) -> None:
-        logger.debug('Sending frame: %s', frame)
+        logger.debug("Sending frame: %s", frame)
         assert self._conn
         await self._conn.write_frame(frame)
 
@@ -131,11 +130,11 @@ class BaseClient:
         return resp
 
     async def start(self) -> None:
-        logger.info('Starting client %s:%s', self.host, self.port)
+        logger.info("Starting client %s:%s", self.host, self.port)
         assert self._conn is None
         self._conn = Connection(self.host, self.port, self._ssl_context)
         await self._conn.open()
-        self.start_task('listener', self._listener())
+        self.start_task("listener", self._listener())
         self.add_handler(schema.Heartbeat, self._on_heartbeat)
         self.add_handler(schema.Close, self._on_close)
 
@@ -147,7 +146,7 @@ class BaseClient:
             except ConnectionClosed:
                 break
 
-            logger.debug('Received frame: %s', frame)
+            logger.debug("Received frame: %s", frame)
             _key = frame.key, frame.corr_id
             while self._waiters[_key]:
                 fut = self._waiters[_key].pop()
@@ -159,10 +158,10 @@ class BaseClient:
                     if maybe_coro is not None:
                         await maybe_coro
                 except Exception:
-                    logger.exception('Error while running handler %s of frame %s', handler, frame)
+                    logger.exception("Error while running handler %s of frame %s", handler, frame)
 
     def _start_heartbeat(self) -> None:
-        self.start_task('heartbeat_sender', self._heartbeat_sender())
+        self.start_task("heartbeat_sender", self._heartbeat_sender())
         self._last_heartbeat = time.monotonic()
 
     async def _heartbeat_sender(self) -> None:
@@ -174,13 +173,13 @@ class BaseClient:
             await asyncio.sleep(self._heartbeat)
 
             if time.monotonic() - self._last_heartbeat > self._heartbeat * 2:
-                logger.warning('Heartbeats from server missing')
+                logger.warning("Heartbeats from server missing")
 
     def _on_heartbeat(self, _: schema.Heartbeat) -> None:
         self._last_heartbeat = time.monotonic()
 
     def _on_close(self, close: schema.Close) -> None:
-        exc = exceptions.ServerError(f'Server closed, reason: {close.reason}')
+        exc = exceptions.ServerError(f"Server closed, reason: {close.reason}")
         for waiters in self._waiters.values():
             for fut in waiters:
                 fut.set_exception(exc)
@@ -188,10 +187,10 @@ class BaseClient:
 
     @property
     def is_started(self) -> bool:
-        return 'heartbeat_sender' in self._tasks
+        return "heartbeat_sender" in self._tasks
 
     async def close(self) -> None:
-        logger.info('Stopping client %s:%s', self.host, self.port)
+        logger.info("Stopping client %s:%s", self.host, self.port)
         if self._conn is None:
             return
 
@@ -200,12 +199,12 @@ class BaseClient:
                 schema.Close(
                     self._corr_id_seq.next(),
                     code=1,
-                    reason='OK',
+                    reason="OK",
                 ),
                 resp_schema=schema.CloseResponse,
             )
 
-        await self.stop_task('listener')
+        await self.stop_task("listener")
 
         await self._conn.close()
         self._conn = None
@@ -217,24 +216,18 @@ class BaseClient:
 
 class Client(BaseClient):
     async def close(self) -> None:
-        await self.stop_task('heartbeat_sender')
+        await self.stop_task("heartbeat_sender")
         await super().close()
 
     async def peer_properties(self) -> dict[str, str]:
         resp = await self.sync_request(
             schema.PeerProperties(
                 correlation_id=self._corr_id_seq.next(),
-                properties=[
-                    schema.Property(key, value)
-                    for key, value in self._client_properties.items()
-                ],
+                properties=[schema.Property(key, value) for key, value in self._client_properties.items()],
             ),
             resp_schema=schema.PeerPropertiesResponse,
         )
-        return {
-            prop.key: prop.value
-            for prop in resp.properties
-        }
+        return {prop.key: prop.value for prop in resp.properties}
 
     async def open(self, vhost: str) -> dict[str, str]:
         resp = await self.sync_request(
@@ -244,10 +237,7 @@ class Client(BaseClient):
             ),
             resp_schema=schema.OpenResponse,
         )
-        return {
-            prop.key: prop.value
-            for prop in resp.properties
-        }
+        return {prop.key: prop.value for prop in resp.properties}
 
     async def authenticate(self, vhost: str, username: str, password: str) -> dict[str, str]:
         self._server_properties = await self.peer_properties()
@@ -258,17 +248,21 @@ class Client(BaseClient):
             ),
             resp_schema=schema.SaslHandshakeResponse,
         )
-        assert 'PLAIN' in handshake_resp.mechanisms
+        assert "PLAIN" in handshake_resp.mechanisms
 
-        auth_data = b''.join((
-            b'\0', username.encode('utf-8'),
-            b'\0', password.encode('utf-8'),
-        ))
+        auth_data = b"".join(
+            (
+                b"\0",
+                username.encode("utf-8"),
+                b"\0",
+                password.encode("utf-8"),
+            )
+        )
         waiter = self.wait_frame(schema.Tune)
         await self.sync_request(
             schema.SaslAuthenticate(
                 self._corr_id_seq.next(),
-                mechanism='PLAIN',
+                mechanism="PLAIN",
                 data=auth_data,
             ),
             resp_schema=schema.SaslAuthenticateResponse,
@@ -296,10 +290,7 @@ class Client(BaseClient):
             schema.Create(
                 self._corr_id_seq.next(),
                 stream=stream,
-                arguments=[
-                    schema.Property(key, str(val))
-                    for key, val in arguments.items()
-                ],
+                arguments=[schema.Property(key, str(val)) for key, val in arguments.items()],
             ),
             resp_schema=schema.CreateResponse,
         )
@@ -341,15 +332,9 @@ class Client(BaseClient):
         metadata = metadata_resp.metadata[0]
         assert metadata.name == stream
 
-        brokers = {
-            broker.reference: broker
-            for broker in metadata_resp.brokers
-        }
+        brokers = {broker.reference: broker for broker in metadata_resp.brokers}
         leader = brokers[metadata.leader_ref]
-        replicas = [
-            brokers[replica_ref]
-            for replica_ref in metadata.replicas_refs
-        ]
+        replicas = [brokers[replica_ref] for replica_ref in metadata.replicas_refs]
         return leader, replicas
 
     async def subscribe(
@@ -367,10 +352,7 @@ class Client(BaseClient):
                 stream=stream,
                 offset_spec=offset_spec,
                 credit=initial_credit,
-                properties=[
-                    schema.Property(key, str(value))
-                    for key, value in (properties or {}).items()
-                ],
+                properties=[schema.Property(key, str(value)) for key, value in (properties or {}).items()],
             ),
             resp_schema=schema.SubscribeResponse,
         )

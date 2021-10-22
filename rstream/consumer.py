@@ -16,15 +16,12 @@ from typing import (
     Union,
 )
 
-from . import schema
+from . import exceptions, schema
 from .client import Client, ClientPool
 from .constants import OffsetType
 
-MT = TypeVar('MT')
-CB = Annotated[
-    Callable[[MT], Union[None, Awaitable[None]]],
-    'Message callback type'
-]
+MT = TypeVar("MT")
+CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
 
 
 @dataclass
@@ -46,7 +43,7 @@ class Consumer:
         port: int = 5552,
         *,
         ssl_context: Optional[ssl.SSLContext] = None,
-        vhost: str = '/',
+        vhost: str = "/",
         username: str,
         password: str,
         frame_max: int = 1 * 1024 * 1024,
@@ -71,7 +68,7 @@ class Consumer:
     @property
     def default_client(self) -> Client:
         if self._default_client is None:
-            raise ValueError('Consumer is not started')
+            raise ValueError("Consumer is not started")
         return self._default_client
 
     async def __aenter__(self) -> Consumer:
@@ -124,7 +121,7 @@ class Consumer:
 
         # We can have multiple subscribers sharing same connection, so their ids must be distinct
         subscription_id = len([s for s in self._subscribers.values() if s.client is client]) + 1
-        reference = subscriber_name or f'{stream}_subscriber_{subscription_id}'
+        reference = subscriber_name or f"{stream}_subscriber_{subscription_id}"
         decoder = decoder or (lambda x: x)
 
         if offset_type in (OffsetType.LAST, OffsetType.NEXT):
@@ -190,9 +187,9 @@ class Consumer:
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
         return await self.default_client.query_offset(
-                stream,
-                subscriber_name,
-            )
+            stream,
+            subscriber_name,
+        )
 
     async def store_offset(self, stream: str, subscriber_name: str, offset: int) -> None:
         await self.default_client.store_offset(
@@ -232,15 +229,28 @@ class Consumer:
             if maybe_coro is not None:
                 await maybe_coro
 
-    async def create_stream(self, stream: str, arguments: Optional[dict[str, Any]] = None) -> None:
-        await self.default_client.create_stream(stream, arguments)
+    async def create_stream(
+        self,
+        stream: str,
+        arguments: Optional[dict[str, Any]] = None,
+        exists_ok: bool = False,
+    ) -> None:
+        try:
+            await self.default_client.create_stream(stream, arguments)
+        except exceptions.StreamAlreadyExists:
+            if not exists_ok:
+                raise
 
-    async def delete_stream(self, stream: str) -> None:
+    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
         for subscriber in list(self._subscribers.values()):
             if subscriber.stream == stream:
                 del self._subscribers[subscriber.reference]
 
-        await self.default_client.delete_stream(stream)
+        try:
+            await self.default_client.delete_stream(stream)
+        except exceptions.StreamDoesNotExist:
+            if not missing_ok:
+                raise
 
     async def stream_exists(self, stream: str) -> bool:
         return await self.default_client.stream_exists(stream)

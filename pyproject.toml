@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rstream"
-version = "0.3.0"
+version = "0.3.1"
 description = "A python client for RabbitMQ Streams"
 authors = ["George Fortunatov <qweeeze@gmail.com>"]
 readme = "README.md"
@@ -19,3 +19,14 @@ isort = "^5.9.3"
 mypy = "^0.910"
 pytest = "^6.2.4"
 pytest-asyncio = "^0.15.1"
+black = "^21.9b0"
+
+[tool.black]
+line-length = 110
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "local_tests.*"
+ignore_errors = true

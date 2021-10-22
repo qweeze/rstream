@@ -4,10 +4,10 @@ from .consumer import Consumer
 from .producer import Producer, RawMessage
 
 __all__ = [
-    'AMQPMessage',
-    'amqp_decoder',
-    'Consumer',
-    'RawMessage',
-    'Producer',
-    'OffsetType',
+    "AMQPMessage",
+    "amqp_decoder",
+    "Consumer",
+    "RawMessage",
+    "Producer",
+    "OffsetType",
 ]

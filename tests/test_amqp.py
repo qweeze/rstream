@@ -12,9 +12,9 @@ pytestmark = pytest.mark.asyncio
 
 async def test_amqp_message(stream: str, consumer: Consumer, producer: Producer) -> None:
     amqp_message = AMQPMessage(
-        properties={'subject': 'test-subject'},
-        annotations={'test': 42},
-        body='test-body',
+        properties={"subject": "test-subject"},
+        annotations={"test": 42},
+        body="test-body",
     )
     await producer.publish(stream, amqp_message)
 
