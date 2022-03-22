@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 import logging
 import ssl
 import time
 from collections import defaultdict
 from contextlib import suppress
+from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
