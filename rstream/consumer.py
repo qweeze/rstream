@@ -17,7 +17,7 @@ from typing import (
 )
 
 from . import exceptions, schema
-from .client import Client, ClientPool
+from .client import AddressResolver, Client, ClientPool
 from .constants import OffsetType
 
 MT = TypeVar("MT")
@@ -43,6 +43,7 @@ class Consumer:
         port: int = 5552,
         *,
         ssl_context: Optional[ssl.SSLContext] = None,
+        address_resolver: Optional[AddressResolver] = None,
         vhost: str = "/",
         username: str,
         password: str,
@@ -58,6 +59,7 @@ class Consumer:
             password=password,
             frame_max=frame_max,
             heartbeat=heartbeat,
+            address_resolver=address_resolver
         )
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}

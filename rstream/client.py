@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import logging
 import ssl
 import time
@@ -11,6 +12,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    NamedTuple,
     Optional,
     Type,
     TypeVar,
@@ -31,6 +33,19 @@ DEFAULT_REQUEST_TIMEOUT = 10
 
 logger = logging.getLogger(__name__)
 
+class AddressResolutionMaxRetryError(Exception):
+    pass
+
+class Addr(NamedTuple):
+    host: str
+    port: int
+
+@dataclass
+class AddressResolver:
+    addr: Addr
+    enabled: bool
+    max_retries: int = 20
+    retry_backoff_seconds: float = 0.2
 
 class BaseClient:
     def __init__(
@@ -280,7 +295,9 @@ class Client(BaseClient):
         )
         self._start_heartbeat()
 
-        return await self.open(vhost)
+        open_response = await self.open(vhost)
+        self._server_properties.update(open_response)
+        return open_response
 
     async def create_stream(self, stream: str, arguments: Optional[dict[str, Any]] = None) -> None:
         if arguments is None:
@@ -433,10 +450,6 @@ class Client(BaseClient):
             ),
         )
 
-
-Addr = tuple[str, int]
-
-
 class ClientPool:
     def __init__(
         self,
@@ -444,14 +457,16 @@ class ClientPool:
         port: int,
         *,
         ssl_context: Optional[ssl.SSLContext] = None,
+        address_resolver: Optional[AddressResolver] = None,
         vhost: str,
         username: str,
         password: str,
         frame_max: int,
         heartbeat: int,
     ):
-        self.addr: Addr = host, port
+        self.addr = Addr(host=host, port=port)
         self.ssl_context = ssl_context
+        self.address_resolver = address_resolver
         self.vhost = vhost
         self.username = username
         self.password = password
@@ -461,14 +476,47 @@ class ClientPool:
         self._clients: dict[Addr, Client] = {}
 
     async def get(self, addr: Optional[Addr] = None) -> Client:
-        if addr is None:
-            addr = self.addr
+        """Get a client according to `addr` parameter
 
-        if addr not in self._clients:
-            self._clients[addr] = await self.new(addr)
+        If class param `address_resolver` is set and enabled, load balancer
+        logic will be excuted. Here we do not attempt to connect to the desired `addr`
+        directly, but rather connect to the address defined in the `address_resolver` in a loop
+        until the desired client is returned.
+        """
+        desiredAddr = addr or self.addr
 
-        assert self._clients[addr].is_started
-        return self._clients[addr]
+        if desiredAddr not in self._clients:
+            if addr and self.address_resolver and self.address_resolver.enabled:
+                self._clients[desiredAddr] = await self.resolve_client(desiredAddr)
+            else:
+                self._clients[desiredAddr] = await self.new(desiredAddr)
+
+        assert self._clients[desiredAddr].is_started
+        return self._clients[desiredAddr]
+
+    async def resolve_client(self, addr: Addr) -> Client:
+        desiredHost, desiredPort = addr[0], str(addr[1])
+
+        # initial connection outside of loop to avoid the sleep penalty
+        c = await self.new(self.address_resolver.addr)
+        connection_attempts = 1
+
+        advertisedHost = c._server_properties.get("advertised_host")
+        advertisedPort = c._server_properties.get("advertised_port")
+
+        while desiredHost != advertisedHost or desiredPort != advertisedPort:
+            await c.close()
+
+            if connection_attempts >= self.address_resolver.max_retries:
+                raise AddressResolutionMaxRetryError
+
+            c = await self.new(self.address_resolver.addr)
+            connection_attempts += 1
+            advertisedHost = c._server_properties.get("advertised_host")
+            advertisedPort = c._server_properties.get("advertised_port")
+            await asyncio.sleep(self.address_resolver.retry_backoff_seconds)
+
+        return c
 
     async def new(self, addr: Addr) -> Client:
         host, port = addr
