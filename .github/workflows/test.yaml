@@ -6,9 +6,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.8, 3.9]
-        poetry-version: [1.1.11]
-        os: [ubuntu-18.04, macos-latest, windows-latest]
+        python-version: [ 3.8, 3.9 ]
+        poetry-version: [ 1.1.11 ]
+        os: [ ubuntu-18.04, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     services:
       rabbitmq-streaming:
@@ -29,5 +29,13 @@ jobs:
           poetry-version: ${{ matrix.poetry-version }}
       - name: poetry install
         run: poetry install
+      - name: isort check-only
+        run: isort --check-only .
+      - name: black check
+        run: black --check .
+      - name: flake8
+        run: flake8 --exclude=venv,local_tests --max-line-length=120 --ignore=E203
+      - name: mypy
+        run: mypy .
       - name: poetry run pytest
         run: poetry run pytest
