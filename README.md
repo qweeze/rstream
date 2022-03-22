@@ -1,6 +1,6 @@
 # RabbitMQ Stream Python Client
 
-A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)  
+A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)
 _This is a work in progress_
 
 ## Install
@@ -74,6 +74,38 @@ producer = Producer(
     username='guest',
     password='guest',
 )
+```
+
+## Load Balancer
+
+In order to handle load balancers, you can use the `AddressResolver` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
+
+Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
+
+Example producer with and address resolver:
+
+```
+import asyncio
+from rstream import Producer, AMQPMessage
+from rstream.client import AddressResolver, Addr
+
+async def publish():
+
+    address_resolver = AddressResolver(
+        addr=Addr(host='localhost', port=5552),    # load balancer address
+        enabled=True                               # must be enabled to work
+    )
+
+    async with Producer('localhost', username='guest', password='guest', address_resolver=address_resolver) as producer:
+        await producer.create_stream('mystream')
+
+        for i in range(100):
+            amqp_message = AMQPMessage(
+                body='hello: {}'.format(i),
+            )
+            await producer.publish('mystream', amqp_message)
+
+asyncio.run(publish())
 ```
 
 ## TODO
