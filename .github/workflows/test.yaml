@@ -30,6 +30,8 @@ jobs:
           poetry-version: ${{ matrix.poetry-version }}
       - name: poetry install
         run: poetry install
+      - name: poetry shell
+        run: poetry shell
       - name: isort check-only
         run: isort --check-only .
       - name: black check
