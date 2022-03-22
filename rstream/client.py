@@ -495,16 +495,16 @@ class ClientPool:
         return self._clients[desiredAddr]
 
     async def resolve_client(self, addr: Addr) -> Client:
-        desiredHost, desiredPort = addr[0], str(addr[1])
+        desired_host, desired_port = addr[0], str(addr[1])
 
         # initial connection outside of loop to avoid the sleep penalty
         c = await self.new(self.address_resolver.addr)
         connection_attempts = 1
 
-        advertisedHost = c._server_properties.get("advertised_host")
-        advertisedPort = c._server_properties.get("advertised_port")
+        advertised_host = c._server_properties.get("advertised_host")
+        advertised_port = c._server_properties.get("advertised_port")
 
-        while desiredHost != advertisedHost or desiredPort != advertisedPort:
+        while desired_host != advertised_host or desired_port != advertised_port:
             await c.close()
 
             if connection_attempts >= self.address_resolver.max_retries:
@@ -512,8 +512,8 @@ class ClientPool:
 
             c = await self.new(self.address_resolver.addr)
             connection_attempts += 1
-            advertisedHost = c._server_properties.get("advertised_host")
-            advertisedPort = c._server_properties.get("advertised_port")
+            advertised_host = c._server_properties.get("advertised_host")
+            advertised_port = c._server_properties.get("advertised_port")
             await asyncio.sleep(self.address_resolver.retry_backoff_seconds)
 
         return c
