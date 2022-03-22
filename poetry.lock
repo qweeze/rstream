@@ -64,6 +64,14 @@ python2 = ["typed-ast (>=1.4.2)"]
 uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
+name = "certifi"
+version = "2021.10.8"
+description = "Python package for providing Mozilla's CA Bundle."
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "click"
 version = "8.0.3"
 description = "Composable command line interface toolkit"
@@ -392,23 +400,20 @@ pytest = ">=5.4.0"
 testing = ["coverage", "hypothesis (>=5.7.1)"]
 
 [[package]]
-name = "python-qpid-proton"
-version = "0.35.0"
-description = "An AMQP based messaging library."
-category = "main"
-optional = false
-python-versions = "*"
-
-[package.extras]
-opentracing = ["opentracing", "jaeger-client"]
-
-[[package]]
 name = "regex"
 version = "2021.10.21"
 description = "Alternative regular expression module, to replace re."
 category = "dev"
 optional = false
 python-versions = "*"
+
+[[package]]
+name = "six"
+version = "1.16.0"
+description = "Python 2 and 3 compatibility utilities"
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "toml"
@@ -442,19 +447,23 @@ test = ["pytest"]
 
 [[package]]
 name = "typing-extensions"
-version = "3.10.0.0"
+version = "3.10.0.2"
 description = "Backported and Experimental Type Hints for Python 3.5+"
 category = "dev"
 optional = false
 python-versions = "*"
 
 [[package]]
-name = "typing-extensions"
-version = "3.10.0.2"
-description = "Backported and Experimental Type Hints for Python 3.5+"
-category = "dev"
+name = "uamqp"
+version = "1.5.2"
+description = "AMQP 1.0 Client Library for Python"
+category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.6"
+
+[package.dependencies]
+certifi = ">=2017.4.17"
+six = ">=1.0,<2.0"
 
 [[package]]
 name = "wcwidth"
@@ -467,7 +476,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "c9aa37babdb98b4ea38b2deee91f1b90eddbfec895275d6e7dfd08de267b4b2c"
+content-hash = "169e22709ecf17ccc2ff74fa9d31d3b7c549c86c067983d727d88102eb8533a9"
 
 [metadata.files]
 appnope = [
@@ -489,6 +498,10 @@ backcall = [
 black = [
     {file = "black-21.9b0-py3-none-any.whl", hash = "sha256:380f1b5da05e5a1429225676655dddb96f5ae8c75bdf91e53d798871b902a115"},
     {file = "black-21.9b0.tar.gz", hash = "sha256:7de4cfc7eb6b710de325712d40125689101d21d25283eed7e9998722cf10eb91"},
+]
+certifi = [
+    {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
+    {file = "certifi-2021.10.8.tar.gz", hash = "sha256:78884e7c1d4b00ce3cea67b44566851c4343c120abd683433ce934a68ea58872"},
 ]
 click = [
     {file = "click-8.0.3-py3-none-any.whl", hash = "sha256:353f466495adaeb40b6b5f592f9f91cb22372351c84caeb068132442a4518ef3"},
@@ -627,9 +640,6 @@ pytest-asyncio = [
     {file = "pytest-asyncio-0.15.1.tar.gz", hash = "sha256:2564ceb9612bbd560d19ca4b41347b54e7835c2f792c504f698e05395ed63f6f"},
     {file = "pytest_asyncio-0.15.1-py3-none-any.whl", hash = "sha256:3042bcdf1c5d978f6b74d96a151c4cfb9dcece65006198389ccd7e6c60eb1eea"},
 ]
-python-qpid-proton = [
-    {file = "python-qpid-proton-0.35.0.zip", hash = "sha256:abafbedeaf6e138f8cba2bc871b7685c4fd156f3258cec17f253153ede18bbee"},
-]
 regex = [
     {file = "regex-2021.10.21-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:edff4e31d159672a7b9d70164b21289e4b53b239ce1dc945bf9643d266537573"},
     {file = "regex-2021.10.21-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d6432daf42f2c487b357e1aa0bdc43193f050ff53a3188bfab20b88202b53027"},
@@ -668,6 +678,10 @@ regex = [
     {file = "regex-2021.10.21-cp39-cp39-win_amd64.whl", hash = "sha256:74d03c256cf0aed81997e87be8e24297b5792c9718f3a735f5055ddfad392f06"},
     {file = "regex-2021.10.21.tar.gz", hash = "sha256:4832736b3f24617e63dc919ce8c4215680ba94250a5d9e710fcc0c5f457b5028"},
 ]
+six = [
+    {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
+    {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
+]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
     {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
@@ -681,12 +695,36 @@ traitlets = [
     {file = "traitlets-5.0.5.tar.gz", hash = "sha256:178f4ce988f69189f7e523337a3e11d91c786ded9360174a3d9ca83e79bc5396"},
 ]
 typing-extensions = [
-    {file = "typing_extensions-3.10.0.0-py2-none-any.whl", hash = "sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497"},
-    {file = "typing_extensions-3.10.0.0-py3-none-any.whl", hash = "sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84"},
-    {file = "typing_extensions-3.10.0.0.tar.gz", hash = "sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342"},
     {file = "typing_extensions-3.10.0.2-py2-none-any.whl", hash = "sha256:d8226d10bc02a29bcc81df19a26e56a9647f8b0a6d4a83924139f4a8b01f17b7"},
     {file = "typing_extensions-3.10.0.2-py3-none-any.whl", hash = "sha256:f1d25edafde516b146ecd0613dabcc61409817af4766fbbcfb8d1ad4ec441a34"},
     {file = "typing_extensions-3.10.0.2.tar.gz", hash = "sha256:49f75d16ff11f1cd258e1b988ccff82a3ca5570217d7ad8c5f48205dd99a677e"},
+]
+uamqp = [
+    {file = "uamqp-1.5.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:9c91565fc515257572d8a047d5099c39a1abbca3e58758647bcf8b15256e1605"},
+    {file = "uamqp-1.5.2-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:4818a09d81000e163f86c7a5054d71cf6350c6825c691656b9f0ab66cb7d7f7b"},
+    {file = "uamqp-1.5.2-cp310-cp310-win32.whl", hash = "sha256:e6f3644216837de19161f3b668b31f33f8f6ce31d293f540af6610a2bb27d358"},
+    {file = "uamqp-1.5.2-cp310-cp310-win_amd64.whl", hash = "sha256:d8c6880c463d904e448ec9a1fa1ff8e0582aaf75ad9c61a998f4e002f9b2547c"},
+    {file = "uamqp-1.5.2-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:fe65f47e128cf05ec289275437bcab933398e5c76ffd6cf5333913f56a8cb5b3"},
+    {file = "uamqp-1.5.2-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:bd751dada972e62928dd445a76aa24c410e0d14116ee722519974566e5742895"},
+    {file = "uamqp-1.5.2-cp36-cp36m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:764fb5c6daaa7715450a999002b91de15711f96828b94c462c5bfdfad6f5a43c"},
+    {file = "uamqp-1.5.2-cp36-cp36m-win32.whl", hash = "sha256:c43d316692442906e43721258ac3121717b2ec7a4b4cc4d0f9f2ea61273658f0"},
+    {file = "uamqp-1.5.2-cp36-cp36m-win_amd64.whl", hash = "sha256:82972900ada3f759fff3ff09f59d43586cec681a2f7dbe38d78bae34917aa604"},
+    {file = "uamqp-1.5.2-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:a943998d6816f0b3d6efdb8feacf002f6e7ca5398b4e9b38531aef79dbb51486"},
+    {file = "uamqp-1.5.2-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:666880780fc8b78eda4c6b605c0d465b06df00de6d18aa015336ef6800554e05"},
+    {file = "uamqp-1.5.2-cp37-cp37m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:918251372140861c880b43aa6a9df66d63c2094a7af9aa21d1f74233c146a9c6"},
+    {file = "uamqp-1.5.2-cp37-cp37m-win32.whl", hash = "sha256:c648de1aa49ebce57376d190133a4d4d7b302ebdc29a2cb7d02c76f5da0822e7"},
+    {file = "uamqp-1.5.2-cp37-cp37m-win_amd64.whl", hash = "sha256:053f40ba1ec3cafdec3c126bcae104b6672f45257fc47457f6bcd0a38c0e641e"},
+    {file = "uamqp-1.5.2-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:86b3c98528857e174c75e4747a699c85e931c60dea1d72d4b085331af447a4cb"},
+    {file = "uamqp-1.5.2-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:81085da795c038a498d931aea81a20bc10b69ba2feec726e1d29f3c7c6312316"},
+    {file = "uamqp-1.5.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:cfb90f884a99085d538f8bdba5567e483564adf86e967c37416a546c98086291"},
+    {file = "uamqp-1.5.2-cp38-cp38-win32.whl", hash = "sha256:cfdc2a4d728a6d680cc480c609332738e67502aba90abff686894ef62ad32087"},
+    {file = "uamqp-1.5.2-cp38-cp38-win_amd64.whl", hash = "sha256:3d348eb89ea595d85d9edab246e59308e942be554f59e54c8ec971c04e83b38f"},
+    {file = "uamqp-1.5.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:84d3b8afc0a468aaf4f7788627c0b877c65b4fde9420dfdc307b811097ca6d3b"},
+    {file = "uamqp-1.5.2-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:8d3c00c8a4517c9b5975755ab05302238576ea38de68d7f76993ff31aeb84173"},
+    {file = "uamqp-1.5.2-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:0cfe012e2f95341cf7396ad921a947f950b5788e5eda1153496301ece94ac294"},
+    {file = "uamqp-1.5.2-cp39-cp39-win32.whl", hash = "sha256:5e7d2e3c06d5f5b3a187d3434a0ba776b0138ed319938d7fa248c7257d6bc2cb"},
+    {file = "uamqp-1.5.2-cp39-cp39-win_amd64.whl", hash = "sha256:59b27f69f6fb9015a3f85b75403aae994ef343f4fa51311c0330daa15f295ae5"},
+    {file = "uamqp-1.5.2.tar.gz", hash = "sha256:20e0c433d92de83946b9473ff059f385b86cd60e32e0dcd93fb456e62c49bba4"},
 ]
 wcwidth = [
     {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},
