@@ -32,7 +32,7 @@ jobs:
       - name: poetry install
         run: poetry install --no-root
       - name: isort check-only
-        run: isort --check-only .
+        run: poetry run isort --check-only .
       - name: black check
         run: black --check .
       - name: flake8
