@@ -483,40 +483,43 @@ class ClientPool:
         directly, but rather connect to the address defined in the `address_resolver` in a loop
         until the desired client is returned.
         """
-        desiredAddr = addr or self.addr
+        desired_addr = addr or self.addr
 
-        if desiredAddr not in self._clients:
+        if desired_addr not in self._clients:
+            # don't resolve the client when addr is None. Use the default address
+            # as this is likely a request to get metadata and the node isn't important
             if addr and self.address_resolver and self.address_resolver.enabled:
-                self._clients[desiredAddr] = await self.resolve_client(desiredAddr)
+                self._clients[desired_addr] = await self.resolve_client(desired_addr)
             else:
-                self._clients[desiredAddr] = await self.new(desiredAddr)
+                self._clients[desired_addr] = await self.new(desired_addr)
 
-        assert self._clients[desiredAddr].is_started
-        return self._clients[desiredAddr]
+        assert self._clients[desired_addr].is_started
+        return self._clients[desired_addr]
 
     async def resolve_client(self, addr: Addr) -> Client:
         desired_host, desired_port = addr[0], str(addr[1])
 
         # initial connection outside of loop to avoid the sleep penalty
-        c = await self.new(self.address_resolver.addr)
+        conn = await self.new(self.address_resolver.addr)
         connection_attempts = 1
 
-        advertised_host = c._server_properties.get("advertised_host")
-        advertised_port = c._server_properties.get("advertised_port")
+        advertised_host = conn._server_properties.get("advertised_host")
+        advertised_port = conn._server_properties.get("advertised_port")
 
         while desired_host != advertised_host or desired_port != advertised_port:
-            await c.close()
+            await conn.close()
 
             if connection_attempts >= self.address_resolver.max_retries:
-                raise AddressResolutionMaxRetryError
+                raise AddressResolutionMaxRetryError(f"Failed to connect to {desired_host}:{desired_port} after {self.address_resolver.max_retries} tries")
 
-            c = await self.new(self.address_resolver.addr)
+            conn = await self.new(self.address_resolver.addr)
             connection_attempts += 1
-            advertised_host = c._server_properties.get("advertised_host")
-            advertised_port = c._server_properties.get("advertised_port")
+
+            advertised_host = conn._server_properties.get("advertised_host")
+            advertised_port = conn._server_properties.get("advertised_port")
             await asyncio.sleep(self.address_resolver.retry_backoff_seconds)
 
-        return c
+        return conn
 
     async def new(self, addr: Addr) -> Client:
         host, port = addr
