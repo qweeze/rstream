@@ -76,6 +76,16 @@ producer = Producer(
 )
 ```
 
+## Testing locally
+
+Start up a local rabbitmq cluster to test against and run pytest. There is a convenience script provided to set this up
+
+```bash
+./scripts/startrmq.bash
+
+pytest tests/
+```
+
 ## TODO
 
 - [ ] Documentation
