@@ -125,7 +125,10 @@ class Consumer:
         decoder = decoder or (lambda x: x)
 
         if offset_type in (OffsetType.LAST, OffsetType.NEXT):
-            offset = await self.query_offset(stream, reference)
+            try:
+                offset = await self.query_offset(stream, reference)
+            except exceptions.NoOffsetError:
+                offset = 0
 
         subscriber = self._subscribers[reference] = _Subscriber(
             stream=stream,

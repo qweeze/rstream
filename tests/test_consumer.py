@@ -138,6 +138,18 @@ async def test_consume_with_resubscribe(stream: str, consumer: Consumer, produce
     await wait_for(lambda: len(captured) >= 2)
     assert captured == [b"one", b"two"]
 
+async def test_consume_with_resubscribe_on_last(stream: str, consumer: Consumer, producer: Producer) -> None:
+    captured: list[bytes] = []
+    subscriber_name = await consumer.subscribe(stream, callback=captured.append)
+    await producer.publish(stream, b"one")
+    await wait_for(lambda: len(captured) >= 1)
+
+    await consumer.unsubscribe(subscriber_name)
+    await consumer.subscribe(stream, callback=captured.append, offset_type=OffsetType.LAST)
+
+    await producer.publish(stream, b"two")
+    await wait_for(lambda: len(captured) >= 3)
+    assert captured == [b"one", b"one", b"two"]
 
 async def test_consume_with_restart(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
