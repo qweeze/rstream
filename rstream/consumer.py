@@ -127,7 +127,7 @@ class Consumer:
         if offset_type in (OffsetType.LAST, OffsetType.NEXT):
             try:
                 offset = await self.query_offset(stream, reference)
-            except exceptions.NoOffsetError:
+            except exceptions.OffsetNotFound:
                 offset = 0
 
         subscriber = self._subscribers[reference] = _Subscriber(
