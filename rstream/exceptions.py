@@ -82,5 +82,5 @@ class PreconditionFailed(ServerError):
 class PublisherDoesNotExist(ServerError):
     code = 18
 
-class NoOffsetError(ServerError):
+class OffsetNotFound(ServerError):
     code = 19
