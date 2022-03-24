@@ -126,12 +126,6 @@ class Consumer:
         reference = subscriber_name or f"{stream}_subscriber_{subscription_id}"
         decoder = decoder or (lambda x: x)
 
-        if offset_type in (OffsetType.LAST, OffsetType.NEXT):
-            try:
-                offset = await self.query_offset(stream, reference)
-            except exceptions.OffsetNotFound:
-                offset = 0
-
         subscriber = self._subscribers[reference] = _Subscriber(
             stream=stream,
             subscription_id=subscription_id,
@@ -191,6 +185,9 @@ class Consumer:
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
+        if subscriber_name == "":
+            raise ValueError("subscriber_name must not be an empty string")
+
         return await self.default_client.query_offset(
             stream,
             subscriber_name,
