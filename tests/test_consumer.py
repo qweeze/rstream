@@ -86,9 +86,8 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
         subscriber_name="test-subscriber",
     )
 
-    await asyncio.sleep(0.1)
+    await wait_for(lambda: captured[-1] == b"4999")
     assert len(captured) < len(messages)
-    assert captured[-1] == b"4999"
 
 
 async def test_offset_type_next(stream: str, consumer: Consumer, producer: Producer) -> None:
