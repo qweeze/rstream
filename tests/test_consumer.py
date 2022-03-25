@@ -91,36 +91,23 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
 
 
 async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: Producer) -> None:
-    subscriber_name = "test-subscriber-timestamp"
-    captured: list[bytes] = []
-
-    # produce messages
     messages = [str(i).encode() for i in range(1, 5_000)]
     await producer.publish_batch(stream, messages)
 
-    # create subscriber and declare to server, unsub immediately
-    await consumer.subscribe(
-        stream,
-        callback=captured.append,
-        subscriber_name=subscriber_name
-    )
-    await consumer.unsubscribe(subscriber_name)
-
+    # mark time in between message batches
     now = int(time.time() * 1000)
 
-    # produce more messages after the timestamp
     messages = [str(i).encode() for i in range(5_000, 5_100)]
     await producer.publish_batch(stream, messages)
 
+    captured: list[bytes] = []
     await consumer.subscribe(
         stream,
         callback=captured.append,
-        subscriber_name=subscriber_name,
         offset_type=OffsetType.TIMESTAMP,
         offset=now
     )
-
-    await wait_for(lambda: len(captured) > 0 and captured[0] > b"1")
+    await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000")
 
 
 async def test_offset_type_next(stream: str, consumer: Consumer, producer: Producer) -> None:
