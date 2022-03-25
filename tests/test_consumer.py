@@ -120,7 +120,7 @@ async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: 
         offset=now
     )
 
-    await wait_for(lambda: captured[0] >= b"5000")
+    await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000")
 
 
 async def test_offset_type_next(stream: str, consumer: Consumer, producer: Producer) -> None:
