@@ -202,15 +202,15 @@ class Consumer:
 
     @staticmethod
     def _filter_messages(frame: schema.Deliver, subscriber: _Subscriber) -> Iterator[bytes]:
-        minDeliverableOffset = -1
+        min_deliverable_offset = -1
         if subscriber.offset_type is OffsetType.OFFSET:
-            minDeliverableOffset = subscriber.offset
+            min_deliverable_offset = subscriber.offset
 
         offset = frame.chunk_first_offset - 1
 
         for message in frame.get_messages():
             offset += 1
-            if offset < minDeliverableOffset:
+            if offset < min_deliverable_offset:
                 continue
 
             yield message
