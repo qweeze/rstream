@@ -90,6 +90,39 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
     assert len(captured) < len(messages)
 
 
+async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: Producer) -> None:
+    subscriber_name = "test-subscriber-timestamp"
+    captured: list[bytes] = []
+
+    # produce messages
+    messages = [str(i).encode() for i in range(1, 5_000)]
+    await producer.publish_batch(stream, messages)
+
+    # create subscriber and declare to server, unsub immediately
+    await consumer.subscribe(
+        stream,
+        callback=captured.append,
+        subscriber_name=subscriber_name
+    )
+    await consumer.unsubscribe(subscriber_name)
+
+    now = int(time.time() * 1000)
+
+    # produce more messages after the timestamp
+    messages = [str(i).encode() for i in range(5_000, 5_100)]
+    await producer.publish_batch(stream, messages)
+
+    await consumer.subscribe(
+        stream,
+        callback=captured.append,
+        subscriber_name=subscriber_name,
+        offset_type=OffsetType.TIMESTAMP,
+        offset=now
+    )
+
+    await wait_for(lambda: captured[0] >= b"5000")
+
+
 async def test_offset_type_next(stream: str, consumer: Consumer, producer: Producer) -> None:
     messages = [str(i).encode() for i in range(1, 11)]
     await producer.publish_batch(stream, messages)
@@ -106,23 +139,6 @@ async def test_offset_type_next(stream: str, consumer: Consumer, producer: Produ
     assert captured == [b"11"]
 
 
-async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: Producer) -> None:
-    captured: list[bytes] = []
-    now_ms = int(time.time() * 1000)
-    await consumer.subscribe(
-        stream,
-        callback=captured.append,
-        offset_type=OffsetType.TIMESTAMP,
-        offset=now_ms + 100,
-    )
-    await producer.publish(stream, b"one")
-    await asyncio.sleep(0.1)
-    await producer.publish(stream, b"two")
-
-    await wait_for(lambda: len(captured) >= 1)
-    assert captured == [b"two"]
-
-
 async def test_consume_with_resubscribe(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
     subscriber_name = await consumer.subscribe(stream, callback=captured.append)
@@ -136,18 +152,6 @@ async def test_consume_with_resubscribe(stream: str, consumer: Consumer, produce
     await wait_for(lambda: len(captured) >= 2)
     assert captured == [b"one", b"two"]
 
-async def test_consume_with_resubscribe_on_last(stream: str, consumer: Consumer, producer: Producer) -> None:
-    captured: list[bytes] = []
-    subscriber_name = await consumer.subscribe(stream, callback=captured.append)
-    await producer.publish(stream, b"one")
-    await wait_for(lambda: len(captured) >= 1)
-
-    await consumer.unsubscribe(subscriber_name)
-    await consumer.subscribe(stream, callback=captured.append, offset_type=OffsetType.LAST)
-
-    await producer.publish(stream, b"two")
-    await wait_for(lambda: len(captured) >= 3)
-    assert captured == [b"one", b"one", b"two"]
 
 async def test_consume_with_restart(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
