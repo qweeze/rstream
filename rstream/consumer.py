@@ -124,9 +124,6 @@ class Consumer:
         reference = subscriber_name or f"{stream}_subscriber_{subscription_id}"
         decoder = decoder or (lambda x: x)
 
-        if offset_type in (OffsetType.LAST, OffsetType.NEXT):
-            offset = await self.query_offset(stream, reference)
-
         subscriber = self._subscribers[reference] = _Subscriber(
             stream=stream,
             subscription_id=subscription_id,
@@ -186,6 +183,9 @@ class Consumer:
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
+        if subscriber_name == "":
+            raise ValueError("subscriber_name must not be an empty string")
+
         return await self.default_client.query_offset(
             stream,
             subscriber_name,
@@ -200,23 +200,20 @@ class Consumer:
 
     @staticmethod
     def _filter_messages(frame: schema.Deliver, subscriber: _Subscriber) -> Iterator[bytes]:
-        if subscriber.offset_type is OffsetType.TIMESTAMP:
-            if frame.timestamp < subscriber.offset:
-                yield from ()
-            else:
-                yield from frame.get_messages()
+        min_deliverable_offset = -1
+        if subscriber.offset_type is OffsetType.OFFSET:
+            min_deliverable_offset = subscriber.offset
 
-        else:
-            offset = frame.chunk_first_offset - 1
-            if subscriber.offset_type is OffsetType.NEXT:
-                offset -= 1
+        offset = frame.chunk_first_offset - 1
 
-            for message in frame.get_messages():
-                offset += 1
-                if offset >= subscriber.offset:
-                    yield message
+        for message in frame.get_messages():
+            offset += 1
+            if offset < min_deliverable_offset:
+                continue
 
-            subscriber.offset = frame.chunk_first_offset + frame.num_entries
+            yield message
+
+        subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
     async def _on_deliver(self, frame: schema.Deliver, subscriber: _Subscriber) -> None:
         if frame.subscription_id != subscriber.subscription_id:

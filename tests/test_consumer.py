@@ -75,7 +75,9 @@ async def test_offset_type_offset(stream: str, consumer: Consumer, producer: Pro
 
 
 async def test_offset_type_last(stream: str, consumer: Consumer, producer: Producer) -> None:
-    await consumer.store_offset(stream, "test-subscriber", offset=7)
+    messages = [str(i).encode() for i in range(1, 5_000)]
+    await producer.publish_batch(stream, messages)
+
     captured: list[bytes] = []
     await consumer.subscribe(
         stream,
@@ -84,15 +86,34 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
         subscriber_name="test-subscriber",
     )
 
-    messages = [str(i).encode() for i in range(1, 11)]
+    await wait_for(lambda: len(captured) > 0 and captured[-1] == b"4999")
+    assert len(captured) < len(messages)
+
+
+async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: Producer) -> None:
+    messages = [str(i).encode() for i in range(1, 5_000)]
     await producer.publish_batch(stream, messages)
 
-    await wait_for(lambda: len(captured) >= 4)
-    assert captured == messages[6:]
+    # mark time in between message batches
+    now = int(time.time() * 1000)
+
+    messages = [str(i).encode() for i in range(5_000, 5_100)]
+    await producer.publish_batch(stream, messages)
+
+    captured: list[bytes] = []
+    await consumer.subscribe(
+        stream,
+        callback=captured.append,
+        offset_type=OffsetType.TIMESTAMP,
+        offset=now
+    )
+    await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000")
 
 
 async def test_offset_type_next(stream: str, consumer: Consumer, producer: Producer) -> None:
-    await consumer.store_offset(stream, "test-subscriber", offset=7)
+    messages = [str(i).encode() for i in range(1, 11)]
+    await producer.publish_batch(stream, messages)
+
     captured: list[bytes] = []
     await consumer.subscribe(
         stream,
@@ -100,29 +121,9 @@ async def test_offset_type_next(stream: str, consumer: Consumer, producer: Produ
         offset_type=OffsetType.NEXT,
         subscriber_name="test-subscriber",
     )
-
-    messages = [str(i).encode() for i in range(1, 11)]
-    await producer.publish_batch(stream, messages)
-
-    await wait_for(lambda: len(captured) >= 3)
-    assert captured == messages[7:]
-
-
-async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: Producer) -> None:
-    captured: list[bytes] = []
-    now_ms = int(time.time() * 1000)
-    await consumer.subscribe(
-        stream,
-        callback=captured.append,
-        offset_type=OffsetType.TIMESTAMP,
-        offset=now_ms + 100,
-    )
-    await producer.publish(stream, b"one")
-    await asyncio.sleep(0.1)
-    await producer.publish(stream, b"two")
-
-    await wait_for(lambda: len(captured) >= 1)
-    assert captured == [b"two"]
+    await producer.publish(stream, b"11")
+    await wait_for(lambda: len(captured) > 0)
+    assert captured == [b"11"]
 
 
 async def test_consume_with_resubscribe(stream: str, consumer: Consumer, producer: Producer) -> None:
