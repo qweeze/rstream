@@ -101,12 +101,7 @@ async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: 
     await producer.publish_batch(stream, messages)
 
     captured: list[bytes] = []
-    await consumer.subscribe(
-        stream,
-        callback=captured.append,
-        offset_type=OffsetType.TIMESTAMP,
-        offset=now
-    )
+    await consumer.subscribe(stream, callback=captured.append, offset_type=OffsetType.TIMESTAMP, offset=now)
     await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000")
 
 
