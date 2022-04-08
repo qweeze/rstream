@@ -1,0 +1,43 @@
+name: CI
+on:
+  push:
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9 ]
+        os: [ubuntu-18.04]
+    runs-on: ${{ matrix.os }}
+    services:
+      rabbitmq-streaming:
+        image: pivotalrabbitmq/rabbitmq-stream
+        env:
+          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+        ports:
+          - 5552:5552
+          - 15672:15672
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.1.10
+          virtualenvs-create: true
+          virtualenvs-in-project: false
+      - name: poetry install
+        run: poetry install --no-root
+      - name: isort check-only
+        run: poetry run isort --check-only .
+      - name: black check
+        run: poetry run black --check .
+      - name: flake8
+        run: poetry run flake8 --exclude=venv,local_tests --max-line-length=120 --ignore=E203
+      - name: mypy
+        run: poetry run mypy .
+      - name: poetry run pytest
+        run: poetry run pytest
