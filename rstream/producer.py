@@ -45,7 +45,7 @@ class Producer:
         frame_max: int = 1 * 1024 * 1024,
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
-        max_retries: int = 20
+        max_retries: int = 20,
     ):
         self._pool = ClientPool(
             host,
@@ -57,7 +57,7 @@ class Producer:
             frame_max=frame_max,
             heartbeat=heartbeat,
             load_balancer_mode=load_balancer_mode,
-            max_retries=max_retries
+            max_retries=max_retries,
         )
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}

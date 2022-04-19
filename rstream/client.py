@@ -33,12 +33,15 @@ DEFAULT_REQUEST_TIMEOUT = 10
 
 logger = logging.getLogger(__name__)
 
+
 class BrokerResolutionMaxRetryError(Exception):
     pass
+
 
 class Addr(NamedTuple):
     host: str
     port: int
+
 
 class BaseClient:
     def __init__(
@@ -443,6 +446,7 @@ class Client(BaseClient):
             ),
         )
 
+
 class ClientPool:
     def __init__(
         self,
@@ -456,7 +460,7 @@ class ClientPool:
         frame_max: int,
         heartbeat: int,
         load_balancer_mode: bool,
-        max_retries: int
+        max_retries: int,
     ):
         self.addr = Addr(host=host, port=port)
         self.ssl_context = ssl_context
@@ -508,7 +512,9 @@ class ClientPool:
             await client.close()
             await asyncio.sleep(0.2)
 
-        raise BrokerResolutionMaxRetryError(f"Failed to connect to {desired_host}:{desired_port} after {self.max_retries} tries")
+        raise BrokerResolutionMaxRetryError(
+            f"Failed to connect to {desired_host}:{desired_port} after {self.max_retries} tries"
+        )
 
     async def new(self, addr: Addr) -> Client:
         host, port = addr
