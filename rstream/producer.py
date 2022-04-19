@@ -9,7 +9,7 @@ from typing import Any, Optional, TypeVar
 
 from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
-from .client import Client, ClientPool
+from .client import Addr, Client, ClientPool
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 
@@ -97,7 +97,7 @@ class Producer:
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
             leader, _ = await self.default_client.query_leader_and_replicas(stream)
-            self._clients[stream] = await self._pool.get((leader.host, leader.port))
+            self._clients[stream] = await self._pool.get(Addr(host=leader.host, port=leader.port))
 
         return self._clients[stream]
 

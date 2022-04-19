@@ -6,7 +6,6 @@ import ssl
 import time
 from collections import defaultdict
 from contextlib import suppress
-from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
@@ -62,7 +61,7 @@ class BaseClient:
 
         self._conn: Optional[Connection] = None
 
-        self._server_properties: Optional[dict[str, str]] = None
+        self.server_properties: Optional[dict[str, str]] = None
         self._client_properties = {
             "product": "rmq-streams-client",
             "platform": "Python",
@@ -501,11 +500,13 @@ class ClientPool:
 
         while connection_attempts < self.max_retries:
             client = await self.new(self.addr)
-            advertised_host = client.server_properties["advertised_host"]
-            advertised_port = client.server_properties["advertised_port"]
 
-            if advertised_host == desired_host and advertised_port == desired_port:
-                return client
+            if client.server_properties is not None:
+                advertised_host = client.server_properties["advertised_host"]
+                advertised_port = client.server_properties["advertised_port"]
+
+                if advertised_host == desired_host and advertised_port == desired_port:
+                    return client
 
             connection_attempts += 1
 
