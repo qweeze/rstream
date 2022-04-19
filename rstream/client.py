@@ -33,19 +33,12 @@ DEFAULT_REQUEST_TIMEOUT = 10
 
 logger = logging.getLogger(__name__)
 
-class AddressResolutionMaxRetryError(Exception):
+class BrokerResolutionMaxRetryError(Exception):
     pass
 
 class Addr(NamedTuple):
     host: str
     port: int
-
-@dataclass
-class AddressResolver:
-    addr: Addr
-    enabled: bool
-    max_retries: int = 20
-    retry_backoff_seconds: float = 0.2
 
 class BaseClient:
     def __init__(
@@ -224,7 +217,7 @@ class BaseClient:
         await self._conn.close()
         self._conn = None
 
-        self._server_properties = None
+        self.server_properties = None
         self._tasks.clear()
         self._handlers.clear()
 
@@ -255,7 +248,7 @@ class Client(BaseClient):
         return {prop.key: prop.value for prop in resp.properties}
 
     async def authenticate(self, vhost: str, username: str, password: str) -> dict[str, str]:
-        self._server_properties = await self.peer_properties()
+        self.server_properties = await self.peer_properties()
 
         handshake_resp = await self.sync_request(
             schema.SaslHandshake(
@@ -296,7 +289,7 @@ class Client(BaseClient):
         self._start_heartbeat()
 
         open_response = await self.open(vhost)
-        self._server_properties.update(open_response)
+        self.server_properties.update(open_response)
         return open_response
 
     async def create_stream(self, stream: str, arguments: Optional[dict[str, Any]] = None) -> None:
@@ -457,16 +450,18 @@ class ClientPool:
         port: int,
         *,
         ssl_context: Optional[ssl.SSLContext] = None,
-        address_resolver: Optional[AddressResolver] = None,
         vhost: str,
         username: str,
         password: str,
         frame_max: int,
         heartbeat: int,
+        load_balancer_mode: bool,
+        max_retries: int
     ):
         self.addr = Addr(host=host, port=port)
         self.ssl_context = ssl_context
-        self.address_resolver = address_resolver
+        self.load_balancer_mode = load_balancer_mode
+        self.max_retries = max_retries
         self.vhost = vhost
         self.username = username
         self.password = password
@@ -478,48 +473,42 @@ class ClientPool:
     async def get(self, addr: Optional[Addr] = None) -> Client:
         """Get a client according to `addr` parameter
 
-        If class param `address_resolver` is set and enabled, load balancer
-        logic will be excuted. Here we do not attempt to connect to the desired `addr`
-        directly, but rather connect to the address defined in the `address_resolver` in a loop
-        until the desired client is returned.
+        If class param `load_balancer_mode` is True, we create a connection via the LB
+        in a loop until the desired node is returned.
+
+        If no `addr` is supplied, then it is assumed the exact node is not important
+        and `load_balancer_mode` is ignored.
         """
         desired_addr = addr or self.addr
 
         if desired_addr not in self._clients:
-            # don't resolve the client when addr is None. Use the default address
-            # as this is likely a request to get metadata and the node isn't important
-            if addr and self.address_resolver and self.address_resolver.enabled:
-                self._clients[desired_addr] = await self.resolve_client(desired_addr)
+            if addr and self.load_balancer_mode:
+                self._clients[desired_addr] = await self._resolve_broker(desired_addr)
             else:
                 self._clients[desired_addr] = await self.new(desired_addr)
 
         assert self._clients[desired_addr].is_started
         return self._clients[desired_addr]
 
-    async def resolve_client(self, addr: Addr) -> Client:
+    async def _resolve_broker(self, addr: Addr) -> Client:
         desired_host, desired_port = addr[0], str(addr[1])
 
-        # initial connection outside of loop to avoid the sleep penalty
-        conn = await self.new(self.address_resolver.addr)
-        connection_attempts = 1
+        connection_attempts = 0
 
-        advertised_host = conn._server_properties.get("advertised_host")
-        advertised_port = conn._server_properties.get("advertised_port")
+        while connection_attempts < self.max_retries:
+            client = await self.new(self.addr)
+            advertised_host = client.server_properties["advertised_host"]
+            advertised_port = client.server_properties["advertised_port"]
 
-        while desired_host != advertised_host or desired_port != advertised_port:
-            await conn.close()
+            if advertised_host == desired_host and advertised_port == desired_port:
+                return client
 
-            if connection_attempts >= self.address_resolver.max_retries:
-                raise AddressResolutionMaxRetryError(f"Failed to connect to {desired_host}:{desired_port} after {self.address_resolver.max_retries} tries")
-
-            conn = await self.new(self.address_resolver.addr)
             connection_attempts += 1
 
-            advertised_host = conn._server_properties.get("advertised_host")
-            advertised_port = conn._server_properties.get("advertised_port")
-            await asyncio.sleep(self.address_resolver.retry_backoff_seconds)
+            await client.close()
+            await asyncio.sleep(0.2)
 
-        return conn
+        raise BrokerResolutionMaxRetryError(f"Failed to connect to {desired_host}:{desired_port} after {self.max_retries} tries")
 
     async def new(self, addr: Addr) -> Client:
         host, port = addr

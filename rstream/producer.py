@@ -9,7 +9,7 @@ from typing import Any, Optional, TypeVar
 
 from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
-from .client import AddressResolver, Client, ClientPool
+from .client import Client, ClientPool
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 
@@ -39,12 +39,13 @@ class Producer:
         port: int = 5552,
         *,
         ssl_context: Optional[ssl.SSLContext] = None,
-        address_resolver: Optional[AddressResolver] = None,
         vhost: str = "/",
         username: str,
         password: str,
         frame_max: int = 1 * 1024 * 1024,
         heartbeat: int = 60,
+        load_balancer_mode: bool = False,
+        max_retries: int = 20
     ):
         self._pool = ClientPool(
             host,
@@ -55,7 +56,8 @@ class Producer:
             password=password,
             frame_max=frame_max,
             heartbeat=heartbeat,
-            address_resolver=address_resolver
+            load_balancer_mode=load_balancer_mode,
+            max_retries=max_retries
         )
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}
