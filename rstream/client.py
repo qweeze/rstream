@@ -70,7 +70,7 @@ class BaseClient:
 
         self.server_properties: Optional[dict[str, str]] = None
         self._client_properties = {
-            "product": "rmq-streams-client",
+            "product": "RabbitMQ Stream",
             "platform": "Python",
             "version": __version__,
             "license": __license__,
