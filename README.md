@@ -1,6 +1,6 @@
 # RabbitMQ Stream Python Client
 
-A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)  
+A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)
 _This is a work in progress_
 
 ## Install
@@ -75,6 +75,12 @@ producer = Producer(
     password='guest',
 )
 ```
+
+## Load Balancer
+
+In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
+
+Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
 
 ## TODO
 

@@ -9,7 +9,7 @@ from typing import Any, Optional, TypeVar
 
 from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
-from .client import Client, ClientPool
+from .client import Addr, Client, ClientPool
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 
@@ -37,13 +37,15 @@ class Producer:
         self,
         host: str,
         port: int = 5552,
-        ssl_context: Optional[ssl.SSLContext] = None,
         *,
+        ssl_context: Optional[ssl.SSLContext] = None,
         vhost: str = "/",
         username: str,
         password: str,
         frame_max: int = 1 * 1024 * 1024,
         heartbeat: int = 60,
+        load_balancer_mode: bool = False,
+        max_retries: int = 20,
     ):
         self._pool = ClientPool(
             host,
@@ -54,6 +56,8 @@ class Producer:
             password=password,
             frame_max=frame_max,
             heartbeat=heartbeat,
+            load_balancer_mode=load_balancer_mode,
+            max_retries=max_retries,
         )
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}
@@ -93,7 +97,7 @@ class Producer:
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
             leader, _ = await self.default_client.query_leader_and_replicas(stream)
-            self._clients[stream] = await self._pool.get((leader.host, leader.port))
+            self._clients[stream] = await self._pool.get(Addr(leader.host, leader.port))
 
         return self._clients[stream]
 
