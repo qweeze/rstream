@@ -108,7 +108,7 @@ class Consumer:
         if stream not in self._clients:
             leader, replicas = await self.default_client.query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
-            self._clients[stream] = await self._pool.get(Addr(host=broker.host, port=broker.port))
+            self._clients[stream] = await self._pool.get(Addr(broker.host, broker.port))
 
         return self._clients[stream]
 

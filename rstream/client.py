@@ -494,19 +494,20 @@ class ClientPool:
         return self._clients[desired_addr]
 
     async def _resolve_broker(self, addr: Addr) -> Client:
-        desired_host, desired_port = addr[0], str(addr[1])
+        desired_host, desired_port = addr.host, str(addr.port)
 
         connection_attempts = 0
 
         while connection_attempts < self.max_retries:
             client = await self.new(self.addr)
 
-            if client.server_properties is not None:
-                advertised_host = client.server_properties["advertised_host"]
-                advertised_port = client.server_properties["advertised_port"]
+            assert client.server_properties is not None
 
-                if advertised_host == desired_host and advertised_port == desired_port:
-                    return client
+            advertised_host = client.server_properties["advertised_host"]
+            advertised_port = client.server_properties["advertised_port"]
+
+            if advertised_host == desired_host and advertised_port == desired_port:
+                return client
 
             connection_attempts += 1
 
