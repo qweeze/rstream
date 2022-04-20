@@ -17,7 +17,7 @@ from typing import (
 )
 
 from . import exceptions, schema
-from .client import Client, ClientPool
+from .client import Addr, Client, ClientPool
 from .constants import OffsetType
 
 MT = TypeVar("MT")
@@ -48,6 +48,8 @@ class Consumer:
         password: str,
         frame_max: int = 1 * 1024 * 1024,
         heartbeat: int = 60,
+        load_balancer_mode: bool = False,
+        max_retries: int = 20,
     ):
         self._pool = ClientPool(
             host,
@@ -58,6 +60,8 @@ class Consumer:
             password=password,
             frame_max=frame_max,
             heartbeat=heartbeat,
+            load_balancer_mode=load_balancer_mode,
+            max_retries=max_retries,
         )
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}
@@ -104,7 +108,7 @@ class Consumer:
         if stream not in self._clients:
             leader, replicas = await self.default_client.query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
-            self._clients[stream] = await self._pool.get((broker.host, broker.port))
+            self._clients[stream] = await self._pool.get(Addr(broker.host, broker.port))
 
         return self._clients[stream]
 
