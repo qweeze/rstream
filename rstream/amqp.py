@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol, cast
 
 import uamqp
+from typing import Any, Optional, Protocol, cast
 
 
 class _MessageProtocol(Protocol):
