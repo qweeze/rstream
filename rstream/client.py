@@ -18,7 +18,14 @@ from typing import (
     Union,
 )
 
-from . import constants, exceptions, schema, utils
+from . import (
+    __license__,
+    __version__,
+    constants,
+    exceptions,
+    schema,
+    utils,
+)
 from .connection import Connection, ConnectionClosed
 
 FT = TypeVar("FT", bound=schema.Frame)
@@ -63,8 +70,10 @@ class BaseClient:
 
         self.server_properties: Optional[dict[str, str]] = None
         self._client_properties = {
-            "product": "rmq-streams-client",
+            "product": "RabbitMQ Stream",
             "platform": "Python",
+            "version": __version__,
+            "license": __license__,
         }
 
         self._corr_id_seq = utils.MonotonicSeq()
