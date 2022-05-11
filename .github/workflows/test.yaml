@@ -1,20 +1,27 @@
 name: CI
+
 on:
   push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - synchronize
 
 jobs:
   ci:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.9 ]
+        python-version: [3.9]
         os: [ubuntu-18.04]
     runs-on: ${{ matrix.os }}
     services:
       rabbitmq-streaming:
         image: pivotalrabbitmq/rabbitmq-stream
         env:
-          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream  advertised_host localhost"
+          RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream advertised_host localhost"
         ports:
           - 5552:5552
           - 15672:15672
