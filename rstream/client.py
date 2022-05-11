@@ -73,7 +73,7 @@ class BaseClient:
             "product": "RabbitMQ Stream",
             "platform": "Python",
             "version": __version__,
-            "license": __license__,
+            "license": __license__ or "",
         }
 
         self._corr_id_seq = utils.MonotonicSeq()
