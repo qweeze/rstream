@@ -13,6 +13,7 @@ from typing import (
 
 from .constants import Key, T
 from .schema import Frame, Struct, registry
+from dataclasses import _FIELD
 
 __all__ = ["encode_frame", "decode_frame"]
 
@@ -42,49 +43,43 @@ TT = Annotated[Union[_TT, list[_TT]], "Field type metadata"]
 
 
 def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
-    if isinstance(tp, T) and tp in int_specs:
-        assert isinstance(value, int)
-        return value.to_bytes(**int_specs[tp]._asdict())
-
-    elif tp is T.string:
-        assert isinstance(value, str)
-        buffer = bytearray()
-        buffer += len(value).to_bytes(2, "big", signed=False)
-        buffer += value.encode("utf-8")
-        return buffer
-
-    elif tp is T.bytes:
-        assert isinstance(value, bytes)
-        buffer = bytearray()
-        buffer += len(value).to_bytes(4, "big", signed=False)
-        buffer += value
-        return buffer
-
-    elif tp is T.raw:
-        assert isinstance(value, bytes)
-        return value
-
-    elif is_dataclass(value):
-        assert isinstance(value, Struct)
-        return _encode_struct(value)
-
-    elif isinstance(value, list):
-        assert tp is None or isinstance(tp, list)
+    if isinstance(value, list):
         buffer = bytearray()
         buffer += len(value).to_bytes(4, "big", signed=False)
         if tp is None:
             for item in value:
-                assert isinstance(item, Struct)
                 buffer += _encode_struct(item)
         elif len(tp) == 1:
             for item in value:
                 buffer += _encode_field(item, tp[0])
         else:
             for item in value:
-                assert isinstance(item, list)
                 for part, subtype in zip(item, tp):
                     buffer += _encode_field(part, subtype)
         return buffer
+
+    elif tp in int_specs:
+        spec = int_specs[tp]
+        return value.to_bytes(spec.length, byteorder=spec.byteorder, signed=spec.signed)
+
+
+    elif tp is T.string:
+        buffer = bytearray()
+        buffer += len(value).to_bytes(2, "big", signed=False)
+        buffer += value.encode("utf-8")
+        return buffer
+
+    elif tp is T.bytes:
+        buffer = bytearray()
+        buffer += len(value).to_bytes(4, "big", signed=False)
+        buffer += value
+        return buffer
+
+    elif tp is T.raw:
+        return value
+
+    elif hasattr(value, "__dataclass_fields__"):
+        return _encode_struct(value)
 
     else:
         raise NotImplementedError(f"Unexpected type {tp}, value: {value!r}")
@@ -92,10 +87,11 @@ def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
 
 def _encode_struct(struct: Struct) -> bytearray:
     buffer = bytearray()
-    for fld in fields(struct):
-        value = getattr(struct, fld.name)
-        tp = fld.metadata.get("type")
-        buffer += _encode_field(value, tp)
+    for fld in struct.__dataclass_fields__.values():
+        if fld._field_type is _FIELD:
+            value = struct.__dict__[fld.name]
+            tp = fld.metadata.get("type")
+            buffer += _encode_field(value, tp)
     return buffer
 
 
@@ -106,12 +102,12 @@ def encode_frame(frame: Frame) -> bytearray:
         raise ValueError(f"Could not encode frame {frame!r}") from e
 
     length = len(payload) + 2 + 2
-    buffer = bytearray()
-    buffer += length.to_bytes(4, "big", signed=False)
-    buffer += frame.key.value.to_bytes(2, "big", signed=False)
-    buffer += frame.version.to_bytes(2, "big", signed=False)
-    buffer += payload
-    return buffer
+    return b"".join((
+        length.to_bytes(4, "big", signed=False),
+        frame.key.value.to_bytes(2, "big", signed=False),
+        frame.version.to_bytes(2, "big", signed=False),
+        payload,
+    ))
 
 
 def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
@@ -155,11 +151,11 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
 
 def _decode_struct(buf: io.BytesIO, tp: Type[Struct]) -> Struct:
     data = {}
-    for f in fields(tp):
+    for f in tp.__dataclass_fields__.values():
         fld_tp = f.metadata.get("type")
         if fld_tp is None:
-            if typing.get_origin(f.type) is list:
-                fld_tp = list(typing.get_args(f.type))
+            if f.type.__origin__ is list:
+                fld_tp = f.type.__args__
             else:
                 fld_tp = f.type
 
