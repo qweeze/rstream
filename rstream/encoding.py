@@ -151,11 +151,11 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
 
 def _decode_struct(buf: io.BytesIO, tp: Type[Struct]) -> Struct:
     data = {}
-    for f in tp.__dataclass_fields__.values():
+    for f in fields(tp):
         fld_tp = f.metadata.get("type")
         if fld_tp is None:
-            if f.type.__origin__ is list:
-                fld_tp = f.type.__args__
+            if typing.get_origin(f.type) is list:
+                fld_tp = list(typing.get_args(f.type))
             else:
                 fld_tp = f.type
 
