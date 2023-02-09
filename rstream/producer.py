@@ -1,3 +1,6 @@
+# Copyright 2023 VMware, Inc. All Rights Reserved.
+# SPDX-License-Identifier: MIT
+
 from __future__ import annotations
 
 import asyncio
@@ -64,6 +67,13 @@ class Producer:
         self._publishers: dict[str, _Publisher] = {}
         self._waiting_for_confirm: dict[str, dict[asyncio.Future[None], set[int]]] = defaultdict(dict)
         self._lock = asyncio.Lock()
+        # dictionary [stream][list] of buffered messages to send asynchronously
+        self._buffered_messages: dict[str, list] = {}
+        self._buffered_messages_lock = asyncio.Lock()
+        # Delay After sending the messages on _buffered_messages list
+        self._defaultBatchPublishingDelay = 0.2
+        self.task: asyncio.Task[Any]
+        self.thread_active = False
 
     @property
     def default_client(self) -> Client:
@@ -82,6 +92,13 @@ class Producer:
         self._default_client = await self._pool.get()
 
     async def close(self) -> None:
+        # flush messages still in buffer
+        if self.thread_active is True:
+
+            for stream in self._buffered_messages:
+                await self._startPublishTask(stream, False)
+            self.task.cancel()
+
         for publisher in self._publishers.values():
             await publisher.client.delete_publisher(publisher.id)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
@@ -104,13 +121,13 @@ class Producer:
     async def _get_or_create_publisher(
         self,
         stream: str,
+        send_batch_enabled: bool,
         publisher_name: Optional[str] = None,
     ) -> _Publisher:
         if stream in self._publishers:
             publisher = self._publishers[stream]
             if publisher_name is not None:
                 assert publisher.reference == publisher_name
-
             return publisher
 
         client = await self._get_or_create_client(stream)
@@ -146,6 +163,11 @@ class Producer:
             partial(self._on_publish_error, publisher=publisher),
             name=publisher.reference,
         )
+
+        if send_batch_enabled is True and self.thread_active is False:
+            self.task = asyncio.create_task(self._timer(self._defaultBatchPublishingDelay, False))
+            self.thread_active = True
+
         return publisher
 
     async def publish_batch(
@@ -159,10 +181,14 @@ class Producer:
             raise ValueError("Empty batch")
 
         async with self._lock:
-            publisher = await self._get_or_create_publisher(stream, publisher_name)
+            publisher = await self._get_or_create_publisher(
+                stream, send_batch_enabled=False, publisher_name=publisher_name
+            )
 
         messages = []
+
         for item in batch:
+
             msg = RawMessage(item) if isinstance(item, bytes) else item
 
             if msg.publishing_id is None:
@@ -181,6 +207,7 @@ class Producer:
                 messages=messages,
             ),
         )
+
         publishing_ids = [m.publishing_id for m in messages]
 
         if sync:
@@ -196,14 +223,42 @@ class Producer:
         message: MessageT,
         sync: bool = True,
         publisher_name: Optional[str] = None,
+        send_batch_enabled: bool = False,
     ) -> int:
-        publishing_ids = await self.publish_batch(
-            stream,
-            [message],
-            sync=sync,
-            publisher_name=publisher_name,
-        )
-        return publishing_ids[0]
+        if send_batch_enabled is False:
+            publishing_ids = await self.publish_batch(
+                stream,
+                [message],
+                sync=sync,
+                publisher_name=publisher_name,
+            )
+            return publishing_ids[0]
+        else:
+            if stream not in self._buffered_messages:
+                self._buffered_messages[stream] = []
+            async with self._lock:
+                await self._get_or_create_publisher(stream, send_batch_enabled, publisher_name)
+            async with self._buffered_messages_lock:
+                self._buffered_messages[stream].append(message)
+
+            await asyncio.sleep(0)
+            return 0
+
+    # After the timeout send the messages in _buffered_messages in batches
+    async def _timer(self, timeout, sync):
+
+        while True:
+            await asyncio.sleep(timeout)
+            for stream in self._buffered_messages:
+                await self._startPublishTask(stream, sync)
+
+    async def _startPublishTask(self, stream: str, sync: bool) -> None:
+
+        async with self._buffered_messages_lock:
+            if len(self._buffered_messages[stream]) == 0:
+                return
+            await self.publish_batch(stream, self._buffered_messages[stream], sync=sync)
+            self._buffered_messages[stream].clear()
 
     def _on_publish_confirm(self, frame: schema.PublishConfirm, publisher: _Publisher) -> None:
         if frame.publisher_id != publisher.id:

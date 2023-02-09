@@ -1,3 +1,6 @@
+# Copyright 2023 VMware, Inc. All Rights Reserved.
+# SPDX-License-Identifier: MIT
+
 import asyncio
 
 import pytest
@@ -40,6 +43,18 @@ async def test_publishing_sequence(stream: str, producer: Producer, consumer: Co
 
     assert await producer.publish(stream, b"one") == 1
     assert await producer.publish_batch(stream, [b"two", b"three"]) == [2, 3]
+    await wait_for(lambda: len(captured) == 3)
+    assert captured == [b"one", b"two", b"three"]
+
+
+async def test_publishing_sequence_async(stream: str, producer: Producer, consumer: Consumer) -> None:
+    captured: list[bytes] = []
+
+    await consumer.subscribe(stream, callback=captured.append)
+
+    await producer.publish(stream, b"one", sync=False, send_batch_enabled=True)
+    await producer.publish(stream, b"two", sync=False, send_batch_enabled=True)
+    await producer.publish(stream, b"three", sync=False, send_batch_enabled=True)
 
     await wait_for(lambda: len(captured) == 3)
     assert captured == [b"one", b"two", b"three"]
