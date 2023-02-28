@@ -8,7 +8,7 @@ import ssl
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Optional, TypeVar
+from typing import Any, NoReturn, Optional, TypeVar
 
 from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
@@ -68,12 +68,11 @@ class Producer:
         self._waiting_for_confirm: dict[str, dict[asyncio.Future[None], set[int]]] = defaultdict(dict)
         self._lock = asyncio.Lock()
         # dictionary [stream][list] of buffered messages to send asynchronously
-        self._buffered_messages: dict[str, list] = {}
+        self._buffered_messages: dict[str, list] = defaultdict(list)
         self._buffered_messages_lock = asyncio.Lock()
         # Delay After sending the messages on _buffered_messages list
-        self._defaultBatchPublishingDelay = 0.2
-        self.task: asyncio.Task[Any]
-        self.thread_active = False
+        self._default_batch_publishing_delay = 0.2
+        self.task: asyncio.Task[NoReturn] | None = None
 
     @property
     def default_client(self) -> Client:
@@ -93,10 +92,10 @@ class Producer:
 
     async def close(self) -> None:
         # flush messages still in buffer
-        if self.thread_active is True:
+        if self.task is not None:
 
             for stream in self._buffered_messages:
-                await self._startPublishTask(stream, False)
+                await self._publish_buffered_messages(stream)
             self.task.cancel()
 
         for publisher in self._publishers.values():
@@ -164,13 +163,21 @@ class Producer:
             name=publisher.reference,
         )
 
-        if send_batch_enabled is True and self.thread_active is False:
-            self.task = asyncio.create_task(self._timer(self._defaultBatchPublishingDelay, False))
-            self.thread_active = True
+        if send_batch_enabled and not self.task:
+            self.task = asyncio.create_task(self._timer())
 
         return publisher
 
-    async def publish_batch(
+    async def send_batch(
+        self,
+        stream: str,
+        batch: list[MessageT],
+        publisher_name: Optional[str] = None,
+    ) -> list[int]:
+
+        return await self._send_batch(stream, batch, sync=False, publisher_name=publisher_name)
+
+    async def _send_batch(
         self,
         stream: str,
         batch: list[MessageT],
@@ -217,48 +224,50 @@ class Producer:
 
         return publishing_ids
 
-    async def publish(
+    async def send_wait(
         self,
         stream: str,
         message: MessageT,
-        sync: bool = True,
         publisher_name: Optional[str] = None,
-        send_batch_enabled: bool = False,
     ) -> int:
-        if send_batch_enabled is False:
-            publishing_ids = await self.publish_batch(
-                stream,
-                [message],
-                sync=sync,
-                publisher_name=publisher_name,
-            )
-            return publishing_ids[0]
-        else:
-            if stream not in self._buffered_messages:
-                self._buffered_messages[stream] = []
-            async with self._lock:
-                await self._get_or_create_publisher(stream, send_batch_enabled, publisher_name)
-            async with self._buffered_messages_lock:
-                self._buffered_messages[stream].append(message)
+        publishing_ids = await self._send_batch(
+            stream,
+            [message],
+            sync=True,
+            publisher_name=publisher_name,
+        )
+        return publishing_ids[0]
 
-            await asyncio.sleep(0)
-            return 0
+    async def send(
+        self,
+        stream: str,
+        message: MessageT,
+        publisher_name: Optional[str] = None,
+    ):
+
+        async with self._lock:
+            await self._get_or_create_publisher(
+                stream, send_batch_enabled=True, publisher_name=publisher_name
+            )
+        async with self._buffered_messages_lock:
+            self._buffered_messages[stream].append(message)
+
+        await asyncio.sleep(0)
 
     # After the timeout send the messages in _buffered_messages in batches
-    async def _timer(self, timeout, sync):
+    async def _timer(self):
 
         while True:
-            await asyncio.sleep(timeout)
+            await asyncio.sleep(self._default_batch_publishing_delay)
             for stream in self._buffered_messages:
-                await self._startPublishTask(stream, sync)
+                await self._publish_buffered_messages(stream)
 
-    async def _startPublishTask(self, stream: str, sync: bool) -> None:
+    async def _publish_buffered_messages(self, stream: str) -> None:
 
         async with self._buffered_messages_lock:
-            if len(self._buffered_messages[stream]) == 0:
-                return
-            await self.publish_batch(stream, self._buffered_messages[stream], sync=sync)
-            self._buffered_messages[stream].clear()
+            if len(self._buffered_messages[stream]):
+                await self._send_batch(stream, self._buffered_messages[stream], sync=False)
+                self._buffered_messages[stream].clear()
 
     def _on_publish_confirm(self, frame: schema.PublishConfirm, publisher: _Publisher) -> None:
         if frame.publisher_id != publisher.id:
