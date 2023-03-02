@@ -49,6 +49,7 @@ class Producer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
+        default_batch_publishing_delay: float = 0.2,
     ):
         self._pool = ClientPool(
             host,
@@ -70,9 +71,9 @@ class Producer:
         # dictionary [stream][list] of buffered messages to send asynchronously
         self._buffered_messages: dict[str, list] = defaultdict(list)
         self._buffered_messages_lock = asyncio.Lock()
-        # Delay After sending the messages on _buffered_messages list
-        self._default_batch_publishing_delay = 0.2
         self.task: asyncio.Task[NoReturn] | None = None
+        # Delay After sending the messages on _buffered_messages list
+        self._default_batch_publishing_delay = default_batch_publishing_delay
 
     @property
     def default_client(self) -> Client:
@@ -120,7 +121,6 @@ class Producer:
     async def _get_or_create_publisher(
         self,
         stream: str,
-        send_batch_enabled: bool,
         publisher_name: Optional[str] = None,
     ) -> _Publisher:
         if stream in self._publishers:
@@ -163,9 +163,6 @@ class Producer:
             name=publisher.reference,
         )
 
-        if send_batch_enabled and not self.task:
-            self.task = asyncio.create_task(self._timer())
-
         return publisher
 
     async def send_batch(
@@ -188,9 +185,7 @@ class Producer:
             raise ValueError("Empty batch")
 
         async with self._lock:
-            publisher = await self._get_or_create_publisher(
-                stream, send_batch_enabled=False, publisher_name=publisher_name
-            )
+            publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
         messages = []
 
@@ -238,6 +233,14 @@ class Producer:
         )
         return publishing_ids[0]
 
+    def _timer_completed(self, context):
+
+        if not context.cancelled():
+            if context.exception():
+                raise context.exception()
+
+        return 0
+
     async def send(
         self,
         stream: str,
@@ -245,10 +248,14 @@ class Producer:
         publisher_name: Optional[str] = None,
     ):
 
+        # start the background thread to send buffered messages
+        if self.task is None:
+            self.task = asyncio.create_task(self._timer())
+            self.task.add_done_callback(self._timer_completed)
+
         async with self._lock:
-            await self._get_or_create_publisher(
-                stream, send_batch_enabled=True, publisher_name=publisher_name
-            )
+            await self._get_or_create_publisher(stream, publisher_name=publisher_name)
+
         async with self._buffered_messages_lock:
             self._buffered_messages[stream].append(message)
 

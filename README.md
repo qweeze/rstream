@@ -38,6 +38,8 @@ async def publish():
 asyncio.run(publish())
 ```
 
+send is not thread safe so it must be awaited.
+
 Similarly with the send_wait:
 
 ```python
