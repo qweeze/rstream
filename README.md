@@ -11,7 +11,15 @@ pip install rstream
 
 ## Quick start
 
-Publishing messages:
+### Publishing messages: 
+
+You can publish messages with three different methods:
+
+* send: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires.
+* batch_send: Synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
+* send_wait: Synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
+
+Example Using send:
 
 ```python
 import asyncio
@@ -25,12 +33,55 @@ async def publish():
             amqp_message = AMQPMessage(
                 body='hello: {}'.format(i),
             )
-            await producer.publish('mystream', amqp_message)
+            await producer.send('mystream', amqp_message)
 
 asyncio.run(publish())
 ```
 
-Consuming messages:
+send is not thread safe so it must be awaited.
+
+Similarly with the send_wait:
+
+```python
+import asyncio
+from rstream import Producer, AMQPMessage
+
+async def publish():
+    async with Producer('localhost', username='guest', password='guest') as producer:
+        await producer.create_stream('mystream')
+
+        for i in range(100):
+            amqp_message = AMQPMessage(
+                body='hello: {}'.format(i),
+            )
+            await producer.send_wait('mystream', amqp_message)
+
+asyncio.run(publish())
+```
+
+Eventually using batch_send:
+
+```python
+import asyncio
+from rstream import Producer, AMQPMessage
+
+async def publish():
+    async with Producer('localhost', username='guest', password='guest') as producer:
+        await producer.create_stream('mystream')
+        list_messages = []
+
+        for i in range(100):
+            amqp_message = AMQPMessage(
+                body='hello: {}'.format(i),
+            )
+            list_messages.append(amqp_message)
+
+        await producer.send_batch('mystream',  list_messages) 
+
+asyncio.run(publish())
+```
+
+### Consuming messages:
 
 ```python
 import asyncio
@@ -59,7 +110,7 @@ async def consume():
 asyncio.run(consume())
 ```
 
-Connecting with SSL:
+### Connecting with SSL:
 
 ```python
 import ssl

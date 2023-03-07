@@ -1,3 +1,6 @@
+# Copyright 2023 VMware, Inc. All Rights Reserved.
+# SPDX-License-Identifier: MIT
+
 import pytest
 import uamqp.message
 
@@ -17,7 +20,7 @@ async def test_amqp_message(stream: str, consumer: Consumer, producer: Producer)
         annotations={b"test": 42},
         body="test-body",
     )
-    await producer.publish(stream, amqp_message)
+    await producer.send_wait(stream, amqp_message)
 
     incoming_amqp_message = None
 
