@@ -23,10 +23,10 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.extras]
-dev = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "mypy", "pytest-mypy-plugins", "zope.interface", "furo", "sphinx", "sphinx-notfound-page", "pre-commit"]
-docs = ["furo", "sphinx", "zope.interface", "sphinx-notfound-page"]
-tests = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "mypy", "pytest-mypy-plugins", "zope.interface"]
-tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "mypy", "pytest-mypy-plugins"]
+dev = ["coverage[toml] (>=5.0.2)", "furo", "hypothesis", "mypy", "pre-commit", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six", "sphinx", "sphinx-notfound-page", "zope.interface"]
+docs = ["furo", "sphinx", "sphinx-notfound-page", "zope.interface"]
+tests = ["coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six", "zope.interface"]
+tests-no-zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six"]
 
 [[package]]
 name = "backcall"
@@ -53,7 +53,7 @@ regex = ">=2020.1.8"
 tomli = ">=0.2.6,<2.0.0"
 typing-extensions = [
     {version = ">=3.10.0.0", markers = "python_version < \"3.10\""},
-    {version = "!=3.10.0.1", markers = "python_version >= \"3.10\""},
+    {version = ">=3.10.0.0,<3.10.0.1 || >3.10.0.1", markers = "python_version >= \"3.10\""},
 ]
 
 [package.extras]
@@ -138,6 +138,7 @@ pexpect = {version = ">4.3", markers = "sys_platform != \"win32\""}
 pickleshare = "*"
 prompt-toolkit = ">=2.0.0,<3.0.0 || >3.0.0,<3.0.1 || >3.0.1,<3.1.0"
 pygments = "*"
+setuptools = ">=18.5"
 traitlets = ">=4.2"
 
 [package.extras]
@@ -146,10 +147,10 @@ doc = ["Sphinx (>=1.3)"]
 kernel = ["ipykernel"]
 nbconvert = ["nbconvert"]
 nbformat = ["nbformat"]
-notebook = ["notebook", "ipywidgets"]
+notebook = ["ipywidgets", "notebook"]
 parallel = ["ipyparallel"]
 qtconsole = ["qtconsole"]
-test = ["nose (>=0.10.1)", "requests", "testpath", "pygments", "nbformat", "ipykernel", "numpy (>=1.17)"]
+test = ["ipykernel", "nbformat", "nose (>=0.10.1)", "numpy (>=1.17)", "pygments", "requests", "testpath"]
 
 [[package]]
 name = "ipython-genutils"
@@ -168,10 +169,10 @@ optional = false
 python-versions = ">=3.6.1,<4.0"
 
 [package.extras]
-pipfile_deprecated_finder = ["pipreqs", "requirementslib"]
-requirements_deprecated_finder = ["pipreqs", "pip-api"]
 colors = ["colorama (>=0.4.3,<0.5.0)"]
+pipfile-deprecated-finder = ["pipreqs", "requirementslib"]
 plugins = ["setuptools"]
+requirements-deprecated-finder = ["pip-api", "pipreqs"]
 
 [[package]]
 name = "jedi"
@@ -408,12 +409,17 @@ optional = false
 python-versions = "*"
 
 [[package]]
-name = "six"
-version = "1.16.0"
-description = "Python 2 and 3 compatibility utilities"
-category = "main"
+name = "setuptools"
+version = "67.5.1"
+description = "Easily download, build, install, upgrade, and uninstall Python packages"
+category = "dev"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
+python-versions = ">=3.7"
+
+[package.extras]
+docs = ["furo", "jaraco.packaging (>=9)", "jaraco.tidelift (>=1.4)", "pygments-github-lexers (==0.0.5)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-favicon", "sphinx-hoverxref (<2)", "sphinx-inline-tabs", "sphinx-lint", "sphinx-notfound-page (==0.8.3)", "sphinx-reredirects", "sphinxcontrib-towncrier"]
+testing = ["build[virtualenv]", "filelock (>=3.4.0)", "flake8 (<5)", "flake8-2020", "ini2toml[lite] (>=0.9)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pip (>=19.1)", "pip-run (>=8.8)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.3)", "pytest-flake8", "pytest-mypy (>=0.9.1)", "pytest-perf", "pytest-timeout", "pytest-xdist", "tomli-w (>=1.0.0)", "virtualenv (>=13.0.0)", "wheel"]
+testing-integration = ["build[virtualenv]", "filelock (>=3.4.0)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.2.0)", "pytest", "pytest-enabler", "pytest-xdist", "tomli", "virtualenv (>=13.0.0)", "wheel"]
 
 [[package]]
 name = "toml"
@@ -455,15 +461,14 @@ python-versions = "*"
 
 [[package]]
 name = "uamqp"
-version = "1.5.2"
+version = "1.6.4"
 description = "AMQP 1.0 Client Library for Python"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 
 [package.dependencies]
 certifi = ">=2017.4.17"
-six = ">=1.0,<2.0"
 
 [[package]]
 name = "wcwidth"
@@ -476,7 +481,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "169e22709ecf17ccc2ff74fa9d31d3b7c549c86c067983d727d88102eb8533a9"
+content-hash = "1e49ba60b3d3de2068f17c5be18475febefd0699d84ec33272fec3997fe7277d"
 
 [metadata.files]
 appnope = [
@@ -678,9 +683,9 @@ regex = [
     {file = "regex-2021.10.21-cp39-cp39-win_amd64.whl", hash = "sha256:74d03c256cf0aed81997e87be8e24297b5792c9718f3a735f5055ddfad392f06"},
     {file = "regex-2021.10.21.tar.gz", hash = "sha256:4832736b3f24617e63dc919ce8c4215680ba94250a5d9e710fcc0c5f457b5028"},
 ]
-six = [
-    {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
-    {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
+setuptools = [
+    {file = "setuptools-67.5.1-py3-none-any.whl", hash = "sha256:1c39d42bda4cb89f7fdcad52b6762e3c309ec8f8715b27c684176b7d71283242"},
+    {file = "setuptools-67.5.1.tar.gz", hash = "sha256:15136a251127da2d2e77ac7a1bc231eb504654f7e3346d93613a13f2e2787535"},
 ]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
@@ -700,31 +705,27 @@ typing-extensions = [
     {file = "typing_extensions-3.10.0.2.tar.gz", hash = "sha256:49f75d16ff11f1cd258e1b988ccff82a3ca5570217d7ad8c5f48205dd99a677e"},
 ]
 uamqp = [
-    {file = "uamqp-1.5.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:9c91565fc515257572d8a047d5099c39a1abbca3e58758647bcf8b15256e1605"},
-    {file = "uamqp-1.5.2-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:4818a09d81000e163f86c7a5054d71cf6350c6825c691656b9f0ab66cb7d7f7b"},
-    {file = "uamqp-1.5.2-cp310-cp310-win32.whl", hash = "sha256:e6f3644216837de19161f3b668b31f33f8f6ce31d293f540af6610a2bb27d358"},
-    {file = "uamqp-1.5.2-cp310-cp310-win_amd64.whl", hash = "sha256:d8c6880c463d904e448ec9a1fa1ff8e0582aaf75ad9c61a998f4e002f9b2547c"},
-    {file = "uamqp-1.5.2-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:fe65f47e128cf05ec289275437bcab933398e5c76ffd6cf5333913f56a8cb5b3"},
-    {file = "uamqp-1.5.2-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:bd751dada972e62928dd445a76aa24c410e0d14116ee722519974566e5742895"},
-    {file = "uamqp-1.5.2-cp36-cp36m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:764fb5c6daaa7715450a999002b91de15711f96828b94c462c5bfdfad6f5a43c"},
-    {file = "uamqp-1.5.2-cp36-cp36m-win32.whl", hash = "sha256:c43d316692442906e43721258ac3121717b2ec7a4b4cc4d0f9f2ea61273658f0"},
-    {file = "uamqp-1.5.2-cp36-cp36m-win_amd64.whl", hash = "sha256:82972900ada3f759fff3ff09f59d43586cec681a2f7dbe38d78bae34917aa604"},
-    {file = "uamqp-1.5.2-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:a943998d6816f0b3d6efdb8feacf002f6e7ca5398b4e9b38531aef79dbb51486"},
-    {file = "uamqp-1.5.2-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:666880780fc8b78eda4c6b605c0d465b06df00de6d18aa015336ef6800554e05"},
-    {file = "uamqp-1.5.2-cp37-cp37m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:918251372140861c880b43aa6a9df66d63c2094a7af9aa21d1f74233c146a9c6"},
-    {file = "uamqp-1.5.2-cp37-cp37m-win32.whl", hash = "sha256:c648de1aa49ebce57376d190133a4d4d7b302ebdc29a2cb7d02c76f5da0822e7"},
-    {file = "uamqp-1.5.2-cp37-cp37m-win_amd64.whl", hash = "sha256:053f40ba1ec3cafdec3c126bcae104b6672f45257fc47457f6bcd0a38c0e641e"},
-    {file = "uamqp-1.5.2-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:86b3c98528857e174c75e4747a699c85e931c60dea1d72d4b085331af447a4cb"},
-    {file = "uamqp-1.5.2-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:81085da795c038a498d931aea81a20bc10b69ba2feec726e1d29f3c7c6312316"},
-    {file = "uamqp-1.5.2-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:cfb90f884a99085d538f8bdba5567e483564adf86e967c37416a546c98086291"},
-    {file = "uamqp-1.5.2-cp38-cp38-win32.whl", hash = "sha256:cfdc2a4d728a6d680cc480c609332738e67502aba90abff686894ef62ad32087"},
-    {file = "uamqp-1.5.2-cp38-cp38-win_amd64.whl", hash = "sha256:3d348eb89ea595d85d9edab246e59308e942be554f59e54c8ec971c04e83b38f"},
-    {file = "uamqp-1.5.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:84d3b8afc0a468aaf4f7788627c0b877c65b4fde9420dfdc307b811097ca6d3b"},
-    {file = "uamqp-1.5.2-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:8d3c00c8a4517c9b5975755ab05302238576ea38de68d7f76993ff31aeb84173"},
-    {file = "uamqp-1.5.2-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:0cfe012e2f95341cf7396ad921a947f950b5788e5eda1153496301ece94ac294"},
-    {file = "uamqp-1.5.2-cp39-cp39-win32.whl", hash = "sha256:5e7d2e3c06d5f5b3a187d3434a0ba776b0138ed319938d7fa248c7257d6bc2cb"},
-    {file = "uamqp-1.5.2-cp39-cp39-win_amd64.whl", hash = "sha256:59b27f69f6fb9015a3f85b75403aae994ef343f4fa51311c0330daa15f295ae5"},
-    {file = "uamqp-1.5.2.tar.gz", hash = "sha256:20e0c433d92de83946b9473ff059f385b86cd60e32e0dcd93fb456e62c49bba4"},
+    {file = "uamqp-1.6.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:a03f90b280ad4f2fad2f6d4c74f483da3727888e35ede52004d13b75f7f4078b"},
+    {file = "uamqp-1.6.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bac44c5bbda91ca11d4ee2ef36685cd4e97a6279a74bfa9efe163938192abbb1"},
+    {file = "uamqp-1.6.4-cp310-cp310-win32.whl", hash = "sha256:ca01bfb103a020e789663a1a4b75a19577c5632f25dd3c469c9e97def61f90a3"},
+    {file = "uamqp-1.6.4-cp310-cp310-win_amd64.whl", hash = "sha256:ce5dfc751ccc8956a22a269848709203e69b20aa61ed38cd32db4abc4970d2db"},
+    {file = "uamqp-1.6.4-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:e00c79c7d4c21cc4a4d6cf41d279496053f276530f858a747a2343070e96c98c"},
+    {file = "uamqp-1.6.4-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ff847e87f68e0801433f0561f12b8b2884cfdae99cee35122f9b58b26d921961"},
+    {file = "uamqp-1.6.4-cp311-cp311-win32.whl", hash = "sha256:a4213146256da9e9c9c15de149359da6fddf8939aa40d7aab4bab1ba009b9809"},
+    {file = "uamqp-1.6.4-cp311-cp311-win_amd64.whl", hash = "sha256:d29ae7ec33b4729a9c68e67717da26d355d6e2f82dd0748ba20579caf0e7e9a1"},
+    {file = "uamqp-1.6.4-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:61c4f591adbd8c8214c02386ebd9207a180c48ff30bd64fd2df0ab12ed47f831"},
+    {file = "uamqp-1.6.4-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:313f8e6e40cd9b0f0c6fa1c381361fc355686da567222b6d47665694795ec968"},
+    {file = "uamqp-1.6.4-cp37-cp37m-win32.whl", hash = "sha256:cadf0c43cca07be5580115720c56434fe966d42d8b26635b55f6a9fedb93d5ea"},
+    {file = "uamqp-1.6.4-cp37-cp37m-win_amd64.whl", hash = "sha256:5d58b7352ebee51160d5add21cafda7fccfbfcc1d7084adaaca4864b296525d1"},
+    {file = "uamqp-1.6.4-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:8a8e17acafc4d9331b176fca6a46098c411ebe6024041e8c91233394d89f2bca"},
+    {file = "uamqp-1.6.4-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:41e10eb1e008671c5f8d1970be6977769f7710238530e6c7f017ee7ceb102487"},
+    {file = "uamqp-1.6.4-cp38-cp38-win32.whl", hash = "sha256:78ae6e6ac954786fd70471dd7da404dfa530302dcfdd70c6da6dcdef64c2013d"},
+    {file = "uamqp-1.6.4-cp38-cp38-win_amd64.whl", hash = "sha256:ea0d51e35eeeada4f22325ea12adb3f2569b63d63c0f1381c843b5ef34e71a67"},
+    {file = "uamqp-1.6.4-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:376e5636c0b1d6e2c69390d30d95cabfb35a4fca11562a6324d30e248214707a"},
+    {file = "uamqp-1.6.4-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:916f8fc33b9cf1c4d2020aa94e4b91fbff54bd5d679dffe1f111601c2d441376"},
+    {file = "uamqp-1.6.4-cp39-cp39-win32.whl", hash = "sha256:a3c2d5e97ff5159acdf88dbbb0f8effabd493be07e5b8d1d785162c9080c40a9"},
+    {file = "uamqp-1.6.4-cp39-cp39-win_amd64.whl", hash = "sha256:4de3b9011f4c3f8a69868cec0a7c3f40912215fe2a44bd8563bcb2dbb89db9a7"},
+    {file = "uamqp-1.6.4.tar.gz", hash = "sha256:2183332435ef7882fad22724e3f2f63d3fd5a51c7f0c635d63487948b02e3749"},
 ]
 wcwidth = [
     {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},
