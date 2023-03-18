@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+from functools import partial
 
 import pytest
 
@@ -12,7 +13,10 @@ from rstream import (
     exceptions,
 )
 
-from .util import wait_for
+from .util import (
+    on_publish_confirm_client_callback,
+    wait_for,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -143,6 +147,28 @@ async def test_concurrent_publish_async(stream: str, producer: Producer, consume
 
     await wait_for(lambda: len(captured) == 10)
     assert captured == [b"test"] * 10
+
+
+async def test_send_async_confirmation(stream: str, producer: Producer) -> None:
+
+    confirmed_messages: list[int] = []
+    errored_messages: list[int] = []
+
+    async def publish_with_ids(*ids):
+        for publishing_id in ids:
+            await producer.send(
+                stream,
+                RawMessage(f"test_{publishing_id}".encode(), publishing_id),
+                notification_callback=partial(
+                    on_publish_confirm_client_callback,
+                    confirmed_messages=confirmed_messages,
+                    errored_messages=errored_messages,
+                ),
+            )
+
+    await publish_with_ids(1, 2, 3)
+
+    await wait_for(lambda: len(confirmed_messages) == 3)
 
 
 async def test_producer_restart(stream: str, producer: Producer, consumer: Consumer) -> None:

@@ -8,13 +8,25 @@ import ssl
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, NoReturn, Optional, TypeVar
+from typing import (
+    Annotated,
+    Any,
+    Awaitable,
+    Callable,
+    Generic,
+    NoReturn,
+    Optional,
+    TypeVar,
+    Union,
+)
 
 from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
 from .client import Addr, Client, ClientPool
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
+MT = TypeVar("MT")
+CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
 
 
 @dataclass
@@ -33,6 +45,19 @@ class RawMessage(_MessageProtocol):
 
     def __bytes__(self) -> bytes:
         return self.data
+
+
+@dataclass
+class _MessageNotification(Generic[MessageT]):
+    message: MessageT
+    callback: Optional[CB[ConfirmationStatus]] = None
+
+
+@dataclass
+class ConfirmationStatus:
+    message_id: int
+    is_confirmed: bool = False
+    response_code: int = 0
 
 
 class Producer:
@@ -66,7 +91,9 @@ class Producer:
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}
         self._publishers: dict[str, _Publisher] = {}
-        self._waiting_for_confirm: dict[str, dict[asyncio.Future[None], set[int]]] = defaultdict(dict)
+        self._waiting_for_confirm: dict[
+            str, dict[asyncio.Future[None] | CB[ConfirmationStatus], set[int]]
+        ] = defaultdict(dict)
         self._lock = asyncio.Lock()
         # dictionary [stream][list] of buffered messages to send asynchronously
         self._buffered_messages: dict[str, list] = defaultdict(list)
@@ -170,14 +197,20 @@ class Producer:
         stream: str,
         batch: list[MessageT],
         publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
-        return await self._send_batch(stream, batch, sync=False, publisher_name=publisher_name)
+        wrapped_batch = []
+        for item in batch:
+            wrapped_item = _MessageNotification(item, on_publish_confirm)
+            wrapped_batch.append(wrapped_item)
+
+        return await self._send_batch(stream, wrapped_batch, sync=False, publisher_name=publisher_name)
 
     async def _send_batch(
         self,
         stream: str,
-        batch: list[MessageT],
+        batch: list[_MessageNotification],
         sync: bool = True,
         publisher_name: Optional[str] = None,
     ) -> list[int]:
@@ -191,7 +224,7 @@ class Producer:
 
         for item in batch:
 
-            msg = RawMessage(item) if isinstance(item, bytes) else item
+            msg = RawMessage(item.message) if isinstance(item.message, bytes) else item.message
 
             if msg.publishing_id is None:
                 msg.publishing_id = publisher.sequence.next()
@@ -212,7 +245,9 @@ class Producer:
 
         publishing_ids = [m.publishing_id for m in messages]
 
-        if sync:
+        if item.callback is not None:
+            self._waiting_for_confirm[publisher.reference][item.callback] = set(publishing_ids)
+        elif sync:
             future: asyncio.Future[None] = asyncio.Future()
             self._waiting_for_confirm[publisher.reference][future] = set(publishing_ids)
             await future
@@ -225,9 +260,12 @@ class Producer:
         message: MessageT,
         publisher_name: Optional[str] = None,
     ) -> int:
+
+        wrapped_message: _MessageNotification = _MessageNotification(message, None)
+
         publishing_ids = await self._send_batch(
             stream,
-            [message],
+            [wrapped_message],
             sync=True,
             publisher_name=publisher_name,
         )
@@ -246,6 +284,7 @@ class Producer:
         stream: str,
         message: MessageT,
         publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
         # start the background thread to send buffered messages
@@ -256,8 +295,9 @@ class Producer:
         async with self._lock:
             await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
+        wrapped_message = _MessageNotification(message, on_publish_confirm)
         async with self._buffered_messages_lock:
-            self._buffered_messages[stream].append(message)
+            self._buffered_messages[stream].append(wrapped_message)
 
         await asyncio.sleep(0)
 
@@ -277,29 +317,47 @@ class Producer:
                 self._buffered_messages[stream].clear()
 
     def _on_publish_confirm(self, frame: schema.PublishConfirm, publisher: _Publisher) -> None:
+
         if frame.publisher_id != publisher.id:
             return
 
         waiting = self._waiting_for_confirm[publisher.reference]
-        for fut in list(waiting):
-            ids = waiting[fut]
+        for confirmation in list(waiting):
+            ids = waiting[confirmation]
+            ids_to_call = ids.intersection(frame.publishing_ids)
+
+            for id in ids_to_call:
+                if not isinstance(confirmation, asyncio.Future):
+                    confirmation_status: ConfirmationStatus = ConfirmationStatus(id, True)
+                    confirmation(confirmation_status)
             ids.difference_update(frame.publishing_ids)
             if not ids:
-                fut.set_result(None)
-                del waiting[fut]
+                del waiting[confirmation]
+                if isinstance(confirmation, asyncio.Future):
+                    confirmation.set_result(None)
 
     def _on_publish_error(self, frame: schema.PublishError, publisher: _Publisher) -> None:
+
         if frame.publisher_id != publisher.id:
             return
 
         waiting = self._waiting_for_confirm[publisher.reference]
         for error in frame.errors:
             exc = exceptions.ServerError.from_code(error.response_code)
-            for fut in list(waiting):
-                ids = waiting[fut]
+            for confirmation in list(waiting):
+                ids = waiting[confirmation]
                 if error.publishing_id in ids:
-                    fut.set_exception(exc)
-                    del waiting[fut]
+                    if not isinstance(confirmation, asyncio.Future):
+                        confirmation_status = ConfirmationStatus(
+                            error.publishing_id, False, error.response_code
+                        )
+                        confirmation(confirmation_status)
+                        ids.remove(error.publishing_id)
+
+                if not ids:
+                    del waiting[confirmation]
+                    if isinstance(confirmation, asyncio.Future):
+                        confirmation.set_exception(exc)
 
     async def create_stream(
         self,
@@ -307,6 +365,7 @@ class Producer:
         arguments: Optional[dict[str, Any]] = None,
         exists_ok: bool = False,
     ) -> None:
+
         try:
             await self.default_client.create_stream(stream, arguments)
         except exceptions.StreamAlreadyExists:
