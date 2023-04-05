@@ -8,7 +8,7 @@ import ssl
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, NoReturn, Optional, TypeVar
+from typing import Any, Callable, NoReturn, Optional, TypeVar
 
 from . import exceptions, schema, utils
 from .amqp import _MessageProtocol
@@ -74,6 +74,7 @@ class Producer:
         self.task: asyncio.Task[NoReturn] | None = None
         # Delay After sending the messages on _buffered_messages list
         self._default_batch_publishing_delay = default_batch_publishing_delay
+        self._callbacks: dict[int, Callable[[int, int], None]] = {}
 
     @property
     def default_client(self) -> Client:
@@ -170,9 +171,16 @@ class Producer:
         stream: str,
         batch: list[MessageT],
         publisher_name: Optional[str] = None,
+        notification_callback: Optional[Callable[[int, int], None]] = None,
     ) -> list[int]:
 
-        return await self._send_batch(stream, batch, sync=False, publisher_name=publisher_name)
+        return await self._send_batch(
+            stream,
+            batch,
+            sync=False,
+            publisher_name=publisher_name,
+            notification_callback=notification_callback,
+        )
 
     async def _send_batch(
         self,
@@ -180,6 +188,7 @@ class Producer:
         batch: list[MessageT],
         sync: bool = True,
         publisher_name: Optional[str] = None,
+        notification_callback: Optional[Callable[[int, int], None]] = None,
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -211,6 +220,10 @@ class Producer:
         )
 
         publishing_ids = [m.publishing_id for m in messages]
+
+        if notification_callback is not None:
+            for publishing_id in publishing_ids:
+                self._callbacks[publishing_id] = notification_callback
 
         if sync:
             future: asyncio.Future[None] = asyncio.Future()
@@ -288,6 +301,11 @@ class Producer:
                 fut.set_result(None)
                 del waiting[fut]
 
+        for publishing_id in frame.publishing_ids:
+            callback = self._callbacks.pop(publishing_id, None)
+            if callback is not None:
+                callback(publishing_id, 0)
+
     def _on_publish_error(self, frame: schema.PublishError, publisher: _Publisher) -> None:
         if frame.publisher_id != publisher.id:
             return
@@ -300,6 +318,10 @@ class Producer:
                 if error.publishing_id in ids:
                     fut.set_exception(exc)
                     del waiting[fut]
+
+                callback = self._callbacks.pop(error.publishing_id, None)
+                if callback is not None:
+                    callback(error.publishing_id, error.response_code)
 
     async def create_stream(
         self,
