@@ -27,5 +27,5 @@ jobs:
           export PATH="/home/runner/.local/bin:$PATH"
           poetry config repositories.test-pypi $REPO
           poetry build
-          poetry publish --username=$USER --password=$PASS -r testpypi 
+          poetry publish --username=$USER --password=$PASS
             
