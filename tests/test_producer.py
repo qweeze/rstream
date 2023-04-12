@@ -159,7 +159,7 @@ async def test_send_async_confirmation(stream: str, producer: Producer) -> None:
             await producer.send(
                 stream,
                 RawMessage(f"test_{publishing_id}".encode(), publishing_id),
-                notification_callback=partial(
+                on_publish_confirm=partial(
                     on_publish_confirm_client_callback,
                     confirmed_messages=confirmed_messages,
                     errored_messages=errored_messages,
