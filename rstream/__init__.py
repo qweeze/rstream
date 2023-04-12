@@ -1,3 +1,6 @@
+# Copyright 2023 VMware, Inc. All Rights Reserved.
+# SPDX-License-Identifier: MIT
+
 from importlib import metadata
 
 try:
@@ -12,7 +15,11 @@ del metadata
 from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
 from .constants import OffsetType  # noqa: E402
 from .consumer import Consumer  # noqa: E402
-from .producer import Producer, RawMessage  # noqa: E402
+from .producer import (  # noqa: E402
+    ConfirmationStatus,
+    Producer,
+    RawMessage,
+)
 
 __all__ = [
     "AMQPMessage",
@@ -21,4 +28,5 @@ __all__ = [
     "RawMessage",
     "Producer",
     "OffsetType",
+    "ConfirmationStatus",
 ]
