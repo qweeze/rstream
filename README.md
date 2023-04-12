@@ -81,6 +81,48 @@ async def publish():
 asyncio.run(publish())
 ```
 
+### Publishing with confirmation
+
+The Send method takes as parameter an handle function that will be called asynchronously when the message sent will be notified from the server to have been published.
+
+In this case the example will work like this:
+
+
+```python
+import asyncio
+from rstream import Producer, AMQPMessage, ConfirmationStatus
+
+def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
+
+     if confirmation.is_confirmed == True:
+        print("message id: " + str(confirmation.message_id) + " is confirmed")
+     else:
+         print("message id: " + str(confirmation.message_id) + " is not confirmed")
+
+
+async def publish():
+    async with Producer('localhost', username='guest', password='guest') as producer:
+        await producer.create_stream('mystream')
+
+        for i in range(100):
+            amqp_message = AMQPMessage(
+                body='hello: {}'.format(i),
+            )
+            await producer.send('mystream', amqp_message, on_publish_confirm=_on_publish_confirm_client) 
+
+asyncio.run(publish())
+```
+
+Same is valid also for send_batch.
+
+Please note that the publish confirmation callbacks are internally managed by the client and they are triggered in the Producer class.
+This means that when the Producer will terminate its scope and lifetime you will not be able to receive the remaining notifications if any.
+Depending on your scenario, you could add a synchronization mechanism (like an asyncio condition) to wait till all the notifications 
+have been received or you could use an asyncio.wait to give time for the callbacks to be invoked by the client.
+
+
+With `send_wait` instead will wait until the confirmation from the server is received.
+
 ### Consuming messages:
 
 ```python
