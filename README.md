@@ -121,7 +121,7 @@ Depending on your scenario, you could add a synchronization mechanism (like an a
 have been received or you could use an asyncio.wait to give time for the callbacks to be invoked by the client.
 
 
-With Send_wait instead will wait until the confirmation from the server is received.
+With `send_wait` instead will wait until the confirmation from the server is received.
 
 ### Consuming messages:
 
