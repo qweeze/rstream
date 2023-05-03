@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import ssl
+import gzip
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
@@ -300,6 +301,63 @@ class Producer:
             self._buffered_messages[stream].append(wrapped_message)
 
         await asyncio.sleep(0)
+        
+        
+    async def send_sub_entry(
+        self,
+        stream: str,
+        publishing_messages: list[MessageT],
+        compression: Optional[int] = 0,
+        publisher_name: Optional[str] = None,
+          
+    ):
+        
+        if len(publishing_messages) == 0:
+            raise ValueError("Empty batch")
+
+        async with self._lock:
+            publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
+            
+        publisher_id = publisher.id
+        publishing_id = publisher.sequence.next()
+            
+    
+        buffer = bytearray()
+        sub_messages = []
+        for item in publishing_messages: 
+            msg = RawMessage(item) if isinstance(item, bytes) else item
+            sub_messages.append(
+                schema.Message(
+                    publishing_id=publishing_id,
+                    data=bytes(msg),
+                )
+            )
+            
+            buffer += bytes(msg)
+                    
+        uncompressed_data_size = len(buffer)
+        #compressed_value = gzip.compress(buffer)
+        #compressed_data_size = len(compressed_value)
+        
+        print("before sending frame: " + str(uncompressed_data_size) + "subbatching_message_count: " + str(len(publishing_messages)))
+        
+        await publisher.client.send_frame(
+            schema.PublishSubBatching(
+                publisher_id=publisher_id,
+                number_of_root_messages=1,
+                publishing_id=publishing_id,
+                compress_type= 0x80 | 0<<4,
+                subbatching_message_count=len(publishing_messages),
+                uncompressed_data_size=uncompressed_data_size,
+                compressed_data_size=uncompressed_data_size,
+                messages=sub_messages,
+            ),
+        )
+        
+        return publishing_id
+        
+        
+        
 
     # After the timeout send the messages in _buffered_messages in batches
     async def _timer(self):

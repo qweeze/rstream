@@ -180,6 +180,10 @@ class QueryPublisherSequenceResponse(Frame, is_response=True):
 class Message(Struct):
     publishing_id: int = field(metadata={"type": T.uint64})
     data: bytes = field(metadata={"type": T.bytes})
+    
+@dataclass
+class MessageSubBatching(Struct):
+    data: bytes = field(metadata={"type": T.bytes})
 
 
 @dataclass
@@ -187,8 +191,19 @@ class Publish(Frame):
     key = Key.Publish
     publisher_id: int = field(metadata={"type": T.uint8})
     messages: list[Message]
-
-
+    
+@dataclass
+class PublishSubBatching(Frame):
+    key = Key.Publish
+    publisher_id: int = field(metadata={"type": T.uint8})
+    number_of_root_messages: int = field(metadata={"type": T.uint32})
+    publishing_id: int = field(metadata={"type": T.uint64})
+    compress_type: int = field(metadata={"type": T.uint8})
+    subbatching_message_count: int = field(metadata={"type": T.uint16})
+    uncompressed_data_size: int = field(metadata={"type": T.uint32})
+    compressed_data_size: int = field(metadata={"type": T.uint32})    
+    messages: list[Message]
+    #messages: bytearray = field(metadata={"type": T.bytes})
 @dataclass
 class PublishConfirm(Frame):
     key = Key.PublishConfirm
