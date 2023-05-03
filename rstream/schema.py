@@ -1,3 +1,6 @@
+# Copyright 2023 VMware, Inc. All Rights Reserved.
+# SPDX-License-Identifier: MIT
+
 import zlib
 from dataclasses import dataclass, field
 from typing import ClassVar, Optional, Type, cast
@@ -29,9 +32,9 @@ class Frame(Struct):
         assert cls.key is not NotImplemented
         registry[(is_response, cls.key)] = cls
 
-    def check_response_code(self) -> None:
+    def check_response_code(self, raise_exception: bool = True) -> None:
         code: int = getattr(self, "response_code", 0)
-        if code > 1:
+        if code > 1 and raise_exception is True:
             raise ServerError.from_code(code)
 
 
@@ -235,10 +238,10 @@ class MetadataResponse(Frame, is_response=True):
     brokers: list[Broker]
     metadata: list[StreamMetadata]
 
-    def check_response_code(self) -> None:
+    def check_response_code(self, raise_exception: bool = True) -> None:
         for item in self.metadata:
             code = item.response_code
-            if code > 1:
+            if code > 1 and raise_exception is True:
                 raise ServerError.from_code(code)
 
 

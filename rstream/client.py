@@ -1,3 +1,6 @@
+# Copyright 2023 VMware, Inc. All Rights Reserved.
+# SPDX-License-Identifier: MIT
+
 from __future__ import annotations
 
 import asyncio
@@ -141,11 +144,11 @@ class BaseClient:
         fut.add_done_callback(self._waiters[_key].discard)
         return utils.TimeoutWrapper(fut, timeout)
 
-    async def sync_request(self, frame: schema.Frame, resp_schema: Type[FT]) -> FT:
+    async def sync_request(self, frame: schema.Frame, resp_schema: Type[FT], raise_exception=True) -> FT:
         waiter = self.wait_frame(resp_schema, frame.corr_id)
         await self.send_frame(frame)
         resp = await waiter
-        resp.check_response_code()
+        resp.check_response_code(raise_exception=raise_exception)
         return resp
 
     async def start(self) -> None:
@@ -424,6 +427,7 @@ class Client(BaseClient):
                 reference=reference,
             ),
             resp_schema=schema.DeclarePublisherResponse,
+            raise_exception=False,
         )
 
     async def delete_publisher(self, publisher_id: int) -> None:
@@ -443,6 +447,7 @@ class Client(BaseClient):
                 stream=stream,
             ),
             resp_schema=schema.QueryPublisherSequenceResponse,
+            raise_exception=False,
         )
         return resp.sequence
 
