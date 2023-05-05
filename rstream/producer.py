@@ -323,7 +323,9 @@ class Producer:
         for item in publishing_messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
             publishing_id = publisher.sequence.next()
-            buffer += bytes(msg)
+            tmp = bytes(msg)
+            buffer += len(tmp).to_bytes(4, "big")
+            buffer += tmp
 
         uncompressed_data_size = len(buffer)
         # compressed_value = gzip.compress(buffer)
