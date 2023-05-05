@@ -180,7 +180,8 @@ class QueryPublisherSequenceResponse(Frame, is_response=True):
 class Message(Struct):
     publishing_id: int = field(metadata={"type": T.uint64})
     data: bytes = field(metadata={"type": T.bytes})
-    
+
+
 @dataclass
 class MessageSubBatching(Struct):
     data: bytes = field(metadata={"type": T.bytes})
@@ -191,19 +192,21 @@ class Publish(Frame):
     key = Key.Publish
     publisher_id: int = field(metadata={"type": T.uint8})
     messages: list[Message]
-    
+
+
 @dataclass
 class PublishSubBatching(Frame):
     key = Key.Publish
     publisher_id: int = field(metadata={"type": T.uint8})
-    number_of_root_messages: int = field(metadata={"type": T.uint32})
+    number_of_root_messages: int = field(metadata={"type": T.int32})
     publishing_id: int = field(metadata={"type": T.uint64})
     compress_type: int = field(metadata={"type": T.uint8})
     subbatching_message_count: int = field(metadata={"type": T.uint16})
-    uncompressed_data_size: int = field(metadata={"type": T.uint32})
-    compressed_data_size: int = field(metadata={"type": T.uint32})    
-    messages: list[Message]
-    #messages: bytearray = field(metadata={"type": T.bytes})
+    uncompressed_data_size: int = field(metadata={"type": T.int32})
+    compressed_data_size: int = field(metadata={"type": T.int32})
+    messages: bytes = field(metadata={"type": T.raw})
+
+
 @dataclass
 class PublishConfirm(Frame):
     key = Key.PublishConfirm
@@ -422,9 +425,9 @@ class Deliver(Frame):
         pos = 0
         for _ in range(self.num_entries):
             if (self.data[pos] & 0x80) == 0:
-                size = int.from_bytes(self.data[pos : pos + 4], "big")
+                size = int.from_bytes(self.data[pos: pos + 4], "big")
                 pos += 4
-                messages.append(self.data[pos : pos + size])
+                messages.append(self.data[pos: pos + size])
                 pos += size
             else:
                 raise NotImplementedError

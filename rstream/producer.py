@@ -63,19 +63,19 @@ class ConfirmationStatus:
 
 class Producer:
     def __init__(
-        self,
-        host: str,
-        port: int = 5552,
-        *,
-        ssl_context: Optional[ssl.SSLContext] = None,
-        vhost: str = "/",
-        username: str,
-        password: str,
-        frame_max: int = 1 * 1024 * 1024,
-        heartbeat: int = 60,
-        load_balancer_mode: bool = False,
-        max_retries: int = 20,
-        default_batch_publishing_delay: float = 0.2,
+            self,
+            host: str,
+            port: int = 5552,
+            *,
+            ssl_context: Optional[ssl.SSLContext] = None,
+            vhost: str = "/",
+            username: str,
+            password: str,
+            frame_max: int = 1 * 1024 * 1024,
+            heartbeat: int = 60,
+            load_balancer_mode: bool = False,
+            max_retries: int = 20,
+            default_batch_publishing_delay: float = 0.2,
     ):
         self._pool = ClientPool(
             host,
@@ -147,9 +147,9 @@ class Producer:
         return self._clients[stream]
 
     async def _get_or_create_publisher(
-        self,
-        stream: str,
-        publisher_name: Optional[str] = None,
+            self,
+            stream: str,
+            publisher_name: Optional[str] = None,
     ) -> _Publisher:
         if stream in self._publishers:
             publisher = self._publishers[stream]
@@ -194,11 +194,11 @@ class Producer:
         return publisher
 
     async def send_batch(
-        self,
-        stream: str,
-        batch: list[MessageT],
-        publisher_name: Optional[str] = None,
-        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+            self,
+            stream: str,
+            batch: list[MessageT],
+            publisher_name: Optional[str] = None,
+            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
         wrapped_batch = []
@@ -209,11 +209,11 @@ class Producer:
         return await self._send_batch(stream, wrapped_batch, sync=False, publisher_name=publisher_name)
 
     async def _send_batch(
-        self,
-        stream: str,
-        batch: list[_MessageNotification],
-        sync: bool = True,
-        publisher_name: Optional[str] = None,
+            self,
+            stream: str,
+            batch: list[_MessageNotification],
+            sync: bool = True,
+            publisher_name: Optional[str] = None,
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -256,10 +256,10 @@ class Producer:
         return publishing_ids
 
     async def send_wait(
-        self,
-        stream: str,
-        message: MessageT,
-        publisher_name: Optional[str] = None,
+            self,
+            stream: str,
+            message: MessageT,
+            publisher_name: Optional[str] = None,
     ) -> int:
 
         wrapped_message: _MessageNotification = _MessageNotification(message, None)
@@ -281,11 +281,11 @@ class Producer:
         return 0
 
     async def send(
-        self,
-        stream: str,
-        message: MessageT,
-        publisher_name: Optional[str] = None,
-        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+            self,
+            stream: str,
+            message: MessageT,
+            publisher_name: Optional[str] = None,
+            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
         # start the background thread to send buffered messages
@@ -301,63 +301,52 @@ class Producer:
             self._buffered_messages[stream].append(wrapped_message)
 
         await asyncio.sleep(0)
-        
-        
+
     async def send_sub_entry(
-        self,
-        stream: str,
-        publishing_messages: list[MessageT],
-        compression: Optional[int] = 0,
-        publisher_name: Optional[str] = None,
-          
+            self,
+            stream: str,
+            publishing_messages: list[MessageT],
+            compression: Optional[int] = 0,
+            publisher_name: Optional[str] = None,
+
     ):
-        
+
         if len(publishing_messages) == 0:
             raise ValueError("Empty batch")
 
         async with self._lock:
             publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
-            
+
         publisher_id = publisher.id
-        publishing_id = publisher.sequence.next()
-            
-    
-        buffer = bytearray()
-        sub_messages = []
-        for item in publishing_messages: 
+
+        buffer = bytes()
+        for item in publishing_messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
-            sub_messages.append(
-                schema.Message(
-                    publishing_id=publishing_id,
-                    data=bytes(msg),
-                )
-            )
-            
+            publishing_id = publisher.sequence.next()
             buffer += bytes(msg)
-                    
+
         uncompressed_data_size = len(buffer)
-        #compressed_value = gzip.compress(buffer)
-        #compressed_data_size = len(compressed_value)
-        
-        print("before sending frame: " + str(uncompressed_data_size) + "subbatching_message_count: " + str(len(publishing_messages)))
-        
+        # compressed_value = gzip.compress(buffer)
+        # compressed_data_size = len(compressed_value)
+
+        print("before sending frame: " + str(uncompressed_data_size) + "subbatching_message_count: " + str(
+            len(publishing_messages)))
+
+        c = 0x80 | 0 << 4
         await publisher.client.send_frame(
             schema.PublishSubBatching(
                 publisher_id=publisher_id,
                 number_of_root_messages=1,
                 publishing_id=publishing_id,
-                compress_type= 0x80 | 0<<4,
+                compress_type=c,
                 subbatching_message_count=len(publishing_messages),
                 uncompressed_data_size=uncompressed_data_size,
                 compressed_data_size=uncompressed_data_size,
-                messages=sub_messages,
+                messages=buffer,
             ),
         )
-        
+
         return publishing_id
-        
-        
-        
 
     # After the timeout send the messages in _buffered_messages in batches
     async def _timer(self):
@@ -418,10 +407,10 @@ class Producer:
                         confirmation.set_exception(exc)
 
     async def create_stream(
-        self,
-        stream: str,
-        arguments: Optional[dict[str, Any]] = None,
-        exists_ok: bool = False,
+            self,
+            stream: str,
+            arguments: Optional[dict[str, Any]] = None,
+            exists_ok: bool = False,
     ) -> None:
 
         try:
