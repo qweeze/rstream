@@ -21,9 +21,10 @@ from typing import (
     Union,
 )
 
-from . import exceptions, schema, utils
+from . import exceptions, schema, utils, compression
 from .amqp import _MessageProtocol
 from .client import Addr, Client, ClientPool
+from .compression import CompressionType, CompressionHelper
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 MT = TypeVar("MT")
@@ -306,7 +307,7 @@ class Producer:
             self,
             stream: str,
             publishing_messages: list[MessageT],
-            compression: Optional[int] = 0,
+            compression_type: Optional[CompressionType] = CompressionType.No,
             publisher_name: Optional[str] = None,
 
     ):
@@ -318,35 +319,50 @@ class Producer:
             publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
         publisher_id = publisher.id
-
-        buffer = bytes()
         for item in publishing_messages:
-            msg = RawMessage(item) if isinstance(item, bytes) else item
             publishing_id = publisher.sequence.next()
-            tmp = bytes(msg)
-            buffer += len(tmp).to_bytes(4, "big")
-            buffer += tmp
 
-        uncompressed_data_size = len(buffer)
-        # compressed_value = gzip.compress(buffer)
-        # compressed_data_size = len(compressed_value)
+        #buffer = bytes()
+        #for item in publishing_messages:
+        #   msg = RawMessage(item) if isinstance(item, bytes) else item
+        #   publishing_id = publisher.sequence.next()
+        #   tmp = bytes(msg)
+        #   buffer += len(tmp).to_bytes(4, "big")
+        #   buffer += tmp
 
-        print("before sending frame: " + str(uncompressed_data_size) + "subbatching_message_count: " + str(
-            len(publishing_messages)))
-
-        c = 0x80 | 0 << 4
+        #uncompressed_data_size = len(buffer)
+        
+        codec = CompressionHelper.compress(publishing_messages, compression_type)
+        
         await publisher.client.send_frame(
             schema.PublishSubBatching(
                 publisher_id=publisher_id,
                 number_of_root_messages=1,
                 publishing_id=publishing_id,
-                compress_type=c,
-                subbatching_message_count=len(publishing_messages),
-                uncompressed_data_size=uncompressed_data_size,
-                compressed_data_size=uncompressed_data_size,
-                messages=buffer,
+                compress_type= 0x80 | codec.compression_type() << 4,
+                subbatching_message_count=codec.messages_count(),
+                uncompressed_data_size=codec.uncompressed_size(),
+                compressed_data_size=codec.compressed_size(),
+                messages=codec.data(),
             ),
         )
+        
+        
+
+
+        #c = 0x80 | 0 << 4
+        #await publisher.client.send_frame(
+        #    schema.PublishSubBatching(
+        #        publisher_id=publisher_id,
+        #        number_of_root_messages=1,
+        #        publishing_id=publishing_id,
+        #        compress_type=c,
+        #        subbatching_message_count=len(publishing_messages),
+        #        uncompressed_data_size=codec.uncompressed_data_size,
+        #        compressed_data_size=uncompressed_data_size,
+        #        messages=buffer,
+        #    ),
+        #)
 
         return publishing_id
 

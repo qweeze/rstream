@@ -20,6 +20,7 @@ from .producer import (  # noqa: E402
     Producer,
     RawMessage,
 )
+from .compression import CompressionType, CompressionHelper
 
 __all__ = [
     "AMQPMessage",
