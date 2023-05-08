@@ -181,12 +181,6 @@ class Message(Struct):
     publishing_id: int = field(metadata={"type": T.uint64})
     data: bytes = field(metadata={"type": T.bytes})
 
-
-@dataclass
-class MessageSubBatching(Struct):
-    data: bytes = field(metadata={"type": T.bytes})
-
-
 @dataclass
 class Publish(Frame):
     key = Key.Publish
@@ -425,9 +419,9 @@ class Deliver(Frame):
         pos = 0
         for _ in range(self.num_entries):
             if (self.data[pos] & 0x80) == 0:
-                size = int.from_bytes(self.data[pos: pos + 4], "big")
+                size = int.from_bytes(self.data[pos:pos + 4], "big")
                 pos += 4
-                messages.append(self.data[pos: pos + size])
+                messages.append(self.data[pos:pos + size])
                 pos += size
             else:
                 raise NotImplementedError

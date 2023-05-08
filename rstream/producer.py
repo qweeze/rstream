@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import asyncio         
 import ssl
 import gzip
 from collections import defaultdict
@@ -24,7 +24,8 @@ from typing import (
 from . import exceptions, schema, utils, compression
 from .amqp import _MessageProtocol
 from .client import Addr, Client, ClientPool
-from .compression import CompressionType, CompressionHelper
+from .compression import CompressionType, CompressionHelper, ICompressionCodec
+from .utils import RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 MT = TypeVar("MT")
@@ -39,28 +40,16 @@ class _Publisher:
     sequence: utils.MonotonicSeq
     client: Client
 
-
-@dataclass
-class RawMessage(_MessageProtocol):
-    data: bytes
-    publishing_id: Optional[int] = None
-
-    def __bytes__(self) -> bytes:
-        return self.data
-
-
 @dataclass
 class _MessageNotification(Generic[MessageT]):
-    message: MessageT
+    entry: MessageT | ICompressionCodec
     callback: Optional[CB[ConfirmationStatus]] = None
-
-
+ 
 @dataclass
 class ConfirmationStatus:
     message_id: int
     is_confirmed: bool = False
     response_code: int = 0
-
 
 class Producer:
     def __init__(
@@ -204,7 +193,7 @@ class Producer:
 
         wrapped_batch = []
         for item in batch:
-            wrapped_item = _MessageNotification(item, on_publish_confirm)
+            wrapped_item = _MessageNotification(entry=item, callback=on_publish_confirm)
             wrapped_batch.append(wrapped_item)
 
         return await self._send_batch(stream, wrapped_batch, sync=False, publisher_name=publisher_name)
@@ -219,42 +208,79 @@ class Producer:
         if len(batch) == 0:
             raise ValueError("Empty batch")
 
+        print("_send_batch")
         async with self._lock:
             publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
         messages = []
+        publishing_ids = set()
 
         for item in batch:
+            
+            if not isinstance(item.entry, ICompressionCodec):
 
-            msg = RawMessage(item.message) if isinstance(item.message, bytes) else item.message
+                msg = RawMessage(item.entry) if isinstance(item.entry, bytes) else item.entry
 
-            if msg.publishing_id is None:
-                msg.publishing_id = publisher.sequence.next()
+                if msg.publishing_id is None:
+                    msg.publishing_id = publisher.sequence.next()
 
-            messages.append(
-                schema.Message(
-                    publishing_id=msg.publishing_id,
-                    data=bytes(msg),
+                messages.append(
+                    schema.Message(
+                        publishing_id=msg.publishing_id,
+                        data=bytes(msg),
+                    )
                 )
+            else:
+               
+                if len(messages) > 0:
+                    await publisher.client.send_frame(
+                        schema.Publish(
+                            publisher_id=publisher.id,
+                            messages=messages,
+                        ),
+                    )
+                    publishing_ids.update([m.publishing_id for m in messages])
+                    messages.clear()
+                for _ in range(item.entry.messages_count()):
+                    publishing_id = publisher.sequence.next()
+                
+                await publisher.client.send_frame(
+                    schema.PublishSubBatching(
+                        publisher_id=publisher.id,
+                        number_of_root_messages=1,
+                        publishing_id=publishing_id,
+                        compress_type= 0x80 | item.entry.compression_type() << 4,
+                        subbatching_message_count=item.entry.messages_count(),
+                        uncompressed_data_size=item.entry.uncompressed_size(),
+                        compressed_data_size=item.entry.compressed_size(),
+                        messages=item.entry.data(),
+                    ),
+                )
+                publishing_ids.update([publishing_id])
+                
+        if len(messages) > 0:
+            
+            await publisher.client.send_frame(
+                schema.Publish(
+                    publisher_id=publisher.id,
+                    messages=messages,
+                ),
             )
+            publishing_ids.update([m.publishing_id for m in messages])
 
-        await publisher.client.send_frame(
-            schema.Publish(
-                publisher_id=publisher.id,
-                messages=messages,
-            ),
-        )
 
-        publishing_ids = [m.publishing_id for m in messages]
-
+        print("im here len of messags:" +str(len(publishing_ids)) )
         if item.callback is not None:
-            self._waiting_for_confirm[publisher.reference][item.callback] = set(publishing_ids)
+            self._waiting_for_confirm[publisher.reference][item.callback] = publishing_ids.copy()
         elif sync:
             future: asyncio.Future[None] = asyncio.Future()
-            self._waiting_for_confirm[publisher.reference][future] = set(publishing_ids)
+            self._waiting_for_confirm[publisher.reference][future] = publishing_ids.copy()
             await future
+            
+        print("im here len of messags:" +str(len(publishing_ids)) )
+        
 
-        return publishing_ids
+        return list(publishing_ids)
 
     async def send_wait(
             self,
@@ -263,7 +289,7 @@ class Producer:
             publisher_name: Optional[str] = None,
     ) -> int:
 
-        wrapped_message: _MessageNotification = _MessageNotification(message, None)
+        wrapped_message: _MessageNotification = _MessageNotification(entry=message, callback=None)
 
         publishing_ids = await self._send_batch(
             stream,
@@ -297,7 +323,7 @@ class Producer:
         async with self._lock:
             await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
-        wrapped_message = _MessageNotification(message, on_publish_confirm)
+        wrapped_message = _MessageNotification(entry=message, callback=on_publish_confirm)
         async with self._buffered_messages_lock:
             self._buffered_messages[stream].append(wrapped_message)
 
@@ -309,62 +335,30 @@ class Producer:
             publishing_messages: list[MessageT],
             compression_type: Optional[CompressionType] = CompressionType.No,
             publisher_name: Optional[str] = None,
+            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
 
     ):
 
         if len(publishing_messages) == 0:
             raise ValueError("Empty batch")
+        
+        # start the background thread to send buffered messages
+        if self.task is None:
+            self.task = asyncio.create_task(self._timer())
+            self.task.add_done_callback(self._timer_completed)
 
         async with self._lock:
             publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
-        publisher_id = publisher.id
-        for item in publishing_messages:
-            publishing_id = publisher.sequence.next()
-
-        #buffer = bytes()
-        #for item in publishing_messages:
-        #   msg = RawMessage(item) if isinstance(item, bytes) else item
-        #   publishing_id = publisher.sequence.next()
-        #   tmp = bytes(msg)
-        #   buffer += len(tmp).to_bytes(4, "big")
-        #   buffer += tmp
-
-        #uncompressed_data_size = len(buffer)
-        
+        publisher_id = publisher.id        
         codec = CompressionHelper.compress(publishing_messages, compression_type)
         
-        await publisher.client.send_frame(
-            schema.PublishSubBatching(
-                publisher_id=publisher_id,
-                number_of_root_messages=1,
-                publishing_id=publishing_id,
-                compress_type= 0x80 | codec.compression_type() << 4,
-                subbatching_message_count=codec.messages_count(),
-                uncompressed_data_size=codec.uncompressed_size(),
-                compressed_data_size=codec.compressed_size(),
-                messages=codec.data(),
-            ),
-        )
+        wrapped_message = _MessageNotification(entry=codec, callback=on_publish_confirm)
+        async with self._buffered_messages_lock:
+            self._buffered_messages[stream].append(wrapped_message)
+            
+        await asyncio.sleep(0)
         
-        
-
-
-        #c = 0x80 | 0 << 4
-        #await publisher.client.send_frame(
-        #    schema.PublishSubBatching(
-        #        publisher_id=publisher_id,
-        #        number_of_root_messages=1,
-        #        publishing_id=publishing_id,
-        #        compress_type=c,
-        #        subbatching_message_count=len(publishing_messages),
-        #        uncompressed_data_size=codec.uncompressed_data_size,
-        #        compressed_data_size=uncompressed_data_size,
-        #        messages=buffer,
-        #    ),
-        #)
-
-        return publishing_id
 
     # After the timeout send the messages in _buffered_messages in batches
     async def _timer(self):

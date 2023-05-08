@@ -6,9 +6,13 @@ import abc
 from .amqp import _MessageProtocol
 from collections import defaultdict
 import gzip
+from dataclasses import dataclass
+from . import utils
+from .utils import RawMessage
 
 from typing import (
     TypeVar,
+    Optional,
 )
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
@@ -129,7 +133,7 @@ class StreamCompressionCodecs:
     @staticmethod
     def get_compression_codec(compression_type: CompressionType) -> ICompressionCodec:
         return StreamCompressionCodecs.available_compress_codecs[compression_type]
-    
+   
 class CompressionHelper:
     
     @staticmethod
