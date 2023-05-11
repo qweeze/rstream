@@ -7,6 +7,7 @@ from typing import ClassVar, Optional, Type, cast
 
 from .constants import Key, OffsetType, T
 from .exceptions import ServerError
+from .compression import CompressionType, CompressionHelper, ICompressionCodec
 
 registry: dict[tuple[bool, Key], Type["Frame"]] = {}
 
@@ -386,6 +387,45 @@ class QueryOffsetResponse(Frame, is_response=True):
     response_code: int = field(metadata={"type": T.uint16})
     offset: int = field(metadata={"type": T.uint64})
 
+@dataclass
+class SubEntryChunk:
+    compress_value: bytes
+    num_records_in_batch: int
+    uncompressed_data_size: int
+    message_count: int        
+    data_len: int
+    
+    @classmethod
+    def read(self, data:bytes, entry_type:bytes, pos:int) -> int:
+
+        self.num_records_in_batch=int.from_bytes(data[pos:2])
+        pos+=2
+        self.uncompressed_data_size=int.from_bytes(data[pos:pos+4])
+        pos+=4
+        self.data_len=int.from_bytes(data[pos:pos+4])
+        pos+=4
+        
+        print("entry_type: " + str(entry_type))
+        print("num record in batch" + str(self.num_records_in_batch))
+        print("uncompressed_data_size" + str(self.uncompressed_data_size))
+        print("data_len" + str(self.data_len))
+        
+        compression_type = CompressionType((entry_type & 0x70) >> 4)
+        print("compression: " + str(compression_type))
+        
+        data = data[pos:]
+        uncompressed_data=CompressionHelper.uncompress(data, compression_type=compression_type, uncompressed_data_size=self.uncompressed_data_size)
+        
+        messages = []
+        
+        for i in range(self.num_records_in_batch):
+            size = int.from_bytes(uncompressed_data[pos:pos + 4], "big")
+            pos += 4
+            messages.append(uncompressed_data[pos:pos + size])
+            pos += size
+            
+        return messages
+        
 
 @dataclass
 class Deliver(Frame):
@@ -417,15 +457,21 @@ class Deliver(Frame):
     def get_messages(self) -> list[bytes]:
         messages = []
         pos = 0
+       
         for _ in range(self.num_entries):
-            if (self.data[pos] & 0x80) == 0:
+            entry_type = self.data[pos] & 0x80
+            if (entry_type == 0):
                 size = int.from_bytes(self.data[pos:pos + 4], "big")
                 pos += 4
                 messages.append(self.data[pos:pos + size])
                 pos += size
             else:
-                raise NotImplementedError
-
+                #raise NotImplementedError
+                size = int.from_bytes(self.data[pos:pos + 4], "big")
+                pos += 4
+                messages_subbatch = SubEntryChunk.read(self.data, entry_type, pos)
+                messages.append(messages_subbatch)
+                
         return messages
 
 
@@ -441,3 +487,5 @@ class CreditResponse(Frame, is_response=True):
     key = Key.Credit
     response_code: int = field(metadata={"type": T.uint16})
     subscription_id: int = field(metadata={"type": T.uint8})
+    
+

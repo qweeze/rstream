@@ -66,6 +66,12 @@ class NoneCompressionCodec(ICompressionCodec):
         self.uncompressed_data_size = len(self.buffer)
         self.compressed_data_size  = self.uncompressed_data_size
         
+    def uncompress(self, compressed_data:bytes, uncompressed_data_size:int) -> bytes:
+        
+       
+           
+       return compressed_data
+        
     def compressed_size(self) -> int:
         return self.compressed_data_size
     
@@ -104,6 +110,17 @@ class GzipCompressionCodec(ICompressionCodec):
         self.compressed_data_size  = len(compressed_buffer)
         self.buffer = compressed_buffer
         
+    def uncompress(self, compressed_data:bytes, uncompressed_data_size:int) -> bytes:
+        
+       uncompressed_data = gzip.decompress(compressed_data)
+       
+       if len(uncompressed_data) != uncompressed_data_size:
+           print("uncompressed len is different")
+           
+       return uncompressed_data
+           
+        
+        
     def compressed_size(self) -> int:
         return self.compressed_data_size
     
@@ -141,3 +158,11 @@ class CompressionHelper:
         codec = StreamCompressionCodecs.get_compression_codec(compression_type=compression_type)
         codec.compress(messages=messages)
         return codec
+    
+    @staticmethod
+    def uncompress(data: bytes, compression_type: CompressionType, uncompressed_data_size: int) -> bytes:
+        codec = StreamCompressionCodecs.get_compression_codec(compression_type=compression_type)
+        messages=codec.uncompress(compressed_data=data, uncompressed_data_size=uncompressed_data_size)
+        return messages
+    
+    
