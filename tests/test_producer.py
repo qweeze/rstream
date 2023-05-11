@@ -11,6 +11,7 @@ from rstream import (
     Producer,
     RawMessage,
     exceptions,
+    CompressionType
 )
 
 from .util import (
@@ -169,6 +170,27 @@ async def test_send_async_confirmation(stream: str, producer: Producer) -> None:
     await publish_with_ids(1, 2, 3)
 
     await wait_for(lambda: len(confirmed_messages) == 3)
+    
+async def test_send_entry_subbatch_async_confirmation(stream: str, producer: Producer) -> None:
+
+    confirmed_messages: list[int] = []
+    errored_messages: list[int] = []
+
+    async def publish_with_ids(*ids):
+        entry_list = []
+        for publishing_id in ids:
+            entry_list.append(RawMessage(f"test_{publishing_id}".encode(), publishing_id))
+        
+        await producer.send_sub_entry(stream,  entry_list, compression_type=CompressionType.Gzip, on_publish_confirm=partial(
+                on_publish_confirm_client_callback,
+                confirmed_messages=confirmed_messages,
+                errored_messages=errored_messages,
+            ),
+        )
+            
+    await publish_with_ids(1, 2, 3)
+
+    await wait_for(lambda: len(confirmed_messages) == 1)
 
 
 async def test_producer_restart(stream: str, producer: Producer, consumer: Consumer) -> None:
