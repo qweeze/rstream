@@ -243,6 +243,8 @@ class Producer:
                     messages.clear()
                 for _ in range(item.entry.messages_count()):
                     publishing_id = publisher.sequence.next()
+                    
+                print("compressiontye: " + str(item.entry.compression_type()))
                 
                 await publisher.client.send_frame(
                     schema.PublishSubBatching(

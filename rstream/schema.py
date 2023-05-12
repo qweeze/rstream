@@ -412,7 +412,7 @@ class SubEntryChunk:
         print("data_len" + str(self.data_len))
 
         compression_type = CompressionType((entry_type & 0x70) >> 4)
-        print("compression: " + str(compression_type))
+        print("compression: " + str((entry_type & 0x70) >> 4))
 
         data = data[pos:]
         print("len: " + str(len(data)))
@@ -463,6 +463,7 @@ class Deliver(Frame):
 
         for _ in range(self.num_entries):
             entry_type = self.data[pos] & 0x80
+            print("entry_type " + str(entry_type))
             if entry_type == 0:
                 size = int.from_bytes(self.data[pos:pos + 4], "big")
                 pos += 4
