@@ -398,36 +398,35 @@ class SubEntryChunk:
     data_len: int
 
     @classmethod
-    def read(self, data: bytes, entry_type: bytes, pos: int) -> list[bytes]:
-        self.num_records_in_batch = int.from_bytes(data[pos:3], byteorder='big')
+    def read(self, data: bytes, entry_type: bytes, pos: int) -> (list[bytes], int):
+        self.num_records_in_batch = int.from_bytes(data[pos:pos + 2], byteorder='big')
         pos += 2
         self.uncompressed_data_size = int.from_bytes(data[pos:pos + 4], byteorder='big')
         pos += 4
         self.data_len = int.from_bytes(data[pos:pos + 4], byteorder='big')
         pos += 4
 
-        print("entry_type: " + str(entry_type))
-        print("num record in batch" + str(self.num_records_in_batch))
-        print("uncompressed_data_size" + str(self.uncompressed_data_size))
-        print("data_len" + str(self.data_len))
-
+        # print("entry_type: " + str(entry_type))
+        # print("num record in batch" + str(self.num_records_in_batch))
+        # print("uncompressed_data_size" + str(self.uncompressed_data_size))
+        # print("data_len" + str(self.data_len))
         compression_type = CompressionType((entry_type & 0x70) >> 4)
         print("compression: " + str((entry_type & 0x70) >> 4))
-
         data = data[pos:]
+        pos += self.data_len
         print("len: " + str(len(data)))
         uncompressed_data = CompressionHelper.uncompress(data, compression_type=compression_type,
                                                          uncompressed_data_size=self.uncompressed_data_size)
 
         messages = []
-        pos = 0
+        uncompressed_pos = 0
         for i in range(self.num_records_in_batch):
-            size = int.from_bytes(uncompressed_data[pos:pos + 4], "big")
-            pos += 4
-            messages.append(uncompressed_data[pos: pos + size])
-            pos += size
+            size = int.from_bytes(uncompressed_data[uncompressed_pos:uncompressed_pos + 4], "big")
+            uncompressed_pos += 4
+            messages.append(uncompressed_data[uncompressed_pos: uncompressed_pos + size])
+            uncompressed_pos += size
 
-        return messages
+        return messages, pos
 
 
 @dataclass
@@ -460,18 +459,20 @@ class Deliver(Frame):
     def get_messages(self) -> list[bytes]:
         messages = []
         pos = 0
-
+        # print("num_entries " + str(self.num_entries))
         for _ in range(self.num_entries):
-            entry_type = self.data[pos] & 0x80
-            print("entry_type " + str(entry_type))
-            if entry_type == 0:
+            entry_type = self.data[pos]
+            # print("entry_type " + str(entry_type))
+            if entry_type & 0x80 == 0:
                 size = int.from_bytes(self.data[pos:pos + 4], "big")
                 pos += 4
                 messages.append(self.data[pos:pos + size])
                 pos += size
             else:
                 pos += 1
-                messages.extend(SubEntryChunk.read(self.data, entry_type, pos))
+                tmp, tmp_pos = SubEntryChunk.read(self.data, entry_type, pos)
+                messages.extend(tmp)
+                pos = tmp_pos
 
         return messages
 
