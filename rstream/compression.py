@@ -5,7 +5,7 @@ from enum import Enum
 import abc
 from .amqp import _MessageProtocol
 from collections import defaultdict
-import gzip
+import zlib
 from dataclasses import dataclass
 from . import utils
 from .utils import RawMessage
@@ -96,21 +96,25 @@ class GzipCompressionCodec(ICompressionCodec):
 
     def compress(self, messages: list[MessageT]):
 
+
+        uncompressed_data = bytes()
         for item in messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
             tmp = bytes(msg)
-            self.buffer += len(tmp).to_bytes(4, "big")
-            self.buffer += tmp
+            uncompressed_data += len(tmp).to_bytes(4, "big")
+            uncompressed_data += tmp
 
         self.message_count = len(messages)
-        self.uncompressed_data_size = len(self.buffer)
-        compressed_buffer = gzip.compress(self.buffer)
-        self.compressed_data_size = len(compressed_buffer)
-        self.buffer = compressed_buffer
+        self.uncompressed_data_size = len(uncompressed_data)
+        self.buffer = zlib.compress(self.buffer)
+        self.compressed_data_size = len(self.buffer)
 
     def uncompress(self, compressed_data: bytes, uncompressed_data_size: int) -> bytes:
+        
+        print("decompressing with gzip")
 
-        uncompressed_data = gzip.decompress(compressed_data)
+        uncompressed_data = zlib.decompress(compressed_data)
+
 
         if len(uncompressed_data) != uncompressed_data_size:
             print("uncompressed len is different")

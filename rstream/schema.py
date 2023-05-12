@@ -398,13 +398,14 @@ class SubEntryChunk:
     data_len: int
 
     @classmethod
-    def read(self, data: bytes, entry_type: bytes, pos: int) -> (list[bytes], int):
-        self.num_records_in_batch = int.from_bytes(data[pos:pos + 2], byteorder='big')
-        pos += 2
-        self.uncompressed_data_size = int.from_bytes(data[pos:pos + 4], byteorder='big')
-        pos += 4
-        self.data_len = int.from_bytes(data[pos:pos + 4], byteorder='big')
-        pos += 4
+    def read(self, data: bytes, entry_type: bytes, offset: int) -> (list[bytes], int):
+        index = 0
+        self.num_records_in_batch = int.from_bytes(data[index+offset: index + offset + 2], byteorder='big')
+        index += 2
+        self.uncompressed_data_size = int.from_bytes(data[index+offset: index + offset + 4], byteorder='big')
+        index += 4
+        self.data_len = int.from_bytes(data[index + offset: index + offset + 4], byteorder='big')
+        index += 4
 
         # print("entry_type: " + str(entry_type))
         # print("num record in batch" + str(self.num_records_in_batch))
@@ -412,8 +413,10 @@ class SubEntryChunk:
         # print("data_len" + str(self.data_len))
         compression_type = CompressionType((entry_type & 0x70) >> 4)
         print("compression: " + str((entry_type & 0x70) >> 4))
-        data = data[pos:]
-        pos += self.data_len
+
+        data = data[index+offset:]
+        index += self.data_len
+
         print("len: " + str(len(data)))
         uncompressed_data = CompressionHelper.uncompress(data, compression_type=compression_type,
                                                          uncompressed_data_size=self.uncompressed_data_size)
@@ -426,7 +429,8 @@ class SubEntryChunk:
             messages.append(uncompressed_data[uncompressed_pos: uncompressed_pos + size])
             uncompressed_pos += size
 
-        return messages, pos
+        return messages, index
+
 
 
 @dataclass
@@ -472,7 +476,11 @@ class Deliver(Frame):
                 pos += 1
                 tmp, tmp_pos = SubEntryChunk.read(self.data, entry_type, pos)
                 messages.extend(tmp)
+<<<<<<< HEAD
                 pos = tmp_pos
+=======
+                pos += tmp_pos
+>>>>>>> d451174 (fix consumer)
 
         return messages
 
