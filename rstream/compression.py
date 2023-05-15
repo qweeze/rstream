@@ -106,7 +106,7 @@ class GzipCompressionCodec(ICompressionCodec):
 
         self.message_count = len(messages)
         self.uncompressed_data_size = len(uncompressed_data)
-        self.buffer = zlib.compress(self.buffer)
+        self.buffer = zlib.compress(uncompressed_data)
         self.compressed_data_size = len(self.buffer)
 
     def uncompress(self, compressed_data: bytes, uncompressed_data_size: int) -> bytes:

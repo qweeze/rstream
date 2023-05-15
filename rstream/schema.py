@@ -476,11 +476,8 @@ class Deliver(Frame):
                 pos += 1
                 tmp, tmp_pos = SubEntryChunk.read(self.data, entry_type, pos)
                 messages.extend(tmp)
-<<<<<<< HEAD
-                pos = tmp_pos
-=======
                 pos += tmp_pos
->>>>>>> d451174 (fix consumer)
+
 
         return messages
 
