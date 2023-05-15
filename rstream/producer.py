@@ -44,6 +44,7 @@ class _Publisher:
 class _MessageNotification(Generic[MessageT]):
     entry: MessageT | ICompressionCodec
     callback: Optional[CB[ConfirmationStatus]] = None
+    publisher_name: Optional[str] = None
  
 @dataclass
 class ConfirmationStatus:
@@ -193,28 +194,27 @@ class Producer:
 
         wrapped_batch = []
         for item in batch:
-            wrapped_item = _MessageNotification(entry=item, callback=on_publish_confirm)
+            wrapped_item = _MessageNotification(entry=item, callback=on_publish_confirm, publisher_name=publisher_name)
             wrapped_batch.append(wrapped_item)
 
-        return await self._send_batch(stream, wrapped_batch, sync=False, publisher_name=publisher_name)
+        return await self._send_batch(stream, wrapped_batch, sync=False)
 
     async def _send_batch(
             self,
             stream: str,
             batch: list[_MessageNotification],
             sync: bool = True,
-            publisher_name: Optional[str] = None,
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
-
-        async with self._lock:
-            publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
-
+        
         messages = []
         publishing_ids = set()
 
         for item in batch:
+            
+            async with self._lock:
+                publisher = await self._get_or_create_publisher(stream, publisher_name=item.publisher_name)
             
             if not isinstance(item.entry, ICompressionCodec):
 
@@ -283,13 +283,12 @@ class Producer:
             publisher_name: Optional[str] = None,
     ) -> int:
 
-        wrapped_message: _MessageNotification = _MessageNotification(entry=message, callback=None)
+        wrapped_message: _MessageNotification = _MessageNotification(entry=message, callback=None, publisher_name=publisher_name)
 
         publishing_ids = await self._send_batch(
             stream,
             [wrapped_message],
             sync=True,
-            publisher_name=publisher_name,
         )
         return publishing_ids[0]
 
@@ -314,10 +313,7 @@ class Producer:
             self.task = asyncio.create_task(self._timer())
             self.task.add_done_callback(self._timer_completed)
 
-        async with self._lock:
-            await self._get_or_create_publisher(stream, publisher_name=publisher_name)
-
-        wrapped_message = _MessageNotification(entry=message, callback=on_publish_confirm)
+        wrapped_message = _MessageNotification(entry=message, callback=on_publish_confirm, publisher_name=publisher_name)
         async with self._buffered_messages_lock:
             self._buffered_messages[stream].append(wrapped_message)
 
@@ -339,13 +335,10 @@ class Producer:
         if self.task is None:
             self.task = asyncio.create_task(self._timer())
             self.task.add_done_callback(self._timer_completed)
-            
-        async with self._lock:
-            await self._get_or_create_publisher(stream, publisher_name=publisher_name)
-            
+                
         compression_codec = CompressionHelper.compress(sub_entry_messages, compression_type)
         
-        wrapped_message = _MessageNotification(entry=compression_codec, callback=on_publish_confirm)
+        wrapped_message = _MessageNotification(entry=compression_codec, callback=on_publish_confirm, publisher_name=publisher_name)
         async with self._buffered_messages_lock:
             self._buffered_messages[stream].append(wrapped_message)
             
