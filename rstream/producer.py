@@ -208,7 +208,6 @@ class Producer:
         if len(batch) == 0:
             raise ValueError("Empty batch")
 
-        print("_send_batch")
         async with self._lock:
             publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
@@ -231,7 +230,7 @@ class Producer:
                     )
                 )
             else:
-               
+                compression_codec = item.entry
                 if len(messages) > 0:
                     await publisher.client.send_frame(
                         schema.Publish(
@@ -243,19 +242,17 @@ class Producer:
                     messages.clear()
                 for _ in range(item.entry.messages_count()):
                     publishing_id = publisher.sequence.next()
-                    
-                print("compressiontye: " + str(item.entry.compression_type()))
-                
+                                    
                 await publisher.client.send_frame(
                     schema.PublishSubBatching(
                         publisher_id=publisher.id,
                         number_of_root_messages=1,
                         publishing_id=publishing_id,
-                        compress_type= 0x80 | item.entry.compression_type() << 4,
-                        subbatching_message_count=item.entry.messages_count(),
-                        uncompressed_data_size=item.entry.uncompressed_size(),
-                        compressed_data_size=item.entry.compressed_size(),
-                        messages=item.entry.data(),
+                        compress_type= 0x80 | compression_codec.compression_type() << 4,
+                        subbatching_message_count=compression_codec.messages_count(),
+                        uncompressed_data_size=compression_codec.uncompressed_size(),
+                        compressed_data_size=compression_codec.compressed_size(),
+                        messages=compression_codec.data(),
                     ),
                 )
                 publishing_ids.update([publishing_id])
@@ -270,18 +267,13 @@ class Producer:
             )
             publishing_ids.update([m.publishing_id for m in messages])
 
-
-        print("im here len of messags:" +str(len(publishing_ids)) )
         if item.callback is not None:
             self._waiting_for_confirm[publisher.reference][item.callback] = publishing_ids.copy()
         elif sync:
             future: asyncio.Future[None] = asyncio.Future()
             self._waiting_for_confirm[publisher.reference][future] = publishing_ids.copy()
             await future
-            
-        print("im here len of messags:" +str(len(publishing_ids)) )
         
-
         return list(publishing_ids)
 
     async def send_wait(
@@ -334,34 +326,31 @@ class Producer:
     async def send_sub_entry(
             self,
             stream: str,
-            publishing_messages: list[MessageT],
+            sub_entry_messages: list[MessageT],
             compression_type: Optional[CompressionType] = CompressionType.No,
             publisher_name: Optional[str] = None,
             on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
-
     ):
 
-        if len(publishing_messages) == 0:
+        if len(sub_entry_messages) == 0:
             raise ValueError("Empty batch")
         
         # start the background thread to send buffered messages
         if self.task is None:
             self.task = asyncio.create_task(self._timer())
             self.task.add_done_callback(self._timer_completed)
-
+            
         async with self._lock:
-            publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
-
-        publisher_id = publisher.id        
-        codec = CompressionHelper.compress(publishing_messages, compression_type)
+            await self._get_or_create_publisher(stream, publisher_name=publisher_name)
+            
+        compression_codec = CompressionHelper.compress(sub_entry_messages, compression_type)
         
-        wrapped_message = _MessageNotification(entry=codec, callback=on_publish_confirm)
+        wrapped_message = _MessageNotification(entry=compression_codec, callback=on_publish_confirm)
         async with self._buffered_messages_lock:
             self._buffered_messages[stream].append(wrapped_message)
             
         await asyncio.sleep(0)
         
-
     # After the timeout send the messages in _buffered_messages in batches
     async def _timer(self):
 

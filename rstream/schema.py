@@ -182,14 +182,6 @@ class Message(Struct):
     publishing_id: int = field(metadata={"type": T.uint64})
     data: bytes = field(metadata={"type": T.bytes})
 
-
-@dataclass
-class Publish(Frame):
-    key = Key.Publish
-    publisher_id: int = field(metadata={"type": T.uint8})
-    messages: list[Message]
-
-
 @dataclass
 class PublishSubBatching(Frame):
     key = Key.Publish
@@ -202,6 +194,11 @@ class PublishSubBatching(Frame):
     compressed_data_size: int = field(metadata={"type": T.int32})
     messages: bytes = field(metadata={"type": T.raw})
 
+@dataclass
+class Publish(Frame):
+    key = Key.Publish
+    publisher_id: int = field(metadata={"type": T.uint8})
+    messages: list[Message]
 
 @dataclass
 class PublishConfirm(Frame):
@@ -391,47 +388,35 @@ class QueryOffsetResponse(Frame, is_response=True):
 
 @dataclass
 class SubEntryChunk:
-    compress_value: bytes
-    num_records_in_batch: int
-    uncompressed_data_size: int
-    message_count: int
-    data_len: int
 
     @classmethod
     def read(self, data: bytes, entry_type: bytes, offset: int) -> (list[bytes], int):
+        # total bytes read
         index = 0
-        self.num_records_in_batch = int.from_bytes(data[index+offset: index + offset + 2], byteorder='big')
+        num_records_in_batch = int.from_bytes(data[index+offset: index + offset + 2], byteorder='big')
         index += 2
-        self.uncompressed_data_size = int.from_bytes(data[index+offset: index + offset + 4], byteorder='big')
+        uncompressed_data_size = int.from_bytes(data[index+offset: index + offset + 4], byteorder='big')
         index += 4
-        self.data_len = int.from_bytes(data[index + offset: index + offset + 4], byteorder='big')
+        data_len = int.from_bytes(data[index + offset: index + offset + 4], byteorder='big')
         index += 4
 
-        # print("entry_type: " + str(entry_type))
-        # print("num record in batch" + str(self.num_records_in_batch))
-        # print("uncompressed_data_size" + str(self.uncompressed_data_size))
-        # print("data_len" + str(self.data_len))
         compression_type = CompressionType((entry_type & 0x70) >> 4)
-        print("compression: " + str((entry_type & 0x70) >> 4))
-
+       
         current_pos = index + offset
-        data_compressed = data[current_pos:current_pos + self.data_len]
-        index += self.data_len
+        data_compressed = data[current_pos:current_pos + data_len]
+        index += data_len
 
-        print("len: " + str(len(data_compressed)))
         uncompressed_data = CompressionHelper.uncompress(data_compressed, compression_type=compression_type,
-                                                         uncompressed_data_size=self.uncompressed_data_size)
+                                                         uncompressed_data_size=uncompressed_data_size)
+        subbatch_entries = []
+        uncompressed_index = 0
+        for i in range(num_records_in_batch):
+            size = int.from_bytes(uncompressed_data[uncompressed_index:uncompressed_index + 4], "big")
+            uncompressed_index += 4
+            subbatch_entries.append(uncompressed_data[uncompressed_index: uncompressed_index + size])
+            uncompressed_index += size
 
-        messages = []
-        uncompressed_pos = 0
-        for i in range(self.num_records_in_batch):
-            size = int.from_bytes(uncompressed_data[uncompressed_pos:uncompressed_pos + 4], "big")
-            uncompressed_pos += 4
-            messages.append(uncompressed_data[uncompressed_pos: uncompressed_pos + size])
-            uncompressed_pos += size
-
-        return messages, index
-
+        return subbatch_entries, index
 
 
 @dataclass
@@ -464,24 +449,23 @@ class Deliver(Frame):
     def get_messages(self) -> list[bytes]:
         messages = []
         pos = 0
-        # print("num_entries " + str(self.num_entries))
+       
         for _ in range(self.num_entries):
             entry_type = self.data[pos]
-            # print("entry_type " + str(entry_type))
+           
             if entry_type & 0x80 == 0:
                 size = int.from_bytes(self.data[pos:pos + 4], "big")
                 pos += 4
                 messages.append(self.data[pos:pos + size])
                 pos += size
+            # is a subentry-batch message
             else:
                 pos += 1
-                tmp, tmp_pos = SubEntryChunk.read(self.data, entry_type, pos)
-                messages.extend(tmp)
-                pos += tmp_pos
-
+                sub_batched_messages, total_bytes_read = SubEntryChunk.read(self.data, entry_type, pos)
+                messages.extend(sub_batched_messages)
+                pos += total_bytes_read
 
         return messages
-
 
 @dataclass
 class Credit(Frame):

@@ -77,12 +77,29 @@ async def test_publishing_sequence_subbatching_gzip(stream: str, producer: Produ
     list_messages.append(b'one')
     list_messages.append(b'two')
     list_messages.append(b'three')
-  
-        
+     
     await producer.send_sub_entry(stream,  list_messages, compression_type=CompressionType.Gzip) 
 
     await wait_for(lambda: len(captured) == 3)
     assert captured == [b"one", b"two", b"three"]
+    
+async def test_publishing_sequence_subbatching_mix(stream: str, producer: Producer, consumer: Consumer) -> None:
+    captured: list[bytes] = []
+
+    await consumer.subscribe(stream, callback=captured.append)
+
+    list_messages = []
+    list_messages.append(b'one')
+    list_messages.append(b'two')
+    list_messages.append(b'three')
+  
+    await producer.send_batch(stream,  list_messages)     
+    await producer.send_sub_entry(stream,  list_messages, compression_type=CompressionType.Gzip) 
+    await producer.send_sub_entry(stream,  list_messages, compression_type=CompressionType.No) 
+    await producer.send_sub_entry(stream,  list_messages, compression_type=CompressionType.Gzip) 
+
+    await wait_for(lambda: len(captured) == 12)
+    assert captured == [b"one", b"two", b"three",b"one", b"two", b"three",b"one", b"two", b"three",b"one", b"two", b"three"]
     
 async def test_publishing_sequence_async(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []

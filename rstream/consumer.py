@@ -211,7 +211,6 @@ class Consumer:
         offset = frame.chunk_first_offset - 1
 
         for message in frame.get_messages():
-            #print("message: " + str(message))
             offset += 1
             if offset < min_deliverable_offset:
                 continue
@@ -227,7 +226,6 @@ class Consumer:
         await subscriber.client.credit(subscriber.subscription_id, 1)
 
         for message in self._filter_messages(frame, subscriber):
-            #print("message filtered: " + str(message))
             maybe_coro = subscriber.callback(subscriber.decoder(message))
             if maybe_coro is not None:
                 await maybe_coro

@@ -3,6 +3,7 @@
 
 from enum import Enum
 import abc
+from dataclasses import dataclass, field
 from .amqp import _MessageProtocol
 from collections import defaultdict
 import gzip
@@ -10,11 +11,9 @@ from .utils import RawMessage
 
 from typing import (
     TypeVar,
-    Optional,
 )
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
-
 
 class CompressionType(Enum):
     No = 0
@@ -45,21 +44,19 @@ class ICompressionCodec(abc.ABC):
     def compression_type(self) -> int:
         pass
 
-
+@dataclass
 class NoneCompressionCodec(ICompressionCodec):
-
-    def __init__(self):
-        self.uncompressed_data_size = 0
-        self.compressed_data_size = 0
-        self.message_count = 0
-        self.buffer = bytes()
+    uncompressed_data_size: int = 0
+    compressed_data_size: int = 0
+    message_count: int = 0
+    buffer: bytes = bytes()
 
     def compress(self, messages: list[MessageT]):
         for item in messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
-            tmp = bytes(msg)
-            self.buffer += len(tmp).to_bytes(4, "big")
-            self.buffer += tmp
+            msg_buffer = bytes(msg)
+            self.buffer += len(msg_buffer).to_bytes(4, "big")
+            self.buffer += msg_buffer
 
         self.message_count = len(messages)
         self.uncompressed_data_size = len(self.buffer)
@@ -83,23 +80,21 @@ class NoneCompressionCodec(ICompressionCodec):
     def compression_type(self) -> int:
         return 0
 
-
+@dataclass
 class GzipCompressionCodec(ICompressionCodec):
-
-    def __init__(self):
-        self.uncompressed_data_size = 0
-        self.compressed_data_size = 0
-        self.message_count = 0
-        self.buffer = bytes()
+    uncompressed_data_size:int = 0
+    compressed_data_size:int = 0
+    message_count:int = 0
+    buffer:bytes = bytes()
 
     def compress(self, messages: list[MessageT]):
 
         uncompressed_data = bytes()
         for item in messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
-            tmp = bytes(msg)
-            uncompressed_data += len(tmp).to_bytes(4, "big")
-            uncompressed_data += tmp
+            msg_buffer = bytes(msg)
+            uncompressed_data += len(msg_buffer).to_bytes(4, "big")
+            uncompressed_data += msg_buffer
 
         self.message_count = len(messages)
         self.uncompressed_data_size = len(uncompressed_data)
@@ -107,13 +102,11 @@ class GzipCompressionCodec(ICompressionCodec):
         self.compressed_data_size = len(self.buffer)
 
     def uncompress(self, compressed_data: bytes, uncompressed_data_size: int) -> bytes:
-
-        print("decompressing with gzip")
-
+        
         uncompressed_data = gzip.decompress(compressed_data)
 
         if len(uncompressed_data) != uncompressed_data_size:
-            print("uncompressed len is different")
+            raise ValueError("Uncompressed len error")
 
         return uncompressed_data
 
@@ -132,7 +125,6 @@ class GzipCompressionCodec(ICompressionCodec):
     def compression_type(self) -> int:
         return 1
 
-
 class StreamCompressionCodecs:
     available_compress_codecs: dict[CompressionType, ICompressionCodec] = defaultdict(ICompressionCodec)
     available_compress_codecs[CompressionType.No] = NoneCompressionCodec()
@@ -146,9 +138,7 @@ class StreamCompressionCodecs:
     def get_compression_codec(compression_type: CompressionType) -> ICompressionCodec:
         return StreamCompressionCodecs.available_compress_codecs[compression_type]
 
-
 class CompressionHelper:
-
     @staticmethod
     def compress(messages: list[MessageT], compression_type: CompressionType) -> ICompressionCodec:
         codec = StreamCompressionCodecs.get_compression_codec(compression_type=compression_type)
