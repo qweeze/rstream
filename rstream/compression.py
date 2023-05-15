@@ -1,19 +1,18 @@
 # Copyright 2023 VMware, Inc. All Rights Reserved.
 # SPDX-License-Identifier: MIT
 
-from enum import Enum
 import abc
-from dataclasses import dataclass, field
-from .amqp import _MessageProtocol
-from collections import defaultdict
 import gzip
+from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
+from typing import TypeVar
+
+from .amqp import _MessageProtocol
 from .utils import RawMessage
 
-from typing import (
-    TypeVar,
-)
-
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
+
 
 class CompressionType(Enum):
     No = 0
@@ -26,6 +25,10 @@ class CompressionType(Enum):
 class ICompressionCodec(abc.ABC):
     @abc.abstractmethod
     def compress(self, messages: list[MessageT]):
+        pass
+
+    @abc.abstractmethod
+    def uncompress(self, compressed_data: bytes, uncompressed_data_size: int) -> bytes:
         pass
 
     @abc.abstractmethod
@@ -43,6 +46,11 @@ class ICompressionCodec(abc.ABC):
     @abc.abstractmethod
     def compression_type(self) -> int:
         pass
+
+    @abc.abstractmethod
+    def data(self) -> bytes:
+        pass
+
 
 @dataclass
 class NoneCompressionCodec(ICompressionCodec):
@@ -80,12 +88,13 @@ class NoneCompressionCodec(ICompressionCodec):
     def compression_type(self) -> int:
         return 0
 
+
 @dataclass
 class GzipCompressionCodec(ICompressionCodec):
-    uncompressed_data_size:int = 0
-    compressed_data_size:int = 0
-    message_count:int = 0
-    buffer:bytes = bytes()
+    uncompressed_data_size: int = 0
+    compressed_data_size: int = 0
+    message_count: int = 0
+    buffer: bytes = bytes()
 
     def compress(self, messages: list[MessageT]):
 
@@ -102,7 +111,7 @@ class GzipCompressionCodec(ICompressionCodec):
         self.compressed_data_size = len(self.buffer)
 
     def uncompress(self, compressed_data: bytes, uncompressed_data_size: int) -> bytes:
-        
+
         uncompressed_data = gzip.decompress(compressed_data)
 
         if len(uncompressed_data) != uncompressed_data_size:
@@ -125,6 +134,7 @@ class GzipCompressionCodec(ICompressionCodec):
     def compression_type(self) -> int:
         return 1
 
+
 class StreamCompressionCodecs:
     available_compress_codecs: dict[CompressionType, ICompressionCodec] = defaultdict(ICompressionCodec)
     available_compress_codecs[CompressionType.No] = NoneCompressionCodec()
@@ -137,6 +147,7 @@ class StreamCompressionCodecs:
     @staticmethod
     def get_compression_codec(compression_type: CompressionType) -> ICompressionCodec:
         return StreamCompressionCodecs.available_compress_codecs[compression_type]
+
 
 class CompressionHelper:
     @staticmethod

@@ -5,9 +5,9 @@ import zlib
 from dataclasses import dataclass, field
 from typing import ClassVar, Optional, Type, cast
 
+from .compression import CompressionHelper, CompressionType
 from .constants import Key, OffsetType, T
 from .exceptions import ServerError
-from .compression import CompressionType, CompressionHelper, ICompressionCodec
 
 registry: dict[tuple[bool, Key], Type["Frame"]] = {}
 
@@ -182,6 +182,7 @@ class Message(Struct):
     publishing_id: int = field(metadata={"type": T.uint64})
     data: bytes = field(metadata={"type": T.bytes})
 
+
 @dataclass
 class PublishSubBatching(Frame):
     key = Key.Publish
@@ -194,11 +195,13 @@ class PublishSubBatching(Frame):
     compressed_data_size: int = field(metadata={"type": T.int32})
     messages: bytes = field(metadata={"type": T.raw})
 
+
 @dataclass
 class Publish(Frame):
     key = Key.Publish
     publisher_id: int = field(metadata={"type": T.uint8})
     messages: list[Message]
+
 
 @dataclass
 class PublishConfirm(Frame):
@@ -388,32 +391,32 @@ class QueryOffsetResponse(Frame, is_response=True):
 
 @dataclass
 class SubEntryChunk:
-
     @classmethod
-    def read(self, data: bytes, entry_type: bytes, offset: int) -> (list[bytes], int):
+    def read(self, data: bytes, entry_type: int, offset: int) -> tuple[list[bytes], int]:
         # total bytes read
         index = 0
-        num_records_in_batch = int.from_bytes(data[index+offset: index + offset + 2], byteorder='big')
+        num_records_in_batch = int.from_bytes(data[index + offset : index + offset + 2], byteorder="big")
         index += 2
-        uncompressed_data_size = int.from_bytes(data[index+offset: index + offset + 4], byteorder='big')
+        uncompressed_data_size = int.from_bytes(data[index + offset : index + offset + 4], byteorder="big")
         index += 4
-        data_len = int.from_bytes(data[index + offset: index + offset + 4], byteorder='big')
+        data_len = int.from_bytes(data[index + offset : index + offset + 4], byteorder="big")
         index += 4
 
         compression_type = CompressionType((entry_type & 0x70) >> 4)
-       
+
         current_pos = index + offset
-        data_compressed = data[current_pos:current_pos + data_len]
+        data_compressed = data[current_pos : current_pos + data_len]
         index += data_len
 
-        uncompressed_data = CompressionHelper.uncompress(data_compressed, compression_type=compression_type,
-                                                         uncompressed_data_size=uncompressed_data_size)
+        uncompressed_data = CompressionHelper.uncompress(
+            data_compressed, compression_type=compression_type, uncompressed_data_size=uncompressed_data_size
+        )
         subbatch_entries = []
         uncompressed_index = 0
         for i in range(num_records_in_batch):
-            size = int.from_bytes(uncompressed_data[uncompressed_index:uncompressed_index + 4], "big")
+            size = int.from_bytes(uncompressed_data[uncompressed_index : uncompressed_index + 4], "big")
             uncompressed_index += 4
-            subbatch_entries.append(uncompressed_data[uncompressed_index: uncompressed_index + size])
+            subbatch_entries.append(uncompressed_data[uncompressed_index : uncompressed_index + size])
             uncompressed_index += size
 
         return subbatch_entries, index
@@ -449,14 +452,14 @@ class Deliver(Frame):
     def get_messages(self) -> list[bytes]:
         messages = []
         pos = 0
-       
+
         for _ in range(self.num_entries):
             entry_type = self.data[pos]
-           
+
             if entry_type & 0x80 == 0:
-                size = int.from_bytes(self.data[pos:pos + 4], "big")
+                size = int.from_bytes(self.data[pos : pos + 4], "big")
                 pos += 4
-                messages.append(self.data[pos:pos + size])
+                messages.append(self.data[pos : pos + size])
                 pos += size
             # is a subentry-batch message
             else:
@@ -466,6 +469,7 @@ class Deliver(Frame):
                 pos += total_bytes_read
 
         return messages
+
 
 @dataclass
 class Credit(Frame):
