@@ -414,11 +414,12 @@ class SubEntryChunk:
         compression_type = CompressionType((entry_type & 0x70) >> 4)
         print("compression: " + str((entry_type & 0x70) >> 4))
 
-        data = data[index+offset:]
+        current_pos = index + offset
+        data_compressed = data[current_pos:current_pos + self.data_len]
         index += self.data_len
 
-        print("len: " + str(len(data)))
-        uncompressed_data = CompressionHelper.uncompress(data, compression_type=compression_type,
+        print("len: " + str(len(data_compressed)))
+        uncompressed_data = CompressionHelper.uncompress(data_compressed, compression_type=compression_type,
                                                          uncompressed_data_size=self.uncompressed_data_size)
 
         messages = []

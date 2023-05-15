@@ -1,5 +1,7 @@
 import asyncio
 import signal
+import time
+
 from rstream import Consumer, amqp_decoder, AMQPMessage
 
 
