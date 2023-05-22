@@ -218,6 +218,7 @@ class Producer:
 
         messages = []
         publishing_ids = set()
+        publishing_ids_callback: dict[CB[ConfirmationStatus], set[int]] = defaultdict(set)
 
         for item in batch:
 
@@ -237,6 +238,10 @@ class Producer:
                         data=bytes(msg),
                     )
                 )
+
+                if item.callback is not None:
+                    publishing_ids_callback[item.callback].update([msg.publishing_id])
+
             else:
                 compression_codec = item.entry
                 if len(messages) > 0:
@@ -246,7 +251,7 @@ class Producer:
                             messages=messages,
                         ),
                     )
-                    publishing_ids.update([m.publishing_id for m in messages])
+                    # publishing_ids.update([m.publishing_id for m in messages])
                     messages.clear()
                 for _ in range(item.entry.messages_count()):
                     publishing_id = publisher.sequence.next()
@@ -265,6 +270,9 @@ class Producer:
                 )
                 publishing_ids.update([publishing_id])
 
+                if item.callback is not None:
+                    publishing_ids_callback[item.callback].update([publishing_id])
+
         if len(messages) > 0:
 
             await publisher.client.send_frame(
@@ -275,9 +283,12 @@ class Producer:
             )
             publishing_ids.update([m.publishing_id for m in messages])
 
-        if item.callback is not None:
-            self._waiting_for_confirm[publisher.reference][item.callback] = publishing_ids.copy()
-        elif sync:
+        for callback in publishing_ids_callback:
+            self._waiting_for_confirm[publisher.reference][callback] = publishing_ids_callback[
+                callback
+            ].copy()
+        # this is just called in case of send_wait
+        if sync:
             future: asyncio.Future[None] = asyncio.Future()
             self._waiting_for_confirm[publisher.reference][future] = publishing_ids.copy()
             await future
