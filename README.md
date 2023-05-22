@@ -16,8 +16,9 @@ pip install rstream
 You can publish messages with three different methods:
 
 * send: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires.
-* batch_send: Synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
-* send_wait: Synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
+* batch_send: synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
+* send_wait: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
+* send_sub_entry: asynchronous, allow batch in sub-entry mode. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
 
 Example Using send:
 
@@ -59,7 +60,7 @@ async def publish():
 asyncio.run(publish())
 ```
 
-Eventually using batch_send:
+or using batch_send:
 
 ```python
 import asyncio
@@ -80,6 +81,36 @@ async def publish():
 
 asyncio.run(publish())
 ```
+
+and eventually using sub_entry_batch:
+
+```python
+async def publish():
+    async with Producer('localhost', username='guest', password='guest') as producer:
+        await producer.delete_stream('mystream', missing_ok=True)
+        await producer.create_stream('mystream', exists_ok=True)
+
+        messages = []
+        for i in range(10):
+            amqp_message = AMQPMessage(
+                body='a:{}'.format(i),
+            )
+            messages.append(amqp_message_list)
+
+       
+        await producer.send_sub_entry('mixing', compression_type=CompressionType.Gzip,
+                                      sub_entry_messages=messages)
+        
+        
+        await producer.send_sub_entry('mixing', compression_type=CompressionType.No,
+                                      sub_entry_messages=messages)
+
+    await producer.close()
+  
+asyncio.run(publish())
+```
+
+You have the possibility to specify NoCompression (compression_type=CompressionType.No) or Gzip (compression_type=CompressionType.Gzip).
 
 ### Publishing with confirmation
 
