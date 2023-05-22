@@ -16,6 +16,7 @@ from rstream import (
 
 from .util import (
     on_publish_confirm_client_callback,
+    on_publish_confirm_client_callback2,
     wait_for,
 )
 
@@ -240,6 +241,40 @@ async def test_send_async_confirmation(stream: str, producer: Producer) -> None:
     await publish_with_ids(1, 2, 3)
 
     await wait_for(lambda: len(confirmed_messages) == 3)
+
+
+# Checks if to different sends can be registered different callbacks
+async def test_send_async_confirmation_on_different_callbacks(stream: str, producer: Producer) -> None:
+
+    confirmed_messages: list[int] = []
+    confirmed_messages2: list[int] = []
+    errored_messages: list[int] = []
+
+    async def publish_with_ids(*ids):
+        for publishing_id in ids:
+            await producer.send(
+                stream,
+                RawMessage(f"test_{publishing_id}".encode(), publishing_id),
+                on_publish_confirm=partial(
+                    on_publish_confirm_client_callback,
+                    confirmed_messages=confirmed_messages,
+                    errored_messages=errored_messages,
+                ),
+            )
+            await producer.send(
+                stream,
+                RawMessage(f"test_{publishing_id}".encode(), publishing_id),
+                on_publish_confirm=partial(
+                    on_publish_confirm_client_callback2,
+                    confirmed_messages=confirmed_messages2,
+                    errored_messages=errored_messages,
+                ),
+            )
+
+    await publish_with_ids(1, 2, 3)
+
+    await wait_for(lambda: len(confirmed_messages) == 3)
+    await wait_for(lambda: len(confirmed_messages2) == 3)
 
 
 async def test_send_entry_subbatch_async_confirmation(stream: str, producer: Producer) -> None:
