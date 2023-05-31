@@ -5,6 +5,12 @@ import pytest
 from rstream import schema
 from rstream.client import Client
 
+from .http_requests import (
+    create_binding,
+    create_exchange,
+    delete_exchange,
+)
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -54,3 +60,64 @@ async def test_deliver(client: Client, stream: str) -> None:
 async def test_query_leader(client: Client, stream: str) -> None:
     leader, _ = await client.query_leader_and_replicas(stream)
     assert (leader.host, int(leader.port)) == (client.host, int(client.port))
+
+
+async def test_partitions(client: Client, stream: str) -> None:
+    # create an exchange to connect the 3 supersteams
+    status_code = create_exchange(exchange_name=stream)
+    assert status_code == 201 or status_code == 204
+    await client.create_stream(stream + "-0")
+    await client.create_stream(stream + "-1")
+    await client.create_stream(stream + "-2")
+
+    # create bindings with exchange
+    status_code = create_binding(exchange_name=stream, routing_key="0", stream_name=stream + "-0")
+    assert status_code == 201 or status_code == 204
+    status_code = create_binding(exchange_name=stream, routing_key="1", stream_name=stream + "-1")
+    assert status_code == 201 or status_code == 204
+    status_code = create_binding(exchange_name=stream, routing_key="2", stream_name=stream + "-2")
+    assert status_code == 201 or status_code == 204
+
+    partitions = await client.partitions(super_stream=stream)
+
+    await client.delete_stream(stream + "-0")
+    await client.delete_stream(stream + "-1")
+    await client.delete_stream(stream + "-2")
+
+    delete_exchange(exchange_name=stream)
+    assert status_code == 201 or status_code == 204
+
+    assert len(partitions) == 3
+    assert partitions[0] == "test-stream-0"
+    assert partitions[1] == "test-stream-1"
+    assert partitions[2] == "test-stream-2"
+
+
+async def test_routes(client: Client, stream: str) -> None:
+    # create an exchange to connect the 3 supersteams
+    status_code = create_exchange(exchange_name=stream)
+    assert status_code == 201 or status_code == 204
+
+    await client.create_stream(stream + "-0")
+    await client.create_stream(stream + "-1")
+    await client.create_stream(stream + "-2")
+
+    # create bindings with exchange
+    status_code = create_binding(exchange_name=stream, routing_key="test1", stream_name=stream + "-0")
+    assert status_code == 201 or status_code == 204
+    status_code = create_binding(exchange_name=stream, routing_key="test2", stream_name=stream + "-1")
+    assert status_code == 201 or status_code == 204
+    status_code = create_binding(exchange_name=stream, routing_key="test3", stream_name=stream + "-2")
+    assert status_code == 201 or status_code == 204
+
+    partitions = await client.route(super_stream=stream, routing_key="test1")
+
+    await client.delete_stream(stream + "-0")
+    await client.delete_stream(stream + "-1")
+    await client.delete_stream(stream + "-2")
+
+    status_code = delete_exchange(exchange_name=stream)
+    assert status_code == 201 or status_code == 204
+
+    assert len(partitions) == 1
+    assert partitions[0] == "test-stream-0"

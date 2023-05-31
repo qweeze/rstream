@@ -483,3 +483,36 @@ class CreditResponse(Frame, is_response=True):
     key = Key.Credit
     response_code: int = field(metadata={"type": T.uint16})
     subscription_id: int = field(metadata={"type": T.uint8})
+
+
+# For new super stream implementation
+@dataclass
+class SuperStreamRoute(Frame):
+    key = Key.Route
+    # version : int = field(metadata={"type": T.uint16})
+    correlation_id: int = field(metadata={"type": T.uint32})
+    routing_key: str = field(metadata={"type": T.string})
+    super_stream: str = field(metadata={"type": T.string})
+
+
+@dataclass
+class SuperStreamRouteResponse(Frame, is_response=True):
+    key = Key.Route
+    correlation_id: int = field(metadata={"type": T.uint32})
+    response_code: int = field(metadata={"type": T.uint16})
+    streams: list[str] = field(metadata={"type": [T.string]})
+
+
+@dataclass
+class SuperStreamPartitions(Frame):
+    key = Key.Partitions
+    correlation_id: int = field(metadata={"type": T.uint32})
+    super_stream: str = field(metadata={"type": T.string})
+
+
+@dataclass
+class SuperStreamPartitionsResponse(Frame, is_response=True):
+    key = Key.Partitions
+    correlation_id: int = field(metadata={"type": T.uint32})
+    response_code: int = field(metadata={"type": T.uint16})
+    streams: list[str] = field(metadata={"type": [T.string]})

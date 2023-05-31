@@ -459,6 +459,29 @@ class Client(BaseClient):
             ),
         )
 
+    async def partitions(self, super_stream: str) -> list[str]:
+        resp = await self.sync_request(
+            schema.SuperStreamPartitions(
+                self._corr_id_seq.next(),
+                super_stream=super_stream,
+            ),
+            resp_schema=schema.SuperStreamPartitionsResponse,
+            raise_exception=False,
+        )
+        return resp.streams
+
+    async def route(self, routing_key: str, super_stream: str) -> list[str]:
+        resp = await self.sync_request(
+            schema.SuperStreamRoute(
+                self._corr_id_seq.next(),
+                routing_key=routing_key,
+                super_stream=super_stream,
+            ),
+            resp_schema=schema.SuperStreamRouteResponse,
+            raise_exception=False,
+        )
+        return resp.streams
+
 
 class ClientPool:
     def __init__(
