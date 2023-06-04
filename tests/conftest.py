@@ -4,8 +4,20 @@ import ssl
 import pytest
 
 import rstream.client
-from rstream import Consumer, Producer
+from rstream import (
+    Consumer,
+    Producer,
+    RouteType,
+    SuperStreamProducer,
+)
 from rstream.client import Client
+
+from .http_requests import (
+    create_binding,
+    create_exchange,
+    delete_exchange,
+)
+from .util import routing_extractor
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -100,6 +112,52 @@ async def producer(pytestconfig, ssl_context):
         password=pytestconfig.getoption("rmq_password"),
         frame_max=1024 * 1024,
         heartbeat=60,
+    )
+    await producer.start()
+    try:
+        yield producer
+    finally:
+        await producer.close()
+
+
+@pytest.fixture()
+async def super_stream(client: Client):
+    # create an exchange to connect the 3 supersteams
+    super_stream = "test-super-stream"
+    status_code = create_exchange(exchange_name=super_stream)
+    assert status_code == 201 or status_code == 204
+
+    await client.create_stream(super_stream + "-0")
+
+    # create binding with exchange
+    status_code = create_binding(
+        exchange_name=super_stream, routing_key="test1", stream_name=super_stream + "-0"
+    )
+    assert status_code == 201 or status_code == 204
+
+    try:
+        yield "test-super-stream"
+    #
+    finally:
+        await client.delete_stream(super_stream + "-0")
+
+        status_code = delete_exchange(exchange_name=super_stream)
+        assert status_code == 201 or status_code == 204
+
+
+@pytest.fixture()
+async def super_stream_producer(pytestconfig, ssl_context):
+    producer = SuperStreamProducer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        routing=RouteType.Hash,
+        routing_extractor=routing_extractor,
+        super_stream="test-super-stream",
     )
     await producer.start()
     try:

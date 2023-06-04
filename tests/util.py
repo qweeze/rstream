@@ -3,7 +3,7 @@
 
 import asyncio
 
-from rstream import ConfirmationStatus
+from rstream import AMQPMessage, ConfirmationStatus
 
 captured: list[bytes] = []
 
@@ -34,3 +34,7 @@ def on_publish_confirm_client_callback2(
         confirmed_messages.append(confirmation.message_id)
     else:
         errored_messages.append(confirmation.message_id)
+
+
+def routing_extractor(message: AMQPMessage) -> str:
+    return "0"

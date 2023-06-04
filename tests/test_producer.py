@@ -7,10 +7,13 @@ from functools import partial
 import pytest
 
 from rstream import (
+    AMQPMessage,
     CompressionType,
     Consumer,
     Producer,
     RawMessage,
+    SuperStreamProducer,
+    amqp_decoder,
     exceptions,
 )
 
@@ -316,3 +319,19 @@ async def test_producer_restart(stream: str, producer: Producer, consumer: Consu
 
     await wait_for(lambda: len(captured) == 2)
     assert captured == [b"one", b"two"]
+
+
+# Simple test for superstream. Will be modified and improved when consumer part will also support super_stream
+async def test_publishing_sequence_superstream(
+    super_stream: str, producer: Producer, super_stream_producer: SuperStreamProducer, consumer: Consumer
+) -> None:
+    captured: list[bytes] = []
+    amqp_message = AMQPMessage(
+        body="a:{}".format(1),
+    )
+
+    await consumer.subscribe(super_stream + "-0", callback=captured.append, decoder=amqp_decoder)
+
+    await super_stream_producer.send(amqp_message)
+
+    await wait_for(lambda: len(captured) == 1)
