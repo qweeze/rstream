@@ -11,7 +11,6 @@ from typing import (
     Callable,
     Optional,
     TypeVar,
-    Union,
 )
 
 import mmh3
@@ -21,7 +20,7 @@ from .client import Client, ClientPool
 from .producer import ConfirmationStatus, Producer
 
 MT = TypeVar("MT")
-CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
+CB = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 
@@ -77,7 +76,7 @@ class SuperStreamProducer:
         self.max_retries = max_retries
         self.default_batch_publishing_delay = default_batch_publishing_delay
         self._default_client: Optional[Client] = None
-        self._producer = None
+        self._producer: Producer | None = None
         self._routing_strategy: RoutingStrategy
 
     async def _get_producer(self) -> Producer:
@@ -108,7 +107,6 @@ class SuperStreamProducer:
         self._producer = await self._get_producer()
 
         for stream in streams:
-            print("stream is: " + stream)
             await self._producer.send(stream=stream, message=message, on_publish_confirm=on_publish_confirm)
 
     @property
@@ -134,7 +132,8 @@ class SuperStreamProducer:
 
     async def close(self) -> None:
         await self._pool.close()
-        await self._producer.close()
+        if self._producer is not None:
+            await self._producer.close()
         self._default_client = None
 
 
@@ -167,21 +166,22 @@ class RoutingStrategy(abc.ABC):
 
 class RoutingKeyRoutingStrategy(RoutingStrategy):
     def __init__(self, routingKeyExtractor: CB[Any]):
-        self.routingKeyExtractor = routingKeyExtractor
+        self.routingKeyExtractor: CB[Any] = routingKeyExtractor
 
     async def route(self, message: MessageT, metadata: Metadata) -> list[str]:
-        key = self.routingKeyExtractor(message)
+        key = await self.routingKeyExtractor(message)
         return await metadata.routes(str(key))
 
 
 class HashRoutingMurmurStrategy(RoutingStrategy):
     def __init__(self, routingKeyExtractor: CB[Any]):
-        self.routingKeyExtractor = routingKeyExtractor
+        self.routingKeyExtractor: CB[Any] = routingKeyExtractor
 
     async def route(self, message: MessageT, metadata: Metadata) -> list[str]:
         streams = []
-        key = self.routingKeyExtractor(message)
-        hash = mmh3.hash_bytes(bytes(key, "UTF-16"), 104729)
+        key = await self.routingKeyExtractor(message)
+        key_bytes = bytes(key, "UTF-16")
+        hash = mmh3.hash_bytes(key_bytes, 104729)
         partitions = len(await metadata.partitions())
 
         route = int.from_bytes(hash, "little", signed=False) % partitions

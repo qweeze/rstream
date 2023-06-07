@@ -36,5 +36,5 @@ def on_publish_confirm_client_callback2(
         errored_messages.append(confirmation.message_id)
 
 
-def routing_extractor(message: AMQPMessage) -> str:
+async def routing_extractor(message: AMQPMessage) -> str:
     return "0"
