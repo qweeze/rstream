@@ -21,6 +21,10 @@ from .producer import (  # noqa: E402
     Producer,
     RawMessage,
 )
+from .superstream import (  # noqa: E402
+    RouteType,
+    SuperStreamProducer,
+)
 
 __all__ = [
     "AMQPMessage",
@@ -31,4 +35,6 @@ __all__ = [
     "OffsetType",
     "ConfirmationStatus",
     "CompressionType",
+    "SuperStreamProducer",
+    "RouteType",
 ]

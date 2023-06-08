@@ -7,10 +7,13 @@ from functools import partial
 import pytest
 
 from rstream import (
+    AMQPMessage,
     CompressionType,
     Consumer,
     Producer,
     RawMessage,
+    SuperStreamProducer,
+    amqp_decoder,
     exceptions,
 )
 
@@ -316,3 +319,45 @@ async def test_producer_restart(stream: str, producer: Producer, consumer: Consu
 
     await wait_for(lambda: len(captured) == 2)
     assert captured == [b"one", b"two"]
+
+
+# Simple test for superstream. Will be modified and improved when consumer part will also support super_stream
+async def test_publishing_sequence_superstream(
+    super_stream: str, super_stream_producer: SuperStreamProducer, consumer: Consumer
+) -> None:
+    captured: list[bytes] = []
+    amqp_message = AMQPMessage(
+        body="a:{}".format(1),
+    )
+
+    await consumer.subscribe(super_stream + "-0", callback=captured.append, decoder=amqp_decoder)
+
+    await super_stream_producer.send(amqp_message)
+
+    await wait_for(lambda: len(captured) == 1)
+
+
+async def test_publishing_sequence_superstream_with_callback(
+    super_stream: str, super_stream_producer: SuperStreamProducer
+) -> None:
+
+    confirmed_messages: list[int] = []
+    errored_messages: list[int] = []
+
+    async def publish_with_ids(*ids):
+        for publishing_id in ids:
+            amqp_message = AMQPMessage(
+                body="a:{}".format(publishing_id),
+            )
+            await super_stream_producer.send(
+                amqp_message,
+                on_publish_confirm=partial(
+                    on_publish_confirm_client_callback,
+                    confirmed_messages=confirmed_messages,
+                    errored_messages=errored_messages,
+                ),
+            )
+
+    await publish_with_ids(1, 2, 3)
+
+    await wait_for(lambda: len(confirmed_messages) == 3)
