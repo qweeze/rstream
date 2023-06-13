@@ -38,3 +38,7 @@ def on_publish_confirm_client_callback2(
 
 async def routing_extractor(message: AMQPMessage) -> str:
     return "0"
+
+
+async def routing_extractor_key(message: AMQPMessage) -> str:
+    return "key1"
