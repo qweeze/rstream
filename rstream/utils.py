@@ -1,6 +1,18 @@
 import asyncio
 import itertools
-from typing import Any, Generator
+from dataclasses import dataclass
+from typing import Any, Generator, Optional
+
+from .amqp import _MessageProtocol
+
+
+@dataclass
+class RawMessage(_MessageProtocol):
+    data: bytes
+    publishing_id: Optional[int] = None
+
+    def __bytes__(self) -> bytes:
+        return self.data
 
 
 class MonotonicSeq:

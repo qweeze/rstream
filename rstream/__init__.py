@@ -13,12 +13,17 @@ except metadata.PackageNotFoundError:
 del metadata
 
 from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
+from .compression import CompressionType  # noqa: E402
 from .constants import OffsetType  # noqa: E402
 from .consumer import Consumer  # noqa: E402
 from .producer import (  # noqa: E402
     ConfirmationStatus,
     Producer,
     RawMessage,
+)
+from .superstream import (  # noqa: E402
+    RouteType,
+    SuperStreamProducer,
 )
 
 __all__ = [
@@ -29,4 +34,7 @@ __all__ = [
     "Producer",
     "OffsetType",
     "ConfirmationStatus",
+    "CompressionType",
+    "SuperStreamProducer",
+    "RouteType",
 ]
