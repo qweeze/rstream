@@ -49,7 +49,9 @@ async def test_delete_stream_doesnt_exist(producer: Producer) -> None:
 
 async def test_publishing_sequence(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     assert await producer.send_wait(stream, b"one") == 1
     assert await producer.send_batch(stream, [b"two", b"three"]) == [2, 3]
@@ -62,7 +64,9 @@ async def test_publishing_sequence_subbatching_nocompression(
 ) -> None:
     captured: list[bytes] = []
 
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     list_messages = []
     list_messages.append(b"one")
@@ -80,7 +84,9 @@ async def test_publishing_sequence_subbatching_gzip(
 ) -> None:
     captured: list[bytes] = []
 
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     list_messages = []
     list_messages.append(b"one")
@@ -98,7 +104,9 @@ async def test_publishing_sequence_subbatching_mix(
 ) -> None:
     captured: list[bytes] = []
 
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     list_messages = []
     list_messages.append(b"one")
@@ -130,7 +138,9 @@ async def test_publishing_sequence_subbatching_mix(
 async def test_publishing_sequence_async(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []
 
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     await producer.send(stream, b"one")
     await producer.send(stream, b"two")
@@ -142,7 +152,9 @@ async def test_publishing_sequence_async(stream: str, producer: Producer, consum
 
 async def test_publish_deduplication(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     async def publish_with_ids(*ids):
         for publishing_id in ids:
@@ -165,7 +177,9 @@ async def test_publish_deduplication(stream: str, producer: Producer, consumer: 
 
 async def test_publish_deduplication_async(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     async def publish_with_ids(*ids):
         for publishing_id in ids:
@@ -191,7 +205,9 @@ async def test_publish_deduplication_async(stream: str, producer: Producer, cons
 
 async def test_concurrent_publish(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     await asyncio.gather(
         *(
@@ -209,7 +225,9 @@ async def test_concurrent_publish(stream: str, producer: Producer, consumer: Con
 
 async def test_concurrent_publish_async(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     await asyncio.gather(
         *(
@@ -309,7 +327,9 @@ async def test_send_entry_subbatch_async_confirmation(stream: str, producer: Pro
 
 async def test_producer_restart(stream: str, producer: Producer, consumer: Consumer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     await producer.send_wait(stream, b"one")
 
@@ -327,7 +347,9 @@ async def test_publishing_sequence_superstream(
 ) -> None:
     captured: list[bytes] = []
 
-    await super_stream_consumer.subscribe(callback=captured.append, decoder=amqp_decoder)
+    await super_stream_consumer.subscribe(
+        callback=lambda message, message_context: captured.append(bytes(message)), decoder=amqp_decoder
+    )
 
     async def publish_with_ids(*ids):
         for publishing_id in ids:
@@ -347,7 +369,11 @@ async def test_publishing_sequence_superstream_key_routing(
 ) -> None:
     captured: list[bytes] = []
 
-    await consumer.subscribe(stream="test-super-stream-0", callback=captured.append, decoder=amqp_decoder)
+    await consumer.subscribe(
+        stream="test-super-stream-0",
+        callback=lambda message, message_context: captured.append(bytes(message)),
+        decoder=amqp_decoder,
+    )
 
     async def publish_with_ids(*ids):
         for publishing_id in ids:
@@ -367,7 +393,9 @@ async def test_publishing_sequence_superstream_binary(
 ) -> None:
     captured: list[bytes] = []
 
-    await super_stream_consumer.subscribe(callback=captured.append)
+    await super_stream_consumer.subscribe(
+        callback=lambda message, message_context: captured.append(bytes(message))
+    )
 
     async def publish_with_ids(*ids):
         for _ in ids:

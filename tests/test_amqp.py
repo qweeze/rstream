@@ -7,6 +7,7 @@ import uamqp.message
 from rstream import (
     AMQPMessage,
     Consumer,
+    MessageContext,
     Producer,
     amqp_decoder,
 )
@@ -24,7 +25,7 @@ async def test_amqp_message(stream: str, consumer: Consumer, producer: Producer)
 
     incoming_amqp_message = None
 
-    def callback(msg: AMQPMessage):
+    def callback(msg: AMQPMessage, message_context: MessageContext):
         nonlocal incoming_amqp_message
         incoming_amqp_message = msg
         consumer.stop()
