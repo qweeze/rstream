@@ -17,11 +17,19 @@ from typing import (
 )
 
 from . import exceptions, schema
+from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
 from .constants import OffsetType
 
 MT = TypeVar("MT")
-CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
+CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
+
+
+@dataclass
+class MessageContext:
+    stream: str
+    offset: int
+    timestamp: int
 
 
 @dataclass
@@ -30,7 +38,7 @@ class _Subscriber:
     subscription_id: int
     reference: str
     client: Client
-    callback: CB[Any]
+    callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]]
     decoder: Callable[[bytes], Any]
     offset_type: OffsetType
     offset: int
@@ -116,7 +124,7 @@ class Consumer:
         self,
         stream: str,
         subscriber_name: Optional[str],
-        callback: CB[MT],
+        callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
         decoder: Optional[Callable[[bytes], Any]],
         offset_type: OffsetType,
         offset: Optional[int],
@@ -143,7 +151,7 @@ class Consumer:
     async def subscribe(
         self,
         stream: str,
-        callback: CB[MT],
+        callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
         *,
         decoder: Optional[Callable[[bytes], MT]] = None,
         offset: Optional[int] = None,
@@ -217,7 +225,7 @@ class Consumer:
 
             yield message
 
-        subscriber.offset = frame.chunk_first_offset + frame.num_entries
+        # subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
     async def _on_deliver(self, frame: schema.Deliver, subscriber: _Subscriber) -> None:
         if frame.subscription_id != subscriber.subscription_id:
@@ -225,8 +233,10 @@ class Consumer:
 
         await subscriber.client.credit(subscriber.subscription_id, 1)
 
-        for message in self._filter_messages(frame, subscriber):
-            maybe_coro = subscriber.callback(subscriber.decoder(message))
+        for index, message in enumerate(self._filter_messages(frame, subscriber)):
+            subscriber.offset = frame.chunk_first_offset + frame.num_entries + index
+            message_context = MessageContext(subscriber.stream, subscriber.offset, frame.timestamp)
+            maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
             if maybe_coro is not None:
                 await maybe_coro
 

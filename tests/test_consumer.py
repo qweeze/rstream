@@ -41,7 +41,9 @@ async def test_delete_stream_doesnt_exist(consumer: Consumer) -> None:
 
 async def test_consume(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
     assert await producer.send_wait(stream, b"one") == 1
     assert await producer.send_batch(stream, [b"two", b"three"]) == [2, 3]
 
@@ -53,7 +55,7 @@ async def test_offset_type_first(stream: str, consumer: Consumer, producer: Prod
     captured: list[bytes] = []
     await consumer.subscribe(
         stream,
-        callback=captured.append,
+        callback=lambda message, message_context: captured.append(bytes(message)),
         offset_type=OffsetType.FIRST,
     )
     messages = [str(i).encode() for i in range(1, 11)]
@@ -67,7 +69,7 @@ async def test_offset_type_offset(stream: str, consumer: Consumer, producer: Pro
     captured: list[bytes] = []
     await consumer.subscribe(
         stream,
-        callback=captured.append,
+        callback=lambda message, message_context: captured.append(bytes(message)),
         offset_type=OffsetType.OFFSET,
         offset=7,
     )
@@ -85,7 +87,7 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
     captured: list[bytes] = []
     await consumer.subscribe(
         stream,
-        callback=captured.append,
+        callback=lambda message, message_context: captured.append(bytes(message)),
         offset_type=OffsetType.LAST,
         subscriber_name="test-subscriber",
     )
@@ -117,7 +119,7 @@ async def test_offset_type_next(stream: str, consumer: Consumer, producer: Produ
     captured: list[bytes] = []
     await consumer.subscribe(
         stream,
-        callback=captured.append,
+        callback=lambda message, message_context: captured.append(bytes(message)),
         offset_type=OffsetType.NEXT,
         subscriber_name="test-subscriber",
     )
@@ -128,12 +130,18 @@ async def test_offset_type_next(stream: str, consumer: Consumer, producer: Produ
 
 async def test_consume_with_resubscribe(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
-    subscriber_name = await consumer.subscribe(stream, callback=captured.append)
+    subscriber_name = await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
     await producer.send_wait(stream, b"one")
     await wait_for(lambda: len(captured) >= 1)
 
     await consumer.unsubscribe(subscriber_name)
-    await consumer.subscribe(stream, callback=captured.append, offset_type=OffsetType.NEXT)
+    await consumer.subscribe(
+        stream,
+        callback=lambda message, message_context: captured.append(bytes(message)),
+        offset_type=OffsetType.NEXT,
+    )
 
     await producer.send_wait(stream, b"two")
     await wait_for(lambda: len(captured) >= 2)
@@ -144,12 +152,16 @@ async def test_consume_superstream_with_resubscribe(
     super_stream: str, super_stream_consumer: SuperStreamConsumer, super_stream_producer: SuperStreamProducer
 ) -> None:
     captured: list[bytes] = []
-    await super_stream_consumer.subscribe(callback=captured.append)
+    await super_stream_consumer.subscribe(
+        callback=lambda message, message_context: captured.append(bytes(message))
+    )
     await super_stream_producer.send(b"one")
     await wait_for(lambda: len(captured) >= 1)
 
     await super_stream_consumer.unsubscribe()
-    await super_stream_consumer.subscribe(callback=captured.append, offset_type=OffsetType.NEXT)
+    await super_stream_consumer.subscribe(
+        callback=lambda message, message_context: captured.append(bytes(message)), offset_type=OffsetType.NEXT
+    )
 
     await super_stream_producer.send(b"two")
     await wait_for(lambda: len(captured) >= 2)
@@ -158,13 +170,19 @@ async def test_consume_superstream_with_resubscribe(
 
 async def test_consume_with_restart(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
-    await consumer.subscribe(stream, callback=captured.append)
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
     await producer.send_wait(stream, b"one")
     await wait_for(lambda: len(captured) >= 1)
 
     await consumer.close()
     await consumer.start()
-    await consumer.subscribe(stream, callback=captured.append, offset_type=OffsetType.NEXT)
+    await consumer.subscribe(
+        stream,
+        callback=lambda message, message_context: captured.append(bytes(message)),
+        offset_type=OffsetType.NEXT,
+    )
 
     await producer.send_wait(stream, b"two")
     await wait_for(lambda: len(captured) >= 2)
@@ -177,7 +195,14 @@ async def test_consume_multiple_streams(consumer: Consumer, producer: Producer) 
         await asyncio.gather(*(consumer.create_stream(stream) for stream in streams))
 
         captured: list[bytes] = []
-        await asyncio.gather(*(consumer.subscribe(stream, callback=captured.append) for stream in streams))
+        await asyncio.gather(
+            *(
+                consumer.subscribe(
+                    stream, callback=lambda message, message_context: captured.append(bytes(message))
+                )
+                for stream in streams
+            )
+        )
 
         await asyncio.gather(*(producer.send_wait(stream, b"test") for stream in streams))
 

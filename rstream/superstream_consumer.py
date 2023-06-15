@@ -17,9 +17,10 @@ from typing import (
     Union,
 )
 
+from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
 from .constants import OffsetType
-from .consumer import Consumer
+from .consumer import Consumer, MessageContext
 from .superstream import DefaultSuperstreamMetadata
 
 MT = TypeVar("MT")
@@ -114,7 +115,7 @@ class SuperStreamConsumer:
 
     async def subscribe(
         self,
-        callback: CB[MT],
+        callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
         *,
         decoder: Optional[Callable[[bytes], MT]] = None,
         offset: Optional[int] = None,
