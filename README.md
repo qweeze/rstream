@@ -159,7 +159,7 @@ With `send_wait` instead will wait until the confirmation from the server is rec
 ```python
 import asyncio
 import signal
-from rstream import Consumer, amqp_decoder, AMQPMessage
+from rstream import Consumer, amqp_decoder, AMQPMessage, MessageContext
 
 async def consume():
     consumer = Consumer(
@@ -173,8 +173,8 @@ async def consume():
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
 
-    def on_message(msg: AMQPMessage):
-        print('Got message: {}'.format(msg.body))
+    def on_message(msg: AMQPMessage, message_context: MessageContext):
+        print('Got message: {}'.format(msg) + "from stream " + message_context.stream+ "offset: " + str(message_context.offset))
 
     await consumer.start()
     await consumer.subscribe('mystream', on_message, decoder=amqp_decoder)
@@ -182,6 +182,100 @@ async def consume():
 
 asyncio.run(consume())
 ```
+
+### Superstreams
+
+The client is also supporting superstream: https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams/
+A super stream is a logical stream made of individual, regular streams. It is a way to scale out publishing and consuming with RabbitMQ Streams: a large logical stream is divided into partition streams, splitting up the storage and the traffic on several cluster nodes.
+
+You can use superstream_producer and superstream_consumer classes which internally uses producers and consumers to operate on the componsing streams.
+
+How to create a superstream:
+
+```
+rabbitmq-streams add_super_stream orders  --routing-keys key1, key2,key3
+```
+
+How to send a message to a supersteream
+
+```python
+import asyncio
+import time
+import uamqp
+
+from rstream import Producer, AMQPMessage, ConfirmationStatus, CompressionType, SuperStreamProducer, RouteType
+
+async def routing_extractor(message: AMQPMessage) -> str:
+    return str(message.properties.message_id)
+
+async def publish():
+    global counter
+    counter = 0
+    sent = 0
+    async with SuperStreamProducer('localhost', username='guest', password='guest', super_stream='mixing', routing=RouteType.Hash, routing_extractor=routing_extractor) as producer:
+
+        messages = []
+        for i in range(1000):
+            amqp_message = AMQPMessage(
+                body='a:{}'.format(i),
+                properties=uamqp.message.MessageProperties(message_id=i),
+               
+            )
+           
+            await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)
+
+    
+        await asyncio.sleep(1)
+asyncio.run(publish())
+```
+
+How to consume from a superstream:
+
+```python
+import asyncio
+import signal
+from rstream import Consumer, amqp_decoder, AMQPMessage, SuperStreamConsumer, OffsetType, MessageContext
+from typing import Optional
+
+def on_message(msg: AMQPMessage, message_context: Optional[MessageContext]):
+    print('Got message: {}'.format(msg) + "from stream " + message_context.stream+ "offset: " + str(message_context.offset))
+        
+async def consume():
+    print("consume")
+    consumer = SuperStreamConsumer(
+        host='localhost',
+        port=5552,
+        vhost='/',
+        username='guest',
+        password='guest',
+        super_stream='mixing'
+    )
+
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
+
+    await consumer.start()
+    await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_type=OffsetType.FIRST)
+    await consumer.run()
+
+# main coroutine
+async def main():
+    print("starting")
+    # schedule the task
+    task = asyncio.create_task(consume())
+    # suspend a moment
+      # wait a moment
+    await asyncio.sleep(3)
+    # cancel the task
+    was_cancelled = task.cancel()
+   
+    # report a message
+    print('Main done')
+ 
+# run the asyncio program
+asyncio.run(main())
+```
+
 
 ### Connecting with SSL:
 

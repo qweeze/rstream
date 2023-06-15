@@ -43,7 +43,7 @@ jobs:
       - name: black check
         run: poetry run black --check .
       - name: flake8
-        run: poetry run flake8 --exclude=venv,local_tests --max-line-length=120 --ignore=E203
+        run: poetry run flake8 --exclude=venv,local_tests,docs/examples --max-line-length=120 --ignore=E203
       - name: mypy
         run: | 
           poetry add --group dev requests
