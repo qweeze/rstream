@@ -196,7 +196,7 @@ How to create a superstream:
 rabbitmq-streams add_super_stream orders  --routing-keys key1, key2,key3
 ```
 
-How to send a message to a supersteream
+How to send a message to a superstream
 
 ```python
 import asyncio
@@ -260,7 +260,6 @@ async def consume():
 
 # main coroutine
 async def main():
-    print("starting")
     # schedule the task
     task = asyncio.create_task(consume())
     # suspend a moment
@@ -268,9 +267,6 @@ async def main():
     await asyncio.sleep(3)
     # cancel the task
     was_cancelled = task.cancel()
-   
-    # report a message
-    print('Main done')
  
 # run the asyncio program
 asyncio.run(main())
