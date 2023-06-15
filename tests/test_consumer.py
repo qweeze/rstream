@@ -9,13 +9,12 @@ from rstream import (
     Consumer,
     OffsetType,
     Producer,
+    SuperStreamConsumer,
+    SuperStreamProducer,
     exceptions,
 )
 
 from .util import wait_for
-
-# import time
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -137,6 +136,22 @@ async def test_consume_with_resubscribe(stream: str, consumer: Consumer, produce
     await consumer.subscribe(stream, callback=captured.append, offset_type=OffsetType.NEXT)
 
     await producer.send_wait(stream, b"two")
+    await wait_for(lambda: len(captured) >= 2)
+    assert captured == [b"one", b"two"]
+
+
+async def test_consume_superstream_with_resubscribe(
+    super_stream: str, super_stream_consumer: SuperStreamConsumer, super_stream_producer: SuperStreamProducer
+) -> None:
+    captured: list[bytes] = []
+    await super_stream_consumer.subscribe(callback=captured.append)
+    await super_stream_producer.send(b"one")
+    await wait_for(lambda: len(captured) >= 1)
+
+    await super_stream_consumer.unsubscribe()
+    await super_stream_consumer.subscribe(callback=captured.append, offset_type=OffsetType.NEXT)
+
+    await super_stream_producer.send(b"two")
     await wait_for(lambda: len(captured) >= 2)
     assert captured == [b"one", b"two"]
 

@@ -21,7 +21,10 @@ from .producer import (  # noqa: E402
     Producer,
     RawMessage,
 )
-from .superstream import (  # noqa: E402
+from .superstream_consumer import (  # noqa: E402
+    SuperStreamConsumer,
+)
+from .superstream_producer import (  # noqa: E402
     RouteType,
     SuperStreamProducer,
 )
@@ -37,4 +40,5 @@ __all__ = [
     "CompressionType",
     "SuperStreamProducer",
     "RouteType",
+    "SuperStreamConsumer",
 ]

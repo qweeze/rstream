@@ -8,6 +8,7 @@ from rstream import (
     Consumer,
     Producer,
     RouteType,
+    SuperStreamConsumer,
     SuperStreamProducer,
 )
 from rstream.client import Client
@@ -17,7 +18,7 @@ from .http_requests import (
     create_exchange,
     delete_exchange,
 )
-from .util import routing_extractor
+from .util import routing_extractor, routing_extractor_key
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -128,10 +129,20 @@ async def super_stream(client: Client):
     assert status_code == 201 or status_code == 204
 
     await client.create_stream(super_stream + "-0")
+    await client.create_stream(super_stream + "-1")
+    await client.create_stream(super_stream + "-2")
 
     # create binding with exchange
     status_code = create_binding(
-        exchange_name=super_stream, routing_key="test1", stream_name=super_stream + "-0"
+        exchange_name=super_stream, routing_key="key1", stream_name=super_stream + "-0"
+    )
+    assert status_code == 201 or status_code == 204
+    status_code = create_binding(
+        exchange_name=super_stream, routing_key="key2", stream_name=super_stream + "-1"
+    )
+    assert status_code == 201 or status_code == 204
+    status_code = create_binding(
+        exchange_name=super_stream, routing_key="key3", stream_name=super_stream + "-2"
     )
     assert status_code == 201 or status_code == 204
 
@@ -140,6 +151,8 @@ async def super_stream(client: Client):
     #
     finally:
         await client.delete_stream(super_stream + "-0")
+        await client.delete_stream(super_stream + "-1")
+        await client.delete_stream(super_stream + "-2")
 
         status_code = delete_exchange(exchange_name=super_stream)
         assert status_code == 201 or status_code == 204
@@ -164,3 +177,43 @@ async def super_stream_producer(pytestconfig, ssl_context):
         yield producer
     finally:
         await producer.close()
+
+
+@pytest.fixture()
+async def super_stream_key_routing_producer(pytestconfig, ssl_context):
+    producer = SuperStreamProducer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        routing=RouteType.Key,
+        routing_extractor=routing_extractor_key,
+        super_stream="test-super-stream",
+    )
+    await producer.start()
+    try:
+        yield producer
+    finally:
+        await producer.close()
+
+
+@pytest.fixture()
+async def super_stream_consumer(pytestconfig, ssl_context):
+    consumer = SuperStreamConsumer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        super_stream="test-super-stream",
+    )
+    await consumer.start()
+    try:
+        yield consumer
+    finally:
+        await consumer.close()
