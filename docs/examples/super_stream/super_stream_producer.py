@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from rstream import (
     AMQPMessage,
@@ -26,6 +27,10 @@ async def publish():
                 application_properties={"id": "{}".format(i)},
             )
             await super_stream_producer.send(amqp_message)
+        print("Published 100 messages to super stream: invoices")
+
+        # wait a bit to be sure that the messages are delivered
+        await asyncio.sleep(1)
 
 
 asyncio.run(publish())
