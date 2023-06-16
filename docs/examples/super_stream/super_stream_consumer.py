@@ -15,18 +15,14 @@ cont = 0
 
 def on_message(msg: AMQPMessage, message_context: MessageContext):
     print(
-        "Got message: {}".format(msg)
-        + "from stream "
-        + message_context.stream
-        + "offset: "
-        + str(message_context.offset)
+        "Received message: {} from stream: {} - message offset: {}".format(msg, message_context.stream,
+                                                                           message_context.offset)
     )
 
 
 async def consume():
-    print("consume")
     consumer = SuperStreamConsumer(
-        host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="mixing"
+        host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="invoices"
     )
 
     loop = asyncio.get_event_loop()
@@ -35,3 +31,6 @@ async def consume():
     await consumer.start()
     await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_type=OffsetType.FIRST)
     await consumer.run()
+
+
+asyncio.run(consume())
