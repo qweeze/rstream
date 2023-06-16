@@ -225,17 +225,17 @@ class Consumer:
 
             yield message
 
-        # subscriber.offset = frame.chunk_first_offset + frame.num_entries
+        subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
     async def _on_deliver(self, frame: schema.Deliver, subscriber: _Subscriber) -> None:
         if frame.subscription_id != subscriber.subscription_id:
             return
 
         await subscriber.client.credit(subscriber.subscription_id, 1)
-
+        offset = frame.chunk_first_offset
         for index, message in enumerate(self._filter_messages(frame, subscriber)):
-            subscriber.offset = frame.chunk_first_offset + frame.num_entries + index
-            message_context = MessageContext(subscriber.stream, subscriber.offset, frame.timestamp)
+            offset = offset + index
+            message_context = MessageContext(subscriber.stream, offset, frame.timestamp)
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
             if maybe_coro is not None:
                 await maybe_coro
