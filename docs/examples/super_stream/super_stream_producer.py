@@ -14,12 +14,12 @@ async def routing_extractor(message: AMQPMessage) -> str:
 
 async def publish():
     async with SuperStreamProducer(
-            "localhost",
-            username="guest",
-            password="guest",
-            routing_extractor=routing_extractor,
-            routing=RouteType.Hash,
-            super_stream="invoices",
+        "localhost",
+        username="guest",
+        password="guest",
+        routing_extractor=routing_extractor,
+        routing=RouteType.Hash,
+        super_stream="invoices",
     ) as super_stream_producer:
         for i in range(100):
             amqp_message = AMQPMessage(

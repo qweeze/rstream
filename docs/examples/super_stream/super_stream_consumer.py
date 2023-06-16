@@ -15,8 +15,9 @@ cont = 0
 
 def on_message(msg: AMQPMessage, message_context: MessageContext):
     print(
-        "Received message: {} from stream: {} - message offset: {}".format(msg, message_context.stream,
-                                                                           message_context.offset)
+        "Received message: {} from stream: {} - message offset: {}".format(
+            msg, message_context.stream, message_context.offset
+        )
     )
 
 
