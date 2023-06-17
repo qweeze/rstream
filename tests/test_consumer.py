@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+from functools import partial
 
 import pytest
 
@@ -14,7 +15,7 @@ from rstream import (
     exceptions,
 )
 
-from .util import wait_for
+from .util import on_message, wait_for
 
 pytestmark = pytest.mark.asyncio
 
@@ -94,6 +95,54 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
 
     await wait_for(lambda: len(captured) > 0 and captured[-1] == b"4999")
     assert len(captured) < len(messages)
+
+
+async def test_offset_manual_setting(stream: str, consumer: Consumer, producer: Producer) -> None:
+    captured: list[bytes] = []
+    await consumer.store_offset(stream=stream, offset=7, subscriber_name="test_offset_manual_setting")
+    offset = await consumer.query_offset(stream=stream, subscriber_name="test_offset_manual_setting")
+
+    assert offset == 7
+
+    await consumer.subscribe(
+        stream,
+        callback=lambda message, message_context: captured.append(bytes(message)),
+        offset_type=OffsetType.OFFSET,
+        offset=offset,
+    )
+
+    messages = [str(i).encode() for i in range(1, 11)]
+    await producer.send_batch(stream, messages)
+
+    await wait_for(lambda: len(captured) >= 3)
+
+
+async def test_consumer_callback(stream: str, consumer: Consumer, producer: Producer) -> None:
+
+    streams: list[str] = []
+    offsets: list[int] = []
+
+    await consumer.subscribe(
+        stream,
+        callback=partial(
+            on_message,
+            streams=streams,
+            offsets=offsets,
+        ),
+        offset_type=OffsetType.FIRST,
+    )
+
+    messages = [str(i).encode() for i in range(0, 10)]
+    await producer.send_batch(stream, messages)
+
+    await wait_for(lambda: len(streams) >= 10)
+    await wait_for(lambda: len(offsets) >= 10)
+
+    for stream in streams:
+        assert stream == "test-stream"
+
+    for offset in offsets:
+        assert offset >= 0 and offset < 100
 
 
 # this test seems failing (to check)
