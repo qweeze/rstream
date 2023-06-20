@@ -16,6 +16,9 @@ from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
 from .compression import CompressionType  # noqa: E402
 from .constants import OffsetType  # noqa: E402
 from .consumer import Consumer, MessageContext  # noqa: E402
+from .exceptions import OffsetNotFound  # noqa: E402
+from .exceptions import ServerError  # noqa: E402
+from .exceptions import StreamDoesNotExist  # noqa: E402
 from .producer import (  # noqa: E402
     ConfirmationStatus,
     Producer,
@@ -42,4 +45,7 @@ __all__ = [
     "RouteType",
     "SuperStreamConsumer",
     "MessageContext",
+    "ServerError",
+    "OffsetNotFound",
+    "StreamDoesNotExist",
 ]

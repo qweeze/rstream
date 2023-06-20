@@ -27,7 +27,8 @@ CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callb
 
 @dataclass
 class MessageContext:
-    stream: str
+    consumer: Consumer
+    subscriber_name: str
     offset: int
     timestamp: int
 
@@ -101,7 +102,7 @@ class Consumer:
 
         for subscriber in list(self._subscribers.values()):
             await self.unsubscribe(subscriber.reference)
-            await self.store_offset(subscriber.stream, subscriber.reference, subscriber.offset)
+            # await self.store_offset(subscriber.stream, subscriber.reference, subscriber.offset)
 
         self._subscribers.clear()
 
@@ -233,9 +234,11 @@ class Consumer:
 
         await subscriber.client.credit(subscriber.subscription_id, 1)
         offset = frame.chunk_first_offset
+
         for index, message in enumerate(self._filter_messages(frame, subscriber)):
             offset = offset + index
-            message_context = MessageContext(subscriber.stream, offset, frame.timestamp)
+            message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
+
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
             if maybe_coro is not None:
                 await maybe_coro
@@ -265,3 +268,7 @@ class Consumer:
 
     async def stream_exists(self, stream: str) -> bool:
         return await self.default_client.stream_exists(stream)
+
+    async def stream(self, subscriber_name) -> str:
+
+        return self._subscribers[subscriber_name].stream

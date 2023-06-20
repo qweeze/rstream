@@ -3,7 +3,11 @@
 
 import asyncio
 
-from rstream import AMQPMessage, ConfirmationStatus
+from rstream import (
+    AMQPMessage,
+    ConfirmationStatus,
+    MessageContext,
+)
 
 captured: list[bytes] = []
 
@@ -42,3 +46,13 @@ async def routing_extractor(message: AMQPMessage) -> str:
 
 async def routing_extractor_key(message: AMQPMessage) -> str:
     return "key1"
+
+
+async def on_message(
+    msg: AMQPMessage, message_context: MessageContext, streams: list[str], offsets: list[int]
+):
+
+    stream = await message_context.consumer.stream(message_context.subscriber_name)
+    streams.append(stream)
+    offset = message_context.offset
+    offsets.append(offset)
