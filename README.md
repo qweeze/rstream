@@ -1,7 +1,7 @@
 # RabbitMQ Stream Python Client
 
 A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)
-_This is a work in progress_
+
 
 ## Install
 
