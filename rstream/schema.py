@@ -46,6 +46,12 @@ class Property(Struct):
 
 
 @dataclass
+class OffsetSpecification(Struct):
+    offset_type: int = field(metadata={"type": T.uint16})
+    offset: int = field(metadata={"type": T.uint64})
+
+
+@dataclass
 class PeerProperties(Frame):
     key = Key.PeerProperties
     correlation_id: int = field(metadata={"type": T.uint32})
@@ -516,3 +522,19 @@ class SuperStreamPartitionsResponse(Frame, is_response=True):
     correlation_id: int = field(metadata={"type": T.uint32})
     response_code: int = field(metadata={"type": T.uint16})
     streams: list[str] = field(metadata={"type": [T.string]})
+
+
+@dataclass
+class ConsumerUpdateResponse(Frame):
+    key = Key.ConsumerUpdate
+    correlation_id: int = field(metadata={"type": T.uint32})
+    subscription_id: int = field(metadata={"type": T.uint8})
+    active: int = field(metadata={"type": T.uint8})
+
+
+@dataclass
+class ConsumerUpdateServerResponse(Frame, is_response=True):
+    key = Key.ConsumerUpdateRequest
+    correlation_id: int = field(metadata={"type": T.uint32})
+    response_code: int = field(metadata={"type": T.uint16})
+    offset_specification: OffsetSpecification

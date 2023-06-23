@@ -20,6 +20,7 @@ from . import exceptions, schema
 from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
 from .constants import OffsetType
+from .schema import OffsetSpecification
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
@@ -72,6 +73,7 @@ class Consumer:
             load_balancer_mode=load_balancer_mode,
             max_retries=max_retries,
         )
+
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}
         self._subscribers: dict[str, _Subscriber] = {}
@@ -160,6 +162,7 @@ class Consumer:
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
+        consumer_update_handler: Optional[Callable[[bool], OffsetSpecification]] = None,
     ) -> str:
         async with self._lock:
             subscriber = await self._create_subscriber(
@@ -176,6 +179,20 @@ class Consumer:
             partial(self._on_deliver, subscriber=subscriber),
             name=subscriber.reference,
         )
+
+        # to handle single-active-consumer
+        if properties is not None:
+            if "single-active-consumer" in properties:
+                subscriber.client.add_handler(
+                    schema.ConsumerUpdateResponse,
+                    partial(
+                        self._on_consumer_update_query_response,
+                        subscriber=subscriber,
+                        consumer_update_handler=consumer_update_handler,
+                    ),
+                    name=subscriber.reference,
+                )
+
         await subscriber.client.subscribe(
             stream=stream,
             subscription_id=subscriber.subscription_id,
@@ -229,6 +246,7 @@ class Consumer:
         subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
     async def _on_deliver(self, frame: schema.Deliver, subscriber: _Subscriber) -> None:
+
         if frame.subscription_id != subscriber.subscription_id:
             return
 
@@ -242,6 +260,24 @@ class Consumer:
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
             if maybe_coro is not None:
                 await maybe_coro
+
+    async def _on_consumer_update_query_response(
+        self,
+        frame: schema.ConsumerUpdateResponse,
+        subscriber: _Subscriber,
+        consumer_update_handler: Optional[Callable[[bool], OffsetSpecification]] = None,
+    ) -> None:
+
+        # event the consumer is not active, we need to send a ConsumerUpdateResponse
+        # by protocol definition. the offsetType can't be null so we use OffsetTypeNext as default
+        if consumer_update_handler is None:
+            offset_specification = OffsetSpecification(OffsetType.NEXT, 0)
+            await subscriber.client.consumer_update(frame.correlation_id, offset_specification)
+
+        else:
+            is_active = bool(frame.active)
+            offset_specification = consumer_update_handler(is_active)
+            await subscriber.client.consumer_update(frame.correlation_id, offset_specification)
 
     async def create_stream(
         self,
@@ -270,5 +306,9 @@ class Consumer:
         return await self.default_client.stream_exists(stream)
 
     async def stream(self, subscriber_name) -> str:
+
+        return self._subscribers[subscriber_name].stream
+
+    def get_stream(self, subscriber_name) -> str:
 
         return self._subscribers[subscriber_name].stream

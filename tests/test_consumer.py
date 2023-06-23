@@ -5,8 +5,10 @@ import asyncio
 from functools import partial
 
 import pytest
+import uamqp
 
 from rstream import (
+    AMQPMessage,
     Consumer,
     OffsetType,
     Producer,
@@ -15,7 +17,14 @@ from rstream import (
     exceptions,
 )
 
-from .util import on_message, wait_for
+from .util import (
+    consumer_update_handler_first,
+    consumer_update_handler_next,
+    consumer_update_handler_offset,
+    on_message,
+    run_consumer,
+    wait_for,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -261,3 +270,226 @@ async def test_consume_multiple_streams(consumer: Consumer, producer: Producer) 
     finally:
         await producer.close()
         await asyncio.gather(*(consumer.delete_stream(stream) for stream in streams))
+
+
+async def test_consume_superstream_with_sac_all_active(
+    super_stream: str,
+    super_stream_consumer_for_sac1: SuperStreamConsumer,
+    super_stream_consumer_for_sac2: SuperStreamConsumer,
+    super_stream_consumer_for_sac3: SuperStreamConsumer,
+    super_stream_producer_for_sac: SuperStreamProducer,
+) -> None:
+
+    consumer_stream_list1: list[str] = []
+    consumer_stream_list2: list[str] = []
+    consumer_stream_list3: list[str] = []
+
+    await run_consumer(super_stream_consumer_for_sac1, consumer_stream_list1)
+    await run_consumer(super_stream_consumer_for_sac2, consumer_stream_list2)
+    await run_consumer(super_stream_consumer_for_sac3, consumer_stream_list3)
+
+    for i in range(10000):
+        amqp_message = AMQPMessage(
+            body="a:{}".format(i),
+            properties=uamqp.message.MessageProperties(message_id=i),
+        )
+        await super_stream_producer_for_sac.send(amqp_message)
+
+    await asyncio.sleep(1)
+
+    # check that the total number of messages have been consumed by the consumers
+    assert len(consumer_stream_list1) + len(consumer_stream_list2) + len(consumer_stream_list3) == 10000
+
+    consumer_stream_set1 = set(consumer_stream_list1)
+    consumer_stream_set2 = set(consumer_stream_list2)
+    consumer_stream_set3 = set(consumer_stream_list3)
+
+    # check that every consumer consumed in just one set
+    assert len(consumer_stream_set1) == 1
+    assert len(consumer_stream_set2) == 1
+    assert len(consumer_stream_set3) == 1
+
+    consumers_set = consumer_stream_set1.union(consumer_stream_set2)
+    consumers_set = consumers_set.union(consumer_stream_list3)
+
+    assert len(consumers_set) == 3
+
+
+async def test_consume_superstream_with_sac_one_non_active(
+    super_stream: str,
+    super_stream_consumer_for_sac1: SuperStreamConsumer,
+    super_stream_consumer_for_sac2: SuperStreamConsumer,
+    super_stream_consumer_for_sac3: SuperStreamConsumer,
+    super_stream_consumer_for_sac4: SuperStreamConsumer,
+    super_stream_producer_for_sac: SuperStreamProducer,
+) -> None:
+
+    consumer_stream_list1: list[str] = []
+    consumer_stream_list2: list[str] = []
+    consumer_stream_list3: list[str] = []
+    consumer_stream_list4: list[str] = []
+
+    await run_consumer(super_stream_consumer_for_sac1, consumer_stream_list1)
+    await run_consumer(super_stream_consumer_for_sac2, consumer_stream_list2)
+    await run_consumer(super_stream_consumer_for_sac3, consumer_stream_list3)
+    await run_consumer(super_stream_consumer_for_sac4, consumer_stream_list4)
+
+    for i in range(10000):
+        amqp_message = AMQPMessage(
+            body="a:{}".format(i),
+            properties=uamqp.message.MessageProperties(message_id=i),
+        )
+        await super_stream_producer_for_sac.send(amqp_message)
+
+    await asyncio.sleep(1)
+
+    # check that the total number of messages have been consumed by the consumers
+    assert len(consumer_stream_list1) + len(consumer_stream_list2) + len(consumer_stream_list3) == 10000
+
+    consumer_stream_set1 = set(consumer_stream_list1)
+    consumer_stream_set2 = set(consumer_stream_list2)
+    consumer_stream_set3 = set(consumer_stream_list3)
+    consumer_stream_set4 = set(consumer_stream_list4)
+
+    assert (
+        len(consumer_stream_set1) == 0
+        or len(consumer_stream_set2) == 0
+        or len(consumer_stream_set3) == 0
+        or len(consumer_stream_set4) == 0
+    )
+
+    consumers_set = consumer_stream_set1.union(consumer_stream_set2)
+    consumers_set = consumers_set.union(consumer_stream_list3)
+    consumers_set = consumers_set.union(consumer_stream_list4)
+
+    # one consumer was alway inactive
+    assert len(consumers_set) == 3
+
+
+async def test_consume_superstream_with_callback_next(
+    super_stream: str,
+    super_stream_consumer_for_sac1: SuperStreamConsumer,
+    super_stream_consumer_for_sac2: SuperStreamConsumer,
+    super_stream_consumer_for_sac3: SuperStreamConsumer,
+    super_stream_producer_for_sac: SuperStreamProducer,
+) -> None:
+
+    consumer_stream_list1: list[str] = []
+    consumer_stream_list2: list[str] = []
+    consumer_stream_list3: list[str] = []
+
+    await run_consumer(super_stream_consumer_for_sac1, consumer_stream_list1, consumer_update_handler_next)
+    await run_consumer(super_stream_consumer_for_sac2, consumer_stream_list2, consumer_update_handler_next)
+    await run_consumer(super_stream_consumer_for_sac3, consumer_stream_list3, consumer_update_handler_next)
+
+    for i in range(10000):
+        amqp_message = AMQPMessage(
+            body="a:{}".format(i),
+            properties=uamqp.message.MessageProperties(message_id=i),
+        )
+        await super_stream_producer_for_sac.send(amqp_message)
+
+    await asyncio.sleep(1)
+
+    # check that the total number of messages have been consumed by the consumers
+    assert len(consumer_stream_list1) + len(consumer_stream_list2) + len(consumer_stream_list3) == 10000
+
+    consumer_stream_set1 = set(consumer_stream_list1)
+    consumer_stream_set2 = set(consumer_stream_list2)
+    consumer_stream_set3 = set(consumer_stream_list3)
+
+    # check that every consumer consumed in just one set
+    assert len(consumer_stream_set1) == 1
+    assert len(consumer_stream_set2) == 1
+    assert len(consumer_stream_set3) == 1
+
+    consumers_set = consumer_stream_set1.union(consumer_stream_set2)
+    consumers_set = consumers_set.union(consumer_stream_list3)
+
+    assert len(consumers_set) == 3
+
+
+async def test_consume_superstream_with_callback_first(
+    super_stream: str,
+    super_stream_consumer_for_sac1: SuperStreamConsumer,
+    super_stream_consumer_for_sac2: SuperStreamConsumer,
+    super_stream_consumer_for_sac3: SuperStreamConsumer,
+    super_stream_producer_for_sac: SuperStreamProducer,
+) -> None:
+
+    consumer_stream_list1: list[str] = []
+    consumer_stream_list2: list[str] = []
+    consumer_stream_list3: list[str] = []
+
+    await run_consumer(super_stream_consumer_for_sac1, consumer_stream_list1, consumer_update_handler_first)
+    await run_consumer(super_stream_consumer_for_sac2, consumer_stream_list2, consumer_update_handler_first)
+    await run_consumer(super_stream_consumer_for_sac3, consumer_stream_list3, consumer_update_handler_first)
+
+    for i in range(10000):
+        amqp_message = AMQPMessage(
+            body="a:{}".format(i),
+            properties=uamqp.message.MessageProperties(message_id=i),
+        )
+        await super_stream_producer_for_sac.send(amqp_message)
+
+    await asyncio.sleep(1)
+
+    # check that the total number of messages have been consumed by the consumers
+    assert len(consumer_stream_list1) + len(consumer_stream_list2) + len(consumer_stream_list3) == 10000
+
+    consumer_stream_set1 = set(consumer_stream_list1)
+    consumer_stream_set2 = set(consumer_stream_list2)
+    consumer_stream_set3 = set(consumer_stream_list3)
+
+    # check that every consumer consumed in just one set
+    assert len(consumer_stream_set1) == 1
+    assert len(consumer_stream_set2) == 1
+    assert len(consumer_stream_set3) == 1
+
+    consumers_set = consumer_stream_set1.union(consumer_stream_set2)
+    consumers_set = consumers_set.union(consumer_stream_list3)
+
+    assert len(consumers_set) == 3
+
+
+async def test_consume_superstream_with_callback_offset(
+    super_stream: str,
+    super_stream_consumer_for_sac1: SuperStreamConsumer,
+    super_stream_consumer_for_sac2: SuperStreamConsumer,
+    super_stream_consumer_for_sac3: SuperStreamConsumer,
+    super_stream_producer_for_sac: SuperStreamProducer,
+) -> None:
+
+    consumer_stream_list1: list[str] = []
+    consumer_stream_list2: list[str] = []
+    consumer_stream_list3: list[str] = []
+
+    await run_consumer(super_stream_consumer_for_sac1, consumer_stream_list1, consumer_update_handler_offset)
+    await run_consumer(super_stream_consumer_for_sac2, consumer_stream_list2, consumer_update_handler_offset)
+    await run_consumer(super_stream_consumer_for_sac3, consumer_stream_list3, consumer_update_handler_offset)
+
+    for i in range(10000):
+        amqp_message = AMQPMessage(
+            body="a:{}".format(i),
+            properties=uamqp.message.MessageProperties(message_id=i),
+        )
+        await super_stream_producer_for_sac.send(amqp_message)
+
+    await asyncio.sleep(1)
+
+    # check that the total number of messages have been consumed by the consumers
+    assert len(consumer_stream_list1) + len(consumer_stream_list2) + len(consumer_stream_list3) == 10000
+
+    consumer_stream_set1 = set(consumer_stream_list1)
+    consumer_stream_set2 = set(consumer_stream_list2)
+    consumer_stream_set3 = set(consumer_stream_list3)
+
+    # check that every consumer consumed in just one set
+    assert len(consumer_stream_set1) == 1
+    assert len(consumer_stream_set2) == 1
+    assert len(consumer_stream_set3) == 1
+
+    consumers_set = consumer_stream_set1.union(consumer_stream_set2)
+    consumers_set = consumers_set.union(consumer_stream_list3)
+
+    assert len(consumers_set) == 3

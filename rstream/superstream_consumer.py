@@ -21,6 +21,7 @@ from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
 from .constants import OffsetType
 from .consumer import Consumer, MessageContext
+from .schema import OffsetSpecification
 from .superstream import DefaultSuperstreamMetadata
 
 MT = TypeVar("MT")
@@ -123,6 +124,7 @@ class SuperStreamConsumer:
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
+        consumer_update_handler: Optional[Callable[[bool], OffsetSpecification]] = None,
     ):
 
         self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self.default_client)
@@ -146,6 +148,7 @@ class SuperStreamConsumer:
                 initial_credit=initial_credit,
                 properties=properties,
                 subscriber_name=subscriber_name,
+                consumer_update_handler=consumer_update_handler,
             )
             self._subscribers[partition] = subscriber
 

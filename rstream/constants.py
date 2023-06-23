@@ -41,6 +41,8 @@ class Key(enum.Enum):
     Heartbeat = 23
     Route = 24
     Partitions = 25
+    ConsumerUpdate = 26
+    ConsumerUpdateRequest = 32794
 
 
 class OffsetType(int, enum.Enum):

@@ -18,7 +18,11 @@ from .http_requests import (
     create_exchange,
     delete_exchange,
 )
-from .util import routing_extractor, routing_extractor_key
+from .util import (
+    routing_extractor,
+    routing_extractor_for_sac,
+    routing_extractor_key,
+)
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -201,7 +205,107 @@ async def super_stream_key_routing_producer(pytestconfig, ssl_context):
 
 
 @pytest.fixture()
+async def super_stream_producer_for_sac(pytestconfig, ssl_context):
+    producer = SuperStreamProducer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        routing=RouteType.Hash,
+        routing_extractor=routing_extractor_for_sac,
+        super_stream="test-super-stream",
+    )
+    await producer.start()
+    try:
+        yield producer
+    finally:
+        await producer.close()
+
+
+@pytest.fixture()
 async def super_stream_consumer(pytestconfig, ssl_context):
+    consumer = SuperStreamConsumer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        super_stream="test-super-stream",
+    )
+    await consumer.start()
+    try:
+        yield consumer
+    finally:
+        await consumer.close()
+
+
+@pytest.fixture()
+async def super_stream_consumer_for_sac1(pytestconfig, ssl_context):
+
+    consumer = SuperStreamConsumer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        super_stream="test-super-stream",
+    )
+    await consumer.start()
+    try:
+        yield consumer
+    finally:
+        await consumer.close()
+
+
+@pytest.fixture()
+async def super_stream_consumer_for_sac2(pytestconfig, ssl_context):
+    consumer = SuperStreamConsumer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        super_stream="test-super-stream",
+    )
+    await consumer.start()
+    try:
+        yield consumer
+    finally:
+        await consumer.close()
+
+
+@pytest.fixture()
+async def super_stream_consumer_for_sac3(pytestconfig, ssl_context):
+
+    consumer = SuperStreamConsumer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        super_stream="test-super-stream",
+    )
+    await consumer.start()
+    try:
+        yield consumer
+    finally:
+        await consumer.close()
+
+
+@pytest.fixture()
+async def super_stream_consumer_for_sac4(pytestconfig, ssl_context):
+
     consumer = SuperStreamConsumer(
         host=pytestconfig.getoption("rmq_host"),
         port=pytestconfig.getoption("rmq_port"),

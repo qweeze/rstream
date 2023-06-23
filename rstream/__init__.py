@@ -24,6 +24,7 @@ from .producer import (  # noqa: E402
     Producer,
     RawMessage,
 )
+from .schema import OffsetSpecification  # noqa: E402
 from .superstream_consumer import (  # noqa: E402
     SuperStreamConsumer,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "RawMessage",
     "Producer",
     "OffsetType",
+    "OffsetSpecification",
     "ConfirmationStatus",
     "CompressionType",
     "SuperStreamProducer",
