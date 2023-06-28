@@ -19,7 +19,10 @@ from typing import (
 from . import exceptions, schema
 from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
-from .constants import OffsetType
+from .constants import (
+    ConsumerOffsetSpecification,
+    OffsetType,
+)
 from .schema import OffsetSpecification
 
 MT = TypeVar("MT")
@@ -157,21 +160,26 @@ class Consumer:
         callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
         *,
         decoder: Optional[Callable[[bytes], MT]] = None,
-        offset: Optional[int] = None,
-        offset_type: OffsetType = OffsetType.FIRST,
+        # offset: Optional[int] = None,
+        # offset_type: OffsetType = OffsetType.FIRST,
+        offset_specification: Optional[ConsumerOffsetSpecification] = None,
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
         consumer_update_handler: Optional[Callable[[bool], OffsetSpecification]] = None,
     ) -> str:
+
+        if offset_specification is None:
+            offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
+
         async with self._lock:
             subscriber = await self._create_subscriber(
                 stream=stream,
                 subscriber_name=subscriber_name,
                 callback=callback,
                 decoder=decoder,
-                offset_type=offset_type,
-                offset=offset,
+                offset_type=offset_specification.offset_type,
+                offset=offset_specification.offset,
             )
 
         subscriber.client.add_handler(
@@ -196,7 +204,9 @@ class Consumer:
         await subscriber.client.subscribe(
             stream=stream,
             subscription_id=subscriber.subscription_id,
-            offset_spec=schema.OffsetSpec.from_params(offset_type, offset),
+            offset_spec=schema.OffsetSpec.from_params(
+                offset_specification.offset_type, offset_specification.offset
+            ),
             initial_credit=initial_credit,
             properties=properties,
         )

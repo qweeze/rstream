@@ -10,6 +10,7 @@ import uamqp
 from rstream import (
     AMQPMessage,
     Consumer,
+    ConsumerOffsetSpecification,
     OffsetType,
     Producer,
     SuperStreamConsumer,
@@ -66,7 +67,7 @@ async def test_offset_type_first(stream: str, consumer: Consumer, producer: Prod
     await consumer.subscribe(
         stream,
         callback=lambda message, message_context: captured.append(bytes(message)),
-        offset_type=OffsetType.FIRST,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.FIRST, None),
     )
     messages = [str(i).encode() for i in range(1, 11)]
     await producer.send_batch(stream, messages)
@@ -80,8 +81,7 @@ async def test_offset_type_offset(stream: str, consumer: Consumer, producer: Pro
     await consumer.subscribe(
         stream,
         callback=lambda message, message_context: captured.append(bytes(message)),
-        offset_type=OffsetType.OFFSET,
-        offset=7,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.OFFSET, 7),
     )
     messages = [str(i).encode() for i in range(1, 11)]
     await producer.send_batch(stream, messages)
@@ -98,7 +98,7 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
     await consumer.subscribe(
         stream,
         callback=lambda message, message_context: captured.append(bytes(message)),
-        offset_type=OffsetType.LAST,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.LAST, None),
         subscriber_name="test-subscriber",
     )
 
@@ -116,8 +116,7 @@ async def test_offset_manual_setting(stream: str, consumer: Consumer, producer: 
     await consumer.subscribe(
         stream,
         callback=lambda message, message_context: captured.append(bytes(message)),
-        offset_type=OffsetType.OFFSET,
-        offset=offset,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.OFFSET, offset),
     )
 
     messages = [str(i).encode() for i in range(1, 11)]
@@ -138,7 +137,7 @@ async def test_consumer_callback(stream: str, consumer: Consumer, producer: Prod
             streams=streams,
             offsets=offsets,
         ),
-        offset_type=OffsetType.FIRST,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.FIRST, None),
     )
 
     messages = [str(i).encode() for i in range(0, 10)]
@@ -178,7 +177,7 @@ async def test_offset_type_next(stream: str, consumer: Consumer, producer: Produ
     await consumer.subscribe(
         stream,
         callback=lambda message, message_context: captured.append(bytes(message)),
-        offset_type=OffsetType.NEXT,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
         subscriber_name="test-subscriber",
     )
     await producer.send_wait(stream, b"11")
@@ -198,7 +197,7 @@ async def test_consume_with_resubscribe(stream: str, consumer: Consumer, produce
     await consumer.subscribe(
         stream,
         callback=lambda message, message_context: captured.append(bytes(message)),
-        offset_type=OffsetType.NEXT,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
     )
 
     await producer.send_wait(stream, b"two")
@@ -218,7 +217,8 @@ async def test_consume_superstream_with_resubscribe(
 
     await super_stream_consumer.unsubscribe()
     await super_stream_consumer.subscribe(
-        callback=lambda message, message_context: captured.append(bytes(message)), offset_type=OffsetType.NEXT
+        callback=lambda message, message_context: captured.append(bytes(message)),
+        offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
     )
 
     await super_stream_producer.send(b"two")
@@ -239,7 +239,7 @@ async def test_consume_with_restart(stream: str, consumer: Consumer, producer: P
     await consumer.subscribe(
         stream,
         callback=lambda message, message_context: captured.append(bytes(message)),
-        offset_type=OffsetType.NEXT,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
     )
 
     await producer.send_wait(stream, b"two")

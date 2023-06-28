@@ -1,4 +1,6 @@
 import enum
+from dataclasses import dataclass
+from typing import Optional
 
 
 class T(enum.Enum):
@@ -51,3 +53,9 @@ class OffsetType(int, enum.Enum):
     NEXT = 3
     OFFSET = 4
     TIMESTAMP = 5
+
+
+@dataclass
+class ConsumerOffsetSpecification:
+    offset_type: OffsetType = OffsetType.FIRST
+    offset: Optional[int] = None
