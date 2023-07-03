@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from rstream import (
     AMQPMessage,
+    EventContext,
     MessageContext,
     OffsetSpecification,
     OffsetType,
@@ -29,8 +30,11 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 # We can decide a strategy to manage Offset specification in single active consumer based on is_active flag
 # By default if not present the always the strategy OffsetType.NEXT will be set.
 # This handle will be passed to subscribe.
-def consumer_update_handler_offset(is_active: bool) -> OffsetSpecification:
+def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
 
+    print("consumer_update_handler_offset enabled:")
+    print("on stream: " + str(event_context.consumer.get_stream(event_context.subscriber_name)))
+    print("reference group: " + str(event_context.reference))
     return OffsetSpecification(OffsetType.OFFSET, 10)
 
 
