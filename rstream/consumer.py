@@ -38,6 +38,13 @@ class MessageContext:
 
 
 @dataclass
+class EventContext:
+    consumer: Consumer
+    subscriber_name: str
+    reference: str
+
+
+@dataclass
 class _Subscriber:
     stream: str
     subscription_id: int
@@ -160,13 +167,11 @@ class Consumer:
         callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
         *,
         decoder: Optional[Callable[[bytes], MT]] = None,
-        # offset: Optional[int] = None,
-        # offset_type: OffsetType = OffsetType.FIRST,
         offset_specification: Optional[ConsumerOffsetSpecification] = None,
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
-        consumer_update_handler: Optional[Callable[[bool], OffsetSpecification]] = None,
+        consumer_update_handler: Optional[Callable[[bool, EventContext], OffsetSpecification]] = None,
     ) -> str:
 
         if offset_specification is None:
@@ -196,6 +201,7 @@ class Consumer:
                     partial(
                         self._on_consumer_update_query_response,
                         subscriber=subscriber,
+                        reference=properties["name"],
                         consumer_update_handler=consumer_update_handler,
                     ),
                     name=subscriber.reference,
@@ -275,7 +281,8 @@ class Consumer:
         self,
         frame: schema.ConsumerUpdateResponse,
         subscriber: _Subscriber,
-        consumer_update_handler: Optional[Callable[[bool], OffsetSpecification]] = None,
+        reference: str,
+        consumer_update_handler: Optional[Callable[[bool, EventContext], OffsetSpecification]] = None,
     ) -> None:
 
         # event the consumer is not active, we need to send a ConsumerUpdateResponse
@@ -286,7 +293,8 @@ class Consumer:
 
         else:
             is_active = bool(frame.active)
-            offset_specification = consumer_update_handler(is_active)
+            event_context = EventContext(self, subscriber.reference, reference)
+            offset_specification = consumer_update_handler(is_active, event_context)
             await subscriber.client.consumer_update(frame.correlation_id, offset_specification)
 
     async def create_stream(

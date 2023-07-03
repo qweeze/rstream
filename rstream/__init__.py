@@ -18,7 +18,11 @@ from .constants import OffsetType  # noqa: E402
 from .constants import (  # noqa: E402
     ConsumerOffsetSpecification,
 )
-from .consumer import Consumer, MessageContext  # noqa: E402
+from .consumer import (  # noqa: E402
+    Consumer,
+    EventContext,
+    MessageContext,
+)
 from .exceptions import OffsetNotFound  # noqa: E402
 from .exceptions import ServerError  # noqa: E402
 from .exceptions import StreamDoesNotExist  # noqa: E402
@@ -54,4 +58,5 @@ __all__ = [
     "OffsetNotFound",
     "StreamDoesNotExist",
     "OffsetSpecification",
+    "EventContext",
 ]
