@@ -23,19 +23,32 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
     consumer = message_context.consumer
     stream = await message_context.consumer.stream(message_context.subscriber_name)
     offset = message_context.offset
-
+    # store the offset every message received
+    # you should not store the offset every message received in production
+    # it could be a performance issue
+    # this is just an example
+    await consumer.store_offset(stream=stream, offset=offset, subscriber_name=message_context.subscriber_name)
     print("Got message: {} from stream {} offset {}".format(msg, stream, offset))
 
 
 # We can decide a strategy to manage Offset specification in single active consumer based on is_active flag
 # By default if not present the always the strategy OffsetType.NEXT will be set.
 # This handle will be passed to subscribe.
-def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
+async def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
+    stream = str(event_context.consumer.get_stream(event_context.subscriber_name))
+    if is_active:
+        try:
+            offset = await event_context.consumer.query_offset(stream=stream,
+                                                               subscriber_name=event_context.subscriber_name)
+            return OffsetSpecification(OffsetType.OFFSET, offset)
 
-    print("consumer_update_handler_offset enabled:")
-    print("on stream: " + str(event_context.consumer.get_stream(event_context.subscriber_name)))
-    print("reference group: " + str(event_context.reference))
-    return OffsetSpecification(OffsetType.OFFSET, 10)
+        except Exception as e:
+            print("Exception: {}".format(e))
+
+    print("Update handler received on stream: {}  reference: {} isActive {}".format(stream,
+                                                                                    event_context.reference,
+                                                                                    is_active))
+    return OffsetSpecification(OffsetType.FIRST, None)
 
 
 async def consume():
@@ -43,7 +56,7 @@ async def consume():
 
         print("Starting Super Stream Consumer")
         consumer = SuperStreamConsumer(
-            host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="mixing"
+            host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="invoices"
         )
 
         loop = asyncio.get_event_loop()
