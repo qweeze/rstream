@@ -1,18 +1,13 @@
 import asyncio
 import signal
 from collections import defaultdict
-from typing import Any, Optional
 
 from rstream import (
     AMQPMessage,
-    Consumer,
     MessageContext,
-    OffsetNotFound,
     OffsetType,
-    ServerError,
-    StreamDoesNotExist,
     SuperStreamConsumer,
-    amqp_decoder,
+    amqp_decoder, OffsetSpecification,
 )
 
 cont = 0
@@ -27,28 +22,38 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
     stream = await message_context.consumer.stream(message_context.subscriber_name)
     offset = message_context.offset
 
-    print("Got message: {}".format(msg) + "from stream " + stream + "offset: " + str(offset))
+    print("Got message: {} from stream {} offset {}".format(msg, stream, offset))
 
 
 async def consume():
+    try:
 
-    consumer = SuperStreamConsumer(
-        host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="mixing"
-    )
+        print("Starting Super Stream Consumer")
+        consumer = SuperStreamConsumer(
+            host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="invoices"
+        )
 
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
 
-    await consumer.start()
+        await consumer.start()
 
-    # properties of the consumer (enabling single active mode)
-    properties: dict[str, str] = defaultdict(str)
-    properties["single-active-consumer"] = "true"
-    properties["name"] = "consumer-group-1"
-    properties["super-stream"] = "invoices"
+        # properties of the consumer (enabling single active mode)
+        properties: dict[str, str] = defaultdict(str)
+        properties["single-active-consumer"] = "true"
+        properties["name"] = "consumer-group-1"
+        properties["super-stream"] = "invoices"
+        print("Subscribing Super Stream Consumer")
 
-    await consumer.subscribe(callback=on_message, decoder=amqp_decoder, properties=properties)
-    await consumer.run()
+        offset_specification = OffsetSpecification(OffsetType.FIRST, None)
+
+        await consumer.subscribe(callback=on_message,
+                                 offset_specification=offset_specification,
+                                 decoder=amqp_decoder,
+                                 properties=properties)
+        await consumer.run()
+    except Exception as e:
+        print(e)
 
 
 # main coroutine
@@ -57,7 +62,7 @@ async def main():
     task = asyncio.create_task(consume())
     # suspend a moment
     # wait a moment
-    await asyncio.sleep(10)
+    await asyncio.sleep(100)
     # cancel the task
     was_cancelled = task.cancel()
 

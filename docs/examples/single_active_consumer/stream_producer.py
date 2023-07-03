@@ -1,7 +1,9 @@
 import asyncio
-import time
 
 import uamqp
+import sys
+print(sys.path)
+
 
 from rstream import (
     AMQPMessage,
@@ -24,24 +26,23 @@ async def publish():
     counter = 0
     sent = 0
     async with SuperStreamProducer(
-        "localhost",
-        username="guest",
-        password="guest",
-        super_stream="invoices",
-        routing=RouteType.Hash,
-        routing_extractor=routing_extractor,
+            "localhost",
+            username="guest",
+            password="guest",
+            super_stream="invoices",
+            routing=RouteType.Hash,
+            routing_extractor=routing_extractor,
     ) as producer:
-
         messages = []
         # run slowly several messages in order to test with sac
         for i in range(1000000):
             amqp_message = AMQPMessage(
-                body="a:{}".format(i),
+                body="message_:{}".format(i),
                 properties=uamqp.message.MessageProperties(message_id=i),
             )
             await producer.send(message=amqp_message)
-
             await asyncio.sleep(1)
+            print("sent: {} messages ".format(i + 1))
 
         await asyncio.sleep(5)
 
