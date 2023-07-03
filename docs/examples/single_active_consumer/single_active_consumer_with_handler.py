@@ -5,9 +5,10 @@ from collections import defaultdict
 from rstream import (
     AMQPMessage,
     MessageContext,
+    OffsetSpecification,
     OffsetType,
     SuperStreamConsumer,
-    amqp_decoder, OffsetSpecification,
+    amqp_decoder,
 )
 
 cont = 0
@@ -25,12 +26,20 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
     print("Got message: {} from stream {} offset {}".format(msg, stream, offset))
 
 
+# We can decide a strategy to manage Offset specification in single active consumer based on is_active flag
+# By default if not present the always the strategy OffsetType.NEXT will be set.
+# This handle will be passed to subscribe.
+def consumer_update_handler_offset(is_active: bool) -> OffsetSpecification:
+
+    return OffsetSpecification(OffsetType.OFFSET, 10)
+
+
 async def consume():
     try:
 
         print("Starting Super Stream Consumer")
         consumer = SuperStreamConsumer(
-            host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="invoices"
+            host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="mixing"
         )
 
         loop = asyncio.get_event_loop()
@@ -42,15 +51,17 @@ async def consume():
         properties: dict[str, str] = defaultdict(str)
         properties["single-active-consumer"] = "true"
         properties["name"] = "consumer-group-1"
-        properties["super-stream"] = "invoices"
-        print("Subscribing Super Stream Consumer")
+        properties["super-stream"] = "mixing"
 
         offset_specification = OffsetSpecification(OffsetType.FIRST, None)
 
-        await consumer.subscribe(callback=on_message,
-                                 offset_specification=offset_specification,
-                                 decoder=amqp_decoder,
-                                 properties=properties)
+        await consumer.subscribe(
+            callback=on_message,
+            offset_specification=offset_specification,
+            decoder=amqp_decoder,
+            properties=properties,
+            consumer_update_handler=consumer_update_handler_offset,
+        )
         await consumer.run()
     except Exception as e:
         print(e)

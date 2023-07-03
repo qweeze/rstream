@@ -1,7 +1,8 @@
 import asyncio
+import sys
 
 import uamqp
-import sys
+
 print(sys.path)
 
 
@@ -26,12 +27,12 @@ async def publish():
     counter = 0
     sent = 0
     async with SuperStreamProducer(
-            "localhost",
-            username="guest",
-            password="guest",
-            super_stream="invoices",
-            routing=RouteType.Hash,
-            routing_extractor=routing_extractor,
+        "localhost",
+        username="guest",
+        password="guest",
+        super_stream="invoices",
+        routing=RouteType.Hash,
+        routing_extractor=routing_extractor,
     ) as producer:
         messages = []
         # run slowly several messages in order to test with sac
