@@ -40,6 +40,8 @@ async def consumer_update_handler_offset(is_active: bool, event_context: EventCo
         try:
             offset = await event_context.consumer.query_offset(stream=stream,
                                                                subscriber_name=event_context.subscriber_name)
+            print("offset: {}".format(offset))
+
             return OffsetSpecification(OffsetType.OFFSET, offset)
 
         except Exception as e:
@@ -68,7 +70,7 @@ async def consume():
         properties: dict[str, str] = defaultdict(str)
         properties["single-active-consumer"] = "true"
         properties["name"] = "consumer-group-1"
-        properties["super-stream"] = "mixing"
+        properties["super-stream"] = "invoices"
 
         offset_specification = OffsetSpecification(OffsetType.FIRST, None)
 
