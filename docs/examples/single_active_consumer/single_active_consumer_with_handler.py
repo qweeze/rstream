@@ -10,6 +10,7 @@ from rstream import (
     OffsetType,
     SuperStreamConsumer,
     amqp_decoder,
+    ServerError,
 )
 
 cont = 0
@@ -36,6 +37,7 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 # This handle will be passed to subscribe.
 async def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
     stream = str(event_context.consumer.get_stream(event_context.subscriber_name))
+    print ("stream is: " + stream + " subscriber_name" + event_context.subscriber_name)
     if is_active:
         try:
             offset = await event_context.consumer.query_offset(stream=stream,
@@ -44,13 +46,13 @@ async def consumer_update_handler_offset(is_active: bool, event_context: EventCo
 
             return OffsetSpecification(OffsetType.OFFSET, offset)
 
-        except Exception as e:
-            print("Exception: {}".format(e))
+        except ServerError as e:
+            print("Exception: " + str(e))
 
     print("Update handler received on stream: {}  reference: {} isActive {}".format(stream,
                                                                                     event_context.reference,
                                                                                     is_active))
-    return OffsetSpecification(OffsetType.FIRST, None)
+    return OffsetSpecification(OffsetType.NEXT, 0)
 
 
 async def consume():
