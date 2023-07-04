@@ -30,6 +30,7 @@ from . import (
     utils,
 )
 from .connection import Connection, ConnectionClosed
+from .schema import OffsetSpecification
 
 FT = TypeVar("FT", bound=schema.Frame)
 HT = Annotated[
@@ -170,6 +171,7 @@ class BaseClient:
 
             logger.debug("Received frame: %s", frame)
             _key = frame.key, frame.corr_id
+
             while self._waiters[_key]:
                 fut = self._waiters[_key].pop()
                 fut.set_result(frame)
@@ -407,6 +409,7 @@ class Client(BaseClient):
             ),
             resp_schema=schema.QueryOffsetResponse,
         )
+        resp.check_response_code(True)
         return resp.offset
 
     async def store_offset(self, stream: str, reference: str, offset: int) -> None:
@@ -469,6 +472,16 @@ class Client(BaseClient):
             raise_exception=False,
         )
         return resp.streams
+
+    async def consumer_update(self, correlation_id: int, offset_specification: OffsetSpecification) -> None:
+
+        await self.send_frame(
+            schema.ConsumerUpdateServerResponse(
+                correlation_id=correlation_id,
+                response_code=1,
+                offset_specification=offset_specification,
+            ),
+        )
 
     async def route(self, routing_key: str, super_stream: str) -> list[str]:
         resp = await self.sync_request(

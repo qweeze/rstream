@@ -15,7 +15,14 @@ del metadata
 from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
 from .compression import CompressionType  # noqa: E402
 from .constants import OffsetType  # noqa: E402
-from .consumer import Consumer, MessageContext  # noqa: E402
+from .constants import (  # noqa: E402
+    ConsumerOffsetSpecification,
+)
+from .consumer import (  # noqa: E402
+    Consumer,
+    EventContext,
+    MessageContext,
+)
 from .exceptions import OffsetNotFound  # noqa: E402
 from .exceptions import ServerError  # noqa: E402
 from .exceptions import StreamDoesNotExist  # noqa: E402
@@ -24,6 +31,7 @@ from .producer import (  # noqa: E402
     Producer,
     RawMessage,
 )
+from .schema import OffsetSpecification  # noqa: E402
 from .superstream_consumer import (  # noqa: E402
     SuperStreamConsumer,
 )
@@ -39,6 +47,7 @@ __all__ = [
     "RawMessage",
     "Producer",
     "OffsetType",
+    "ConsumerOffsetSpecification",
     "ConfirmationStatus",
     "CompressionType",
     "SuperStreamProducer",
@@ -48,4 +57,6 @@ __all__ = [
     "ServerError",
     "OffsetNotFound",
     "StreamDoesNotExist",
+    "OffsetSpecification",
+    "EventContext",
 ]

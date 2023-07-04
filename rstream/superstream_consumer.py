@@ -19,8 +19,11 @@ from typing import (
 
 from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
-from .constants import OffsetType
-from .consumer import Consumer, MessageContext
+from .constants import (
+    ConsumerOffsetSpecification,
+    OffsetType,
+)
+from .consumer import Consumer, EventContext, MessageContext
 from .superstream import DefaultSuperstreamMetadata
 
 MT = TypeVar("MT")
@@ -118,12 +121,15 @@ class SuperStreamConsumer:
         callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
         *,
         decoder: Optional[Callable[[bytes], MT]] = None,
-        offset: Optional[int] = None,
-        offset_type: OffsetType = OffsetType.FIRST,
+        offset_specification: Optional[ConsumerOffsetSpecification] = None,
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
+        consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
     ):
+
+        if offset_specification is None:
+            offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
 
         self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self.default_client)
         partitions = await self._super_stream_metadata.partitions()
@@ -141,11 +147,11 @@ class SuperStreamConsumer:
                 stream=partition,
                 callback=callback,
                 decoder=decoder,
-                offset_type=offset_type,
-                offset=offset,
+                offset_specification=offset_specification,
                 initial_credit=initial_credit,
                 properties=properties,
                 subscriber_name=subscriber_name,
+                consumer_update_listener=consumer_update_listener,
             )
             self._subscribers[partition] = subscriber
 

@@ -37,6 +37,7 @@ class DefaultSuperstreamMetadata(Metadata):
         self._routes: list[str] = []
 
     async def partitions(self) -> list[str]:
+
         if len(self._partitions) == 0:
             self._partitions = await self.client.partitions(self.super_stream)
             if len(self._partitions) <= 0:
@@ -79,6 +80,7 @@ class HashRoutingMurmurStrategy(RoutingStrategy):
         number_of_partitions = len(await metadata.partitions())
 
         route = int.from_bytes(hash, "little", signed=False) % number_of_partitions
+
         partitions = await metadata.partitions()
         stream = partitions[route]
         streams.append(stream)
