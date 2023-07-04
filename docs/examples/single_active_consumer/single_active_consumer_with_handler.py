@@ -10,7 +10,6 @@ from rstream import (
     OffsetType,
     SuperStreamConsumer,
     amqp_decoder,
-    ServerError,
 )
 
 cont = 0
@@ -37,21 +36,11 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 # This handle will be passed to subscribe.
 async def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
     stream = str(event_context.consumer.get_stream(event_context.subscriber_name))
-    print ("stream is: " + stream + " subscriber_name" + event_context.subscriber_name)
+    print("stream is: " + stream + " subscriber_name" + event_context.subscriber_name)
     if is_active:
-        try:
-            offset = await event_context.consumer.query_offset(stream=stream,
-                                                               subscriber_name=event_context.subscriber_name)
-            print("offset: {}".format(offset))
+        # Put the logic of your use case here
+        return OffsetSpecification(OffsetType.OFFSET, 10)
 
-            return OffsetSpecification(OffsetType.OFFSET, offset)
-
-        except ServerError as e:
-            print("Exception: " + str(e))
-
-    print("Update handler received on stream: {}  reference: {} isActive {}".format(stream,
-                                                                                    event_context.reference,
-                                                                                    is_active))
     return OffsetSpecification(OffsetType.NEXT, 0)
 
 
@@ -60,7 +49,12 @@ async def consume():
 
         print("Starting Super Stream Consumer")
         consumer = SuperStreamConsumer(
-            host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="invoices"
+            host="localhost",
+            port=5552,
+            vhost="/",
+            username="guest",
+            password="guest",
+            super_stream="invoices",
         )
 
         loop = asyncio.get_event_loop()
@@ -81,7 +75,7 @@ async def consume():
             offset_specification=offset_specification,
             decoder=amqp_decoder,
             properties=properties,
-            consumer_update_handler=consumer_update_handler_offset,
+            consumer_update_listener=consumer_update_handler_offset,
         )
         await consumer.run()
     except Exception as e:

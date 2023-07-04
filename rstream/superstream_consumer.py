@@ -24,7 +24,6 @@ from .constants import (
     OffsetType,
 )
 from .consumer import Consumer, EventContext, MessageContext
-from .schema import OffsetSpecification
 from .superstream import DefaultSuperstreamMetadata
 
 MT = TypeVar("MT")
@@ -126,7 +125,7 @@ class SuperStreamConsumer:
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
-        consumer_update_handler: Optional[Callable[[bool, EventContext], OffsetSpecification]] = None,
+        consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
     ):
 
         if offset_specification is None:
@@ -152,7 +151,7 @@ class SuperStreamConsumer:
                 initial_credit=initial_credit,
                 properties=properties,
                 subscriber_name=subscriber_name,
-                consumer_update_handler=consumer_update_handler,
+                consumer_update_listener=consumer_update_listener,
             )
             self._subscribers[partition] = subscriber
 

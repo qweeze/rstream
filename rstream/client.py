@@ -9,8 +9,6 @@ import ssl
 import time
 from collections import defaultdict
 from contextlib import suppress
-from .exceptions import ServerError
-
 from typing import (
     Annotated,
     Any,
@@ -411,8 +409,7 @@ class Client(BaseClient):
             ),
             resp_schema=schema.QueryOffsetResponse,
         )
-        if resp.response_code > 1:
-            raise ServerError.from_code(resp.response_code)
+        resp.check_response_code(True)
         return resp.offset
 
     async def store_offset(self, stream: str, reference: str, offset: int) -> None:

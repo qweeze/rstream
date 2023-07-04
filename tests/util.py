@@ -3,7 +3,7 @@
 
 import asyncio
 from collections import defaultdict
-from typing import Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from rstream import (
     AMQPMessage,
@@ -19,17 +19,17 @@ from rstream import (
 captured: list[bytes] = []
 
 
-def consumer_update_handler_next(is_active: bool, event_context: EventContext) -> OffsetSpecification:
+async def consumer_update_handler_next(is_active: bool, event_context: EventContext) -> OffsetSpecification:
 
     return OffsetSpecification(OffsetType.NEXT, 0)
 
 
-def consumer_update_handler_first(is_active: bool, event_context: EventContext) -> OffsetSpecification:
+async def consumer_update_handler_first(is_active: bool, event_context: EventContext) -> OffsetSpecification:
 
     return OffsetSpecification(OffsetType.FIRST, 0)
 
 
-def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
+async def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
 
     return OffsetSpecification(OffsetType.OFFSET, 10)
 
@@ -93,7 +93,7 @@ async def on_message_sac(msg: AMQPMessage, message_context: MessageContext, stre
 async def run_consumer(
     super_stream_consumer: SuperStreamConsumer,
     streams: list[str],
-    consumer_update_handler: Optional[Callable[[bool, EventContext], OffsetSpecification]] = None,
+    consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
 ):
 
     properties: dict[str, str] = defaultdict(str)
@@ -107,5 +107,5 @@ async def run_consumer(
         ),
         decoder=amqp_decoder,
         properties=properties,
-        consumer_update_handler=consumer_update_handler,
+        consumer_update_listener=consumer_update_listener,
     )
