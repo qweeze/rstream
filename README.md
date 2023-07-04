@@ -13,7 +13,7 @@ pip install rstream
 
 ### Publishing messages: 
 
-You can publish messages with three different methods:
+You can publish messages with four different methods:
 
 * send: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires.
 * batch_send: synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
@@ -261,8 +261,6 @@ async def main():
 asyncio.run(main())
 ```
 
-
-
 ### Superstreams
 
 The client is also supporting superstream: https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams/
@@ -351,7 +349,10 @@ async def main():
 # run the asyncio program
 asyncio.run(main())
 ```
+### Single Active Consumer support:
 
+Single active consumer form streams is also supported: https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams/
+See examples in: the docs/single_active_consumer folder
 
 ### Connecting with SSL:
 
