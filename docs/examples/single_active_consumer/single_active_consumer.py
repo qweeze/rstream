@@ -79,7 +79,7 @@ async def consume():
         )
         await consumer.run()
     except Exception as e:
-        print(e)
+        print("Exception: {}".format(e))
 
 
 # main coroutine
@@ -88,12 +88,12 @@ async def main():
     task = asyncio.create_task(consume())
     # suspend a moment
     # wait a moment
-    await asyncio.sleep(100)
+    await asyncio.sleep(20)
     # cancel the task
-    was_cancelled = task.cancel()
+    task.cancel()
 
     # report a message
-    print("Main done")
+    print("Finished")
 
 
 # run the asyncio program

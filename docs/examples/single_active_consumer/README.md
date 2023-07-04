@@ -18,5 +18,7 @@ Step 3: Run multiple super stream consumers:
 
     $ python3 single_active_consumer.py
 
+The consumer will be stopped after 20 seconds.
+
 You will see that running the first consumer will read from all the partitions, while when all the 3 consumers will be up everyone will read from its own partition.
 The forth consumer if you run it will wait.
