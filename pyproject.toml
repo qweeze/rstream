@@ -2,7 +2,7 @@
 name = "rstream"
 version = "0.9.0"
 description = "A python client for RabbitMQ Streams"
-authors = ["George Fortunatov <qweeeze@gmail.com>"]
+authors = ["George Fortunatov <qweeeze@gmail.com>", "Daniele Palaia <dpalaia@vmware.com>"]
 readme = "README.md"
 homepage = "https://github.com/qweeze/rstream"
 repository = "https://github.com/qweeze/rstream"
