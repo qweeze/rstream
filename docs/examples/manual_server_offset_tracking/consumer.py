@@ -5,6 +5,7 @@ from typing import Optional
 from rstream import (
     AMQPMessage,
     Consumer,
+    ConsumerOffsetSpecification,
     MessageContext,
     OffsetNotFound,
     OffsetType,
@@ -15,6 +16,7 @@ from rstream import (
 
 cont = 0
 lock = asyncio.Lock()
+STREAM = "my-test-stream"
 
 
 async def on_message(msg: AMQPMessage, message_context: MessageContext):
@@ -52,11 +54,12 @@ async def consume():
 
     await consumer.start()
     # catch exceptions if stream or offset for the subscriber name doesn't exist
+    my_offset = 1
     try:
-        my_offset = await consumer.query_offset(stream="mixing", subscriber_name="subscriber_1")
+        # this one will raise an exception if store_offset wasn't never done before (in other word an offset wasn't previously stored in the server)
+        my_offset = await consumer.query_offset(stream=STREAM, subscriber_name="subscriber_1")
     except OffsetNotFound as offset_exception:
         print(f"ValueError: {offset_exception}")
-        exit(1)
 
     except StreamDoesNotExist as stream_exception:
         print(f"ValueError: {stream_exception}")
@@ -66,14 +69,13 @@ async def consume():
         print(f"ValueError: {e}")
         exit(1)
 
-    # print("offset is" + str(my_offset))
+    print("offset to start " + str(my_offset))
     await consumer.subscribe(
-        stream="mixing",
+        stream=STREAM,
         subscriber_name="subscriber_1",
         callback=on_message,
         decoder=amqp_decoder,
-        offset_type=OffsetType.OFFSET,
-        offset=my_offset,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.OFFSET, my_offset),
     )
     await consumer.run()
 
