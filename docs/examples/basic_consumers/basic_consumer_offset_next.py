@@ -26,17 +26,10 @@ async def consume():
     loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
 
     async def on_message(msg: AMQPMessage, message_context: MessageContext):
-<<<<<<< HEAD
-        stream = message_context.consumer.get_stream(message_context.subscriber_name)
-        offset = message_context.offset
-        print("Got message: {} from stream {}, offset {}".format(msg, stream, offset))
-=======
-        consumer = message_context.consumer
         stream = message_context.consumer.get_stream(message_context.subscriber_name)
         offset = message_context.offset
 
         print("Got message: {}".format(msg) + " from stream " + stream + " offset: " + str(offset))
->>>>>>> 55778554d17244679f955868c2f02b07514c7352
 
     await consumer.start()
     await consumer.subscribe(
