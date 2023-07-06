@@ -4,6 +4,7 @@ import signal
 from rstream import (
     AMQPMessage,
     Consumer,
+    ConsumerOffsetSpecification,
     MessageContext,
     OffsetNotFound,
     OffsetType,
@@ -51,11 +52,13 @@ async def consume():
 
     await consumer.start()
     # catch exceptions if stream or offset for the subscriber name doesn't exist
+    my_offset = 1
     try:
+        # this one will raise an exception if store_offset wasn't never done before (in other word an offset wasn't
+        # previously stored in the server)
         my_offset = await consumer.query_offset(stream=STREAM, subscriber_name="subscriber_1")
     except OffsetNotFound as offset_exception:
         print(f"ValueError: {offset_exception}")
-        exit(1)
 
     except StreamDoesNotExist as stream_exception:
         print(f"ValueError: {stream_exception}")
@@ -70,8 +73,7 @@ async def consume():
         subscriber_name="subscriber_1",
         callback=on_message,
         decoder=amqp_decoder,
-        offset_type=OffsetType.OFFSET,
-        offset=my_offset,
+        offset_specification=ConsumerOffsetSpecification(OffsetType.OFFSET, my_offset),
     )
     await consumer.run()
 

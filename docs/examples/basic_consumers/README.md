@@ -11,3 +11,8 @@ The subscribe method of consumer will take in input a callback (on_message) that
 MessageContext store some info about the message (the stream, and the current offset)
 
 Possible values of OffsetType are: FIRST (default), NEXT, LAST, TIMESTAMP and OFFSET
+<<<<<<< HEAD
+=======
+
+Is it also possible to store offsets server-side (see manual_server_offset_tracking folder for an example on this)
+>>>>>>> 55778554d17244679f955868c2f02b07514c7352
