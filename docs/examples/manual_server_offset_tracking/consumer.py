@@ -1,6 +1,5 @@
 import asyncio
 import signal
-from typing import Optional
 
 from rstream import (
     AMQPMessage,
@@ -15,6 +14,7 @@ from rstream import (
 
 cont = 0
 lock = asyncio.Lock()
+STREAM = "my-test-stream"
 
 
 async def on_message(msg: AMQPMessage, message_context: MessageContext):
@@ -25,7 +25,7 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
     stream = await message_context.consumer.stream(message_context.subscriber_name)
     offset = message_context.offset
 
-    print("Got message: {}".format(msg) + "from stream " + stream + "offset: " + str(offset))
+    print("Got message: {} from stream {}, offset {}".format(msg, stream, offset))
 
     # store the offset every 1000 messages received
     async with lock:
@@ -38,7 +38,6 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 
 
 async def consume():
-
     consumer = Consumer(
         host="localhost",
         port=5552,
@@ -53,7 +52,7 @@ async def consume():
     await consumer.start()
     # catch exceptions if stream or offset for the subscriber name doesn't exist
     try:
-        my_offset = await consumer.query_offset(stream="mixing", subscriber_name="subscriber_1")
+        my_offset = await consumer.query_offset(stream=STREAM, subscriber_name="subscriber_1")
     except OffsetNotFound as offset_exception:
         print(f"ValueError: {offset_exception}")
         exit(1)
@@ -66,9 +65,8 @@ async def consume():
         print(f"ValueError: {e}")
         exit(1)
 
-    # print("offset is" + str(my_offset))
     await consumer.subscribe(
-        stream="mixing",
+        stream=STREAM,
         subscriber_name="subscriber_1",
         callback=on_message,
         decoder=amqp_decoder,

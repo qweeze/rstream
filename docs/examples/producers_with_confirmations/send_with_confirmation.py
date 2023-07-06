@@ -11,15 +11,14 @@ MESSAGES = 1000000
 
 
 def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
-
-    if confirmation.is_confirmed == True:
-        print("message id: " + str(confirmation.message_id) + " is confirmed")
+    if confirmation.is_confirmed:
+        print("message id: {} is confirmed".format(confirmation.message_id))
     else:
-        print("message id: " + str(confirmation.message_id) + " is not confirmed")
+        print("message id: {} not confirmed. Response code {}".format(confirmation.message_id,
+                                                                      confirmation.response_code))
 
 
 async def publish():
-
     async with Producer("localhost", username="guest", password="guest") as producer:
         # create a stream if it doesn't already exist
         await producer.create_stream(STREAM, exists_ok=True)

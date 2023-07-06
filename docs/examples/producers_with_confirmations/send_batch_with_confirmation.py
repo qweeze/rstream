@@ -7,22 +7,21 @@ from rstream import (
 )
 
 STREAM = "my-test-stream"
-LOOP = 1000
-BATCH = 1000
+LOOP = 10_000
+BATCH = 100
 
 
 def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
-
-    if confirmation.is_confirmed == True:
-        print("message id: " + str(confirmation.message_id) + " is confirmed")
+    if confirmation.is_confirmed:
+        print("message id: {} is confirmed".format(confirmation.message_id))
     else:
-        print("message id: " + str(confirmation.message_id) + " is not confirmed")
+        print("message id: {} not confirmed. Response code {}".format(confirmation.message_id,
+                                                                      confirmation.response_code))
 
 
 async def publish():
-
     async with Producer("localhost", username="guest", password="guest") as producer:
-        # create a strem if it doesn't already exist
+        # create a stream if it doesn't already exist
         await producer.create_stream(STREAM, exists_ok=True)
 
         # sending a million of messages in AMQP format
