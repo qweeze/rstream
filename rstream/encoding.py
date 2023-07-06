@@ -1,6 +1,6 @@
 import io
 import typing
-from dataclasses import fields, is_dataclass
+from dataclasses import _FIELD, fields, is_dataclass
 from typing import (
     Annotated,
     Any,
@@ -13,7 +13,6 @@ from typing import (
 
 from .constants import Key, T
 from .schema import Frame, Struct, registry
-from dataclasses import _FIELD
 
 __all__ = ["encode_frame", "decode_frame"]
 
@@ -62,7 +61,6 @@ def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
         spec = int_specs[tp]
         return value.to_bytes(spec.length, byteorder=spec.byteorder, signed=spec.signed)
 
-
     elif tp is T.string:
         buffer = bytearray()
         buffer += len(value).to_bytes(2, "big", signed=False)
@@ -102,12 +100,14 @@ def encode_frame(frame: Frame) -> bytearray:
         raise ValueError(f"Could not encode frame {frame!r}") from e
 
     length = len(payload) + 2 + 2
-    return b"".join((
-        length.to_bytes(4, "big", signed=False),
-        frame.key.value.to_bytes(2, "big", signed=False),
-        frame.version.to_bytes(2, "big", signed=False),
-        payload,
-    ))
+    return b"".join(
+        (
+            length.to_bytes(4, "big", signed=False),
+            frame.key.value.to_bytes(2, "big", signed=False),
+            frame.version.to_bytes(2, "big", signed=False),
+            payload,
+        )
+    )
 
 
 def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
