@@ -12,7 +12,7 @@ Step 1: Create the super stream:
 
 Step 2: Run the Super stream producer:
 
-    $ python3 super_stream_producer.py
+    $ python3 sac_super_stream_producer.py
 
 Step 3: Run multiple super stream consumers:
 
