@@ -73,6 +73,7 @@ class Producer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         default_batch_publishing_delay: float = 0.2,
+        default_context_switch_value: int = 1000,
     ):
         self._pool = ClientPool(
             host,
@@ -99,6 +100,8 @@ class Producer:
         self.task: asyncio.Task[NoReturn] | None = None
         # Delay After sending the messages on _buffered_messages list
         self._default_batch_publishing_delay = default_batch_publishing_delay
+        self._default_context_switch_counter = 0
+        self._default_context_switch_value = default_context_switch_value
 
     @property
     def default_client(self) -> Client:
@@ -340,7 +343,11 @@ class Producer:
         async with self._buffered_messages_lock:
             self._buffered_messages[stream].append(wrapped_message)
 
-        await asyncio.sleep(0)
+        self._default_context_switch_counter += 1
+
+        if self._default_context_switch_counter > self._default_context_switch_value:
+            await asyncio.sleep(0)
+            self._default_context_switch_counter = 0
 
     async def send_sub_entry(
         self,
