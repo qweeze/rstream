@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-Simple producers
-=======
+
 Simple producers with confirmations
->>>>>>> 55778554d17244679f955868c2f02b07514c7352
 ---
 
 This section shows basic examples on how to send messages and retrieve confirmation status from the server.
