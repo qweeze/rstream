@@ -93,6 +93,57 @@ In order to handle load balancers, you can use the `load_balancer_mode` paramete
 
 Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
 
+
+### Client Performances
+
+The RabbitMQ Stream queues can handle high throughput. Currently, the client cannot reach the maximum throughput the server can handle. 
+
+We found some bottlenecks; one of them is the current AMQP 1.0 marshal and unmarshal message format. 
+
+This one:
+```python
+ for i in range(1_000_000):
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+            )
+            # send is asynchronous
+            await producer.send(stream=STREAM, message=amqp_message)
+```
+
+is more or less 50% slower than:
+```python
+ for i in range(1_000_000):
+            # send is asynchronous
+            await producer.send(stream=STREAM, message=b"hello")
+```
+
+You can use the `batch_send` to test the performances.
+
+```python
+$ python docs/examples/basic_producers/producer_send_batch_binary.py
+Sent 1000000 messages in 6.7364 seconds. 148446.9526 messages per second
+````
+
+With AMQP 1.0 parser
+```python
+$ python docs/examples/basic_producers/producer_send_batch.py       
+Sent 1000000 messages in 13.2724 seconds. 75344.4910 messages per second
+```
+
+We are evaluating to rewriting the AMQP 1.0 codec optimized for the stream use case.
+
+## When to use the AMQP 1.0 codec
+
+You need to use the AMQP 1.0 codec to exchange messages with other stream clients like
+[Java](https://github.com/rabbitmq/rabbitmq-stream-java-client), [.NET](https://github.com/rabbitmq/rabbitmq-stream-dotnet-client), [Rust](https://github.com/rabbitmq/rabbitmq-stream-rust-client), [Go](https://github.com/rabbitmq/rabbitmq-stream-go-client) or if you want to use the AMQP 0.9.1 clients. 
+
+You can use the binary version if you need to exchange messages from Python to Python. 
+
+<b>Note</b>: The messages stored in binary are not compatible with the other clients and with AMQP 0.9.1 clients. <br /> 
+Once the messages are stored to the server, you can't change them. 
+
+
+
 ## TODO
 
 - [ ] Documentation
