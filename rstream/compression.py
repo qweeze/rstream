@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import abc
+import copy
 import gzip
 from collections import defaultdict
 from dataclasses import dataclass
@@ -60,14 +61,16 @@ class NoneCompressionCodec(ICompressionCodec):
     buffer: bytes = bytes()
 
     def compress(self, messages: list[MessageT]):
+        uncompressed_data = bytes()
         for item in messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
             msg_buffer = bytes(msg)
-            self.buffer += len(msg_buffer).to_bytes(4, "big")
-            self.buffer += msg_buffer
+            uncompressed_data += len(msg_buffer).to_bytes(4, "big")
+            uncompressed_data += msg_buffer
 
         self.message_count = len(messages)
-        self.uncompressed_data_size = len(self.buffer)
+        self.uncompressed_data_size = len(uncompressed_data)
+        self.buffer = uncompressed_data
         self.compressed_data_size = self.uncompressed_data_size
 
     def uncompress(self, compressed_data: bytes, uncompressed_data_size: int) -> bytes:
@@ -146,7 +149,7 @@ class StreamCompressionCodecs:
 
     @staticmethod
     def get_compression_codec(compression_type: CompressionType) -> ICompressionCodec:
-        return StreamCompressionCodecs.available_compress_codecs[compression_type]
+        return copy.copy(StreamCompressionCodecs.available_compress_codecs[compression_type])
 
 
 class CompressionHelper:
