@@ -45,6 +45,7 @@ class SuperStreamConsumer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         super_stream: str,
+        connection_closed_handler: Optional[CB[Exception]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -75,6 +76,7 @@ class SuperStreamConsumer:
         self._consumers: dict[str, Consumer] = {}
         self._stop_event = asyncio.Event()
         self._subscribers: dict[str, str] = defaultdict(str)
+        self._connection_closed_handler = connection_closed_handler
 
     @property
     def default_client(self) -> Client:
@@ -90,7 +92,7 @@ class SuperStreamConsumer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get()
+        self._default_client = await self._pool.get(connection_closed_handler=self._connection_closed_handler)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -112,7 +114,9 @@ class SuperStreamConsumer:
         if stream not in self._clients:
             leader, replicas = await self.default_client.query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
-            self._clients[stream] = await self._pool.get(Addr(broker.host, broker.port))
+            self._clients[stream] = await self._pool.get(
+                Addr(broker.host, broker.port), connection_closed_handler=self._connection_closed_handler
+            )
 
         return self._clients[stream]
 

@@ -87,6 +87,21 @@ producer = Producer(
 )
 ```
 
+### Managing disconnections:
+When the client is disconnected unexpectedly, the client raises an event:
+
+```python
+def on_connection_closed(reason: Exception) -> None:
+    print("connection has been closed for reason: " + str(reason))
+
+consumer = Consumer(
+..        
+connection_closed_handler=on_connection_closed,
+)
+```
+
+See the complete example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/consumer_handle_connections_issues.py)
+
 ## Load Balancer
 
 In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
