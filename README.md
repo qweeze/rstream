@@ -33,7 +33,7 @@ You can use the `Binary` version if you need to exchange messages from Python to
 <b>Note</b>: The messages stored in `Binary` are not compatible with the other clients and with AMQP 0.9.1 clients. <br /> 
 Once the messages are stored to the server, you can't change them. 
 
-Read also the [lient Performances](#client-performances) section 
+Read also the [Client Performances](#client-performances) section 
 
 
 ## Publishing messages
