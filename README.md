@@ -112,7 +112,10 @@ producer = Producer(
 ```
 
 ### Managing disconnections:
-When the client is disconnected unexpectedly, the client raises an event:
+
+The client does not support auto-reconnect at the moment.
+
+When the TCP connection is disconnected unexpectedly, the client raises an event:
 
 ```python
 def on_connection_closed(reason: Exception) -> None:
@@ -124,7 +127,7 @@ connection_closed_handler=on_connection_closed,
 )
 ```
 
-See the complete example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/consumer_handle_connections_issues.py)
+Please take a look at the complete example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/consumer_handle_connections_issues.py)
 
 ## Load Balancer
 
