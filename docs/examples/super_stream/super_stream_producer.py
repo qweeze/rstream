@@ -9,7 +9,7 @@ from rstream import (
 
 SUPER_STREAM = "invoices"
 
-
+# this value will be hashed using mumh3 hashing algorithm to decide the partition resolution for the message
 async def routing_extractor(message: AMQPMessage) -> str:
     return message.application_properties["id"]
 
