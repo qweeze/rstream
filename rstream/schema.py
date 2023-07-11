@@ -1,20 +1,42 @@
 # Copyright 2023 VMware, Inc. All Rights Reserved.
 # SPDX-License-Identifier: MIT
 
+import inspect
 import zlib
-from dataclasses import dataclass, field
-from typing import ClassVar, Optional, Type, cast
+from dataclasses import dataclass, field, fields
+from typing import (
+    Any,
+    ClassVar,
+    Iterator,
+    Optional,
+    Type,
+    TypeGuard,
+    cast,
+)
 
 from .compression import CompressionHelper, CompressionType
 from .constants import Key, OffsetType, T
 from .exceptions import ServerError
+from . import schema
 
 registry: dict[tuple[bool, Key], Type["Frame"]] = {}
 
 
 @dataclass
 class Struct:
-    ...
+    flds_meta: ClassVar[list[tuple[str, T | None, type[Any] | None]]] = NotImplemented
+
+    @classmethod
+    def prepare(cls):
+        cls.flds_meta = [
+            (fld.name, fld.metadata.get("type"), fld.type)
+            for fld in fields(cls)
+        ]
+
+    def iter_typed_values(self) -> Iterator[tuple[Any, T | None]]:
+        _self_dict = self.__dict__
+        for fld_name, tp, _ in self.flds_meta:
+            yield _self_dict[fld_name], tp
 
 
 @dataclass
@@ -538,3 +560,11 @@ class ConsumerUpdateServerResponse(Frame, is_response=True):
     correlation_id: int = field(metadata={"type": T.uint32})
     response_code: int = field(metadata={"type": T.uint16})
     offset_specification: OffsetSpecification
+
+
+def is_struct(obj: Any) -> TypeGuard[type[Struct]]:
+    return hasattr(obj, "flds_meta")
+
+
+for _, struct in inspect.getmembers(schema, is_struct):
+    struct.prepare()
