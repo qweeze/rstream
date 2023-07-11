@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 import ssl
 import time
 from collections import defaultdict
@@ -40,6 +41,8 @@ HT = Annotated[
 
 DEFAULT_REQUEST_TIMEOUT = 10
 
+MT = TypeVar("MT")
+CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,7 @@ class BaseClient:
         ssl_context: Optional[ssl.SSLContext] = None,
         frame_max: int,
         heartbeat: int,
+        connection_closed_handler: Optional[CB[Exception]] = None,
     ):
         self.host = host
         self.port = port
@@ -89,6 +93,7 @@ class BaseClient:
         self._handlers: dict[Type[schema.Frame], dict[str, HT[Any]]] = defaultdict(dict)
 
         self._last_heartbeat: float = 0
+        self._connection_closed_handler = connection_closed_handler
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -128,7 +133,13 @@ class BaseClient:
     async def send_frame(self, frame: schema.Frame) -> None:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
-        await self._conn.write_frame(frame)
+        try:
+            await self._conn.write_frame(frame)
+        except socket.error as e:
+            if self._connection_closed_handler is None:
+                print("TCP connection closed")
+            else:
+                self._connection_closed_handler(e)
 
     def wait_frame(
         self,
@@ -166,7 +177,17 @@ class BaseClient:
         while True:
             try:
                 frame = await self._conn.read_frame()
-            except ConnectionClosed:
+            except ConnectionClosed as e:
+                if self._connection_closed_handler is not None:
+                    self._connection_closed_handler(e)
+                else:
+                    print("TCP connection closed")
+                break
+            except socket.error as e:
+                if self._connection_closed_handler is not None:
+                    self._connection_closed_handler(e)
+                else:
+                    print("TCP connection closed")
                 break
 
             logger.debug("Received frame: %s", frame)
@@ -523,7 +544,9 @@ class ClientPool:
         self._heartbeat = heartbeat
         self._clients: dict[Addr, Client] = {}
 
-    async def get(self, addr: Optional[Addr] = None) -> Client:
+    async def get(
+        self, addr: Optional[Addr] = None, connection_closed_handler: Optional[CB[Exception]] = None
+    ) -> Client:
         """Get a client according to `addr` parameter
 
         If class param `load_balancer_mode` is True, we create a connection via the LB
@@ -536,20 +559,26 @@ class ClientPool:
 
         if desired_addr not in self._clients:
             if addr and self.load_balancer_mode:
-                self._clients[desired_addr] = await self._resolve_broker(desired_addr)
+                self._clients[desired_addr] = await self._resolve_broker(
+                    desired_addr, connection_closed_handler
+                )
             else:
-                self._clients[desired_addr] = await self.new(desired_addr)
+                self._clients[desired_addr] = await self.new(
+                    addr=desired_addr, connection_closed_handler=connection_closed_handler
+                )
 
         assert self._clients[desired_addr].is_started
         return self._clients[desired_addr]
 
-    async def _resolve_broker(self, addr: Addr) -> Client:
+    async def _resolve_broker(
+        self, addr: Addr, connection_closed_handler: Optional[CB[Exception]] = None
+    ) -> Client:
         desired_host, desired_port = addr.host, str(addr.port)
 
         connection_attempts = 0
 
         while connection_attempts < self.max_retries:
-            client = await self.new(self.addr)
+            client = await self.new(addr=self.addr, connection_closed_handler=connection_closed_handler)
 
             assert client.server_properties is not None
 
@@ -568,7 +597,7 @@ class ClientPool:
             f"Failed to connect to {desired_host}:{desired_port} after {self.max_retries} tries"
         )
 
-    async def new(self, addr: Addr) -> Client:
+    async def new(self, addr: Addr, connection_closed_handler: Optional[CB[Exception]] = None) -> Client:
         host, port = addr
         client = Client(
             host=host,
@@ -576,6 +605,7 @@ class ClientPool:
             ssl_context=self.ssl_context,
             frame_max=self._frame_max,
             heartbeat=self._heartbeat,
+            connection_closed_handler=connection_closed_handler,
         )
         await client.start()
         await client.authenticate(

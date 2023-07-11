@@ -51,6 +51,7 @@ class SuperStreamProducer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         default_batch_publishing_delay: float = 0.2,
+        connection_closed_handler: Optional[CB[Exception]] = None
     ):
         self._pool = ClientPool(
             host,
@@ -81,6 +82,7 @@ class SuperStreamProducer:
         self._default_client: Optional[Client] = None
         self._producer: Producer | None = None
         self._routing_strategy: RoutingStrategy
+        self._connection_closed_handler = connection_closed_handler
 
     async def _get_producer(self) -> Producer:
         if self._producer is None:
@@ -126,7 +128,7 @@ class SuperStreamProducer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get()
+        self._default_client = await self._pool.get(connection_closed_handler=self._connection_closed_handler)
         self.super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self._default_client)
         if self.routing == RouteType.Hash:
             self._routing_strategy = HashRoutingMurmurStrategy(self.routing_extractor)

@@ -94,6 +94,48 @@ See examples in:
 
 See the [single active consumer example](https://github.com/qweeze/rstream/blob/master/docs/examples/single_active_consumer/)
 
+### Connecting with SSL:
+
+```python
+import ssl
+
+ssl_context = ssl.SSLContext()
+ssl_context.load_cert_chain('/path/to/certificate.pem', '/path/to/key.pem')
+
+producer = Producer(
+    host='localhost',
+    port=5551,
+    ssl_context=ssl_context,
+    username='guest',
+    password='guest',
+)
+```
+
+### Managing disconnections:
+
+The client does not support auto-reconnect at the moment.
+
+When the TCP connection is disconnected unexpectedly, the client raises an event:
+
+```python
+def on_connection_closed(reason: Exception) -> None:
+    print("connection has been closed for reason: " + str(reason))
+
+consumer = Consumer(
+..        
+connection_closed_handler=on_connection_closed,
+)
+```
+
+Please take a look at the complete example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/consumer_handle_connections_issues.py)
+
+## Load Balancer
+
+In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
+
+Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
+
+
 ### Client Performances
 
 The RabbitMQ Stream queues can handle high throughput. Currently, the client cannot reach the maximum throughput the server can handle. 

@@ -74,6 +74,7 @@ class Producer:
         max_retries: int = 20,
         default_batch_publishing_delay: float = 0.2,
         default_context_switch_value: int = 1000,
+        connection_closed_handler: Optional[CB[Exception]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -102,6 +103,7 @@ class Producer:
         self._default_batch_publishing_delay = default_batch_publishing_delay
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
+        self._connection_closed_handler = connection_closed_handler
 
     @property
     def default_client(self) -> Client:
@@ -117,7 +119,7 @@ class Producer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get()
+        self._default_client = await self._pool.get(connection_closed_handler=self._connection_closed_handler)
 
     async def close(self) -> None:
         # flush messages still in buffer
@@ -142,7 +144,9 @@ class Producer:
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
             leader, _ = await self.default_client.query_leader_and_replicas(stream)
-            self._clients[stream] = await self._pool.get(Addr(leader.host, leader.port))
+            self._clients[stream] = await self._pool.get(
+                Addr(leader.host, leader.port), self._connection_closed_handler
+            )
 
         return self._clients[stream]
 
