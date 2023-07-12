@@ -63,6 +63,14 @@ Example:
 
 With `send_wait` instead will wait until the confirmation from the server is received.
 
+## Deduplication
+
+RabbitMQ Stream can detect and filter out duplicated messages, based on 2 client-side elements: the producer name and the message publishing ID.
+All the producer methods to send messages (send, send_batch, send_wait) takes a publisher_name parameter while the message publishing id can be set in the AMQP message.
+
+Example:
+- [producer with deduplication](https://github.com/qweeze/rstream/blob/master/docs/examples/deduplication/producer_ded.py)
+
 ## Consuming messages
 
 See [consumer examples](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_consumers)  for basic consumer and consumers with different offsets.
