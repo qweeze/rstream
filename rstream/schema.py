@@ -28,10 +28,7 @@ class Struct:
 
     @classmethod
     def prepare(cls):
-        cls.flds_meta = [
-            (fld.name, fld.metadata.get("type"), fld.type)
-            for fld in fields(cls)
-        ]
+        cls.flds_meta = [(fld.name, fld.metadata.get("type"), fld.type) for fld in fields(cls)]
 
     def iter_typed_values(self) -> Iterator[tuple[Any, T | None]]:
         _self_dict = self.__dict__

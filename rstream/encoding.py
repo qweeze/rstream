@@ -125,7 +125,6 @@ def encode_frame(frame: Frame) -> bytes:
     )
 
 
-
 def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
     if tp is T.string:
         length = int.from_bytes(buf.read(2), "big", signed=False)
