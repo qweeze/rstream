@@ -6,7 +6,7 @@ from . import schema
 from .encoding import decode_frame, encode_frame
 
 CHUNK_SIZE = 256
-CONNECT_TIMEOUT = 1
+CONNECT_TIMEOUT = 3
 
 
 class ConnectionClosed(Exception):
