@@ -7,7 +7,7 @@ from rstream import (
     MessageContext,
     OffsetType,
     SuperStreamConsumer,
-    amqp_decoder,
+    amqp_decoder, ConsumerOffsetSpecification,
 )
 
 cont = 0
@@ -26,9 +26,9 @@ async def consume():
 
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
-
+    offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
     await consumer.start()
-    await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_type=OffsetType.FIRST)
+    await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_specification)
     await consumer.run()
 
 
