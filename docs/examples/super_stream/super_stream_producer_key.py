@@ -11,9 +11,9 @@ SUPER_STREAM = "invoices"
 MESSAGES = 1000000
 
 
-# this value will be hashed using mumh3 hashing algorithm to decide the partition resolution for the message
+# routing key and the bindings between the super stream exchange and the streams
 async def routing_extractor(message: AMQPMessage) -> str:
-    return message.application_properties["id"]
+    return "key1"
 
 
 async def publish():
@@ -23,12 +23,11 @@ async def publish():
         username="guest",
         password="guest",
         routing_extractor=routing_extractor,
-        routing=RouteType.Hash,
+        routing=RouteType.Key,
         super_stream=SUPER_STREAM,
     ) as super_stream_producer:
-        # Sending a million messages
-
         start_time = time.perf_counter()
+        # Sending a million messages
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(
                 body="hello: {}".format(i),
