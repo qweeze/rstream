@@ -8,6 +8,7 @@ from rstream import (
 )
 
 SUPER_STREAM = "invoices"
+MESSAGES = 1000000
 
 # this value will be hashed using mumh3 hashing algorithm to decide the partition resolution for the message
 async def routing_extractor(message: AMQPMessage) -> str:
@@ -15,6 +16,7 @@ async def routing_extractor(message: AMQPMessage) -> str:
 
 
 async def publish():
+    # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
         "localhost",
         username="guest",
@@ -23,7 +25,8 @@ async def publish():
         routing=RouteType.Hash,
         super_stream=SUPER_STREAM,
     ) as super_stream_producer:
-        for i in range(1000000):
+        # Sending a million messages
+        for i in range(MESSAGES):
             amqp_message = AMQPMessage(
                 body="hello: {}".format(i),
                 application_properties={"id": "{}".format(i)},

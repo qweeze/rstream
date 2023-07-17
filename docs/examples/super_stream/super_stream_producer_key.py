@@ -16,6 +16,7 @@ async def routing_extractor(message: AMQPMessage) -> str:
 
 
 async def publish():
+    # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
         "localhost",
         username="guest",
@@ -25,6 +26,7 @@ async def publish():
         super_stream=SUPER_STREAM,
     ) as super_stream_producer:
         start_time = time.perf_counter()
+        # Sending a million messages
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(
                 body="hello: {}".format(i),
