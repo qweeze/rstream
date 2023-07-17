@@ -5,354 +5,174 @@ A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq
 
 ## Install
 
+The client is distributed via [`PIP`](https://pypi.org/project/rstream/):
 ```bash
-pip install rstream
+	pip install rstream
 ```
 
-## Quick start
+## Client Codecs
+Before start using the client is important to read this section.
+The client supports two codecs to store the messages to the server:
+ - `AMQP 1.0`
+ - `Binary`
 
-### Publishing messages: 
+By default you should use `AMQP 1.0` codec:
+```python
+   amqp_message = AMQPMessage(
+    body="hello: {}".format(i),
+  )
+```
+ 
+#### AMQP 1.0 codec  vs Binary
+
+You need to use the `AMQP 1.0` codec to exchange messages with other stream clients like
+[Java](https://github.com/rabbitmq/rabbitmq-stream-java-client), [.NET](https://github.com/rabbitmq/rabbitmq-stream-dotnet-client), [Rust](https://github.com/rabbitmq/rabbitmq-stream-rust-client), [Go](https://github.com/rabbitmq/rabbitmq-stream-go-client) or if you want to use the `AMQP 0.9.1` clients. 
+
+You can use the `Binary` version if you need to exchange messages from Python to Python. 
+
+<b>Note</b>: The messages stored in `Binary` are not compatible with the other clients and with AMQP 0.9.1 clients. <br /> 
+Once the messages are stored to the server, you can't change them. 
+
+Read also the [Client Performances](#client-performances) section 
+
+
+## Publishing messages
 
 You can publish messages with four different methods:
 
-* send: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires.
-* batch_send: synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
-* send_wait: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
-* send_sub_entry: asynchronous, allow batch in sub-entry mode. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
+* `send`: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires.
+* `send_batch`: synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
+* `send_wait`: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
+* `send_sub_entry`: asynchronous, allow batch in sub-entry mode. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
 
-Example Using send:
 
-```python
-import asyncio
-from rstream import Producer, AMQPMessage
+On the [examples](https://github.com/qweeze/rstream/blob/master/docs/examples/) directory you can find diffent way to send the messages:
+- [producer using send](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send.py)
+- [producer using send_wait](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send_wait.py)
+- [producer using send_batch](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send_batch.py)
+- [producer using sub_entry_batch](https://github.com/qweeze/rstream/blob/master/docs/examples/sub_entry_batch/producer_sub_entry_batch.py)
 
-async def publish():
-    async with Producer('localhost', username='guest', password='guest') as producer:
-        await producer.create_stream('mystream')
-
-        for i in range(100):
-            amqp_message = AMQPMessage(
-                body='hello: {}'.format(i),
-            )
-            await producer.send('mystream', amqp_message)
-
-asyncio.run(publish())
-```
-
-send is not thread safe so it must be awaited.
-
-Similarly with the send_wait:
-
-```python
-import asyncio
-from rstream import Producer, AMQPMessage
-
-async def publish():
-    async with Producer('localhost', username='guest', password='guest') as producer:
-        await producer.create_stream('mystream')
-
-        for i in range(100):
-            amqp_message = AMQPMessage(
-                body='hello: {}'.format(i),
-            )
-            await producer.send_wait('mystream', amqp_message)
-
-asyncio.run(publish())
-```
-
-or using batch_send:
-
-```python
-import asyncio
-from rstream import Producer, AMQPMessage
-
-async def publish():
-    async with Producer('localhost', username='guest', password='guest') as producer:
-        await producer.create_stream('mystream')
-        list_messages = []
-
-        for i in range(100):
-            amqp_message = AMQPMessage(
-                body='hello: {}'.format(i),
-            )
-            list_messages.append(amqp_message)
-
-        await producer.send_batch('mystream',  list_messages) 
-
-asyncio.run(publish())
-```
-
-and eventually using sub_entry_batch:
-
-```python
-async def publish():
-    async with Producer('localhost', username='guest', password='guest') as producer:
-        await producer.delete_stream('mystream', missing_ok=True)
-        await producer.create_stream('mystream', exists_ok=True)
-
-        messages = []
-        for i in range(10):
-            amqp_message = AMQPMessage(
-                body='a:{}'.format(i),
-            )
-            messages.append(amqp_message_list)
-
-       
-        await producer.send_sub_entry('mixing', compression_type=CompressionType.Gzip,
-                                      sub_entry_messages=messages)
-        
-        
-        await producer.send_sub_entry('mixing', compression_type=CompressionType.No,
-                                      sub_entry_messages=messages)
-
-    await producer.close()
-  
-asyncio.run(publish())
-```
-
-You have the possibility to specify NoCompression (compression_type=CompressionType.No) or Gzip (compression_type=CompressionType.Gzip).
 
 ### Publishing with confirmation
 
 The Send method takes as parameter an handle function that will be called asynchronously when the message sent will be notified from the server to have been published.
 
-In this case the example will work like this:
-
-
-```python
-import asyncio
-from rstream import Producer, AMQPMessage, ConfirmationStatus
-
-def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
-
-     if confirmation.is_confirmed == True:
-        print("message id: " + str(confirmation.message_id) + " is confirmed")
-     else:
-         print("message id: " + str(confirmation.message_id) + " is not confirmed")
-
-
-async def publish():
-    async with Producer('localhost', username='guest', password='guest') as producer:
-        await producer.create_stream('mystream')
-
-        for i in range(100):
-            amqp_message = AMQPMessage(
-                body='hello: {}'.format(i),
-            )
-            await producer.send('mystream', amqp_message, on_publish_confirm=_on_publish_confirm_client) 
-
-asyncio.run(publish())
-```
-
-Same is valid also for send_batch.
-
-Please note that the publish confirmation callbacks are internally managed by the client and they are triggered in the Producer class.
-This means that when the Producer will terminate its scope and lifetime you will not be able to receive the remaining notifications if any.
-Depending on your scenario, you could add a synchronization mechanism (like an asyncio condition) to wait till all the notifications 
-have been received or you could use an asyncio.wait to give time for the callbacks to be invoked by the client.
-
+Example:
+- [producer using send and handling confirmation](https://github.com/qweeze/rstream/blob/master/docs/examples/producers_with_confirmations/send_with_confirmation.py)
+- [producer using send_batch and handling confirmation](https://github.com/qweeze/rstream/blob/master/docs/examples/producers_with_confirmations/send_batch_with_confirmation.py)
 
 With `send_wait` instead will wait until the confirmation from the server is received.
 
-### Consuming messages:
+## Consuming messages
 
-```python
-import asyncio
-import signal
-from rstream import Consumer, amqp_decoder, AMQPMessage, MessageContext
+See [consumer examples](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_consumers)  for basic consumer and consumers with different offsets.
 
-async def consume():
-    consumer = Consumer(
-        host='localhost',
-        port=5552,
-        vhost='/',
-        username='guest',
-        password='guest',
-    )
-
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
-
-    def on_message(msg: AMQPMessage, message_context: MessageContext):
-        consumer = message_context.consumer
-        stream = await message_context.consumer.stream(message_context.subscriber_name)
-        offset = message_context.offset
-    
-    print('Got message: {}'.format(msg) + "from stream " + stream+ "offset: " + str(offset))
-
-    await consumer.start()
-    await consumer.subscribe('mystream', on_message, decoder=amqp_decoder)
-    await consumer.run()
-
-asyncio.run(consume())
-```
 
 ### Server-side offset tracking
 
 RabbitMQ Streams provides server-side offset tracking for consumers. This features allows a consuming application to restart consuming where it left off in a previous run.
 You can use the store_offset (to store an offset in the server) and query_offset (to query it) methods of the consumer class like in this example:
+- [server side offset tracking](https://github.com/qweeze/rstream/blob/master/docs/examples/manual_server_offset_tracking/consumer.py)
 
-```python
-cont = 0
-lock = asyncio.Lock()
 
-async def on_message(msg: AMQPMessage, message_context: MessageContext):
+## Superstreams
 
-    global cont
-    global lock
-
-    consumer = message_context.consumer
-    stream = await message_context.consumer.stream(message_context.subscriber_name)
-    offset = message_context.offset
-    
-    print('Got message: {}'.format(msg) + "from stream " + stream+ "offset: " + str(offset))
-
-    # store the offset every 1000 messages received
-    async with lock:
-        cont = cont+1
-        # store the offset every 1000 messages received
-        if (cont % 1000 == 0):
-            await consumer.store_offset(stream=stream, offset=offset, subscriber_name=message_context.subscriber_name)
-
-async def consume():
-
-    consumer = Consumer  (
-    host='localhost',
-    port=5552,
-        vhost='/',
-        username='guest',
-        password='guest',
-    )
-
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
-
-    await consumer.start()
-    # Take back the server stored offset
-    try: 
-        my_offset = await consumer.query_offset(stream="mixing", subscriber_name="subscriber_1")
-    # catch exceptions if stream or offset for the subscriber name doesn't exist
-    except OffsetNotFound as offset_exception:
-        print(f"ValueError: {offset_exception}")
-        exit(1)
-    
-    except StreamDoesNotExist as stream_exception:
-        print(f"ValueError: {stream_exception}")
-        exit(1)
-         
-    except ServerError as e:
-        print(f"ValueError: {e}")
-        exit(1)
-   
-    await consumer.subscribe(stream='mixing', subscriber_name='subscriber-1', callback=on_message, decoder=amqp_decoder, offset_type=OffsetType.OFFSET, offset=my_offset)
-    await consumer.run()
-
-# main coroutine
-async def main():
-    # schedule the task
-    task = asyncio.create_task(consume())
-
-    # wait a moment
-    await asyncio.sleep(5)
-    # cancel the task
-    was_cancelled = task.cancel()
- 
-# run the asyncio program
-asyncio.run(main())
-```
-
-### Superstreams
-
-The client is also supporting superstream: https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams/
 A super stream is a logical stream made of individual, regular streams. It is a way to scale out publishing and consuming with RabbitMQ Streams: a large logical stream is divided into partition streams, splitting up the storage and the traffic on several cluster nodes.
 
-You can use superstream_producer and superstream_consumer classes which internally uses producers and consumers to operate on the componsing streams.
+See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-super-streams/) for more info.
 
-How to create a superstream:
+You can use `superstream_producer` and `superstream_consumer` classes which internally uses producers and consumers to operate on the componsing streams.
 
-```
-rabbitmq-streams add_super_stream orders  --routing-keys key1, key2,key3
-```
 
-How to send a message to a superstream
+See the Super [Stream example](https://github.com/qweeze/rstream/tree/master/docs/examples/super_stream)
 
-```python
-import asyncio
-import time
-import uamqp
-
-from rstream import Producer, AMQPMessage, ConfirmationStatus, CompressionType, SuperStreamProducer, RouteType
-
-async def routing_extractor(message: AMQPMessage) -> str:
-    return str(message.properties.message_id)
-
-async def publish():
-    global counter
-    counter = 0
-    sent = 0
-    async with SuperStreamProducer('localhost', username='guest', password='guest', super_stream='mixing', routing=RouteType.Hash, routing_extractor=routing_extractor) as producer:
-
-        messages = []
-        for i in range(1000):
-            amqp_message = AMQPMessage(
-                body='a:{}'.format(i),
-                properties=uamqp.message.MessageProperties(message_id=i),
-               
-            )
-           
-            await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)
-
-    
-        await asyncio.sleep(1)
-asyncio.run(publish())
-```
-
-How to consume from a superstream:
-
-```python
-import asyncio
-import signal
-from rstream import Consumer, amqp_decoder, AMQPMessage, SuperStreamConsumer, OffsetType, MessageContext
-from typing import Optional
-
-def on_message(msg: AMQPMessage, message_context: Optional[MessageContext]):
-    print('Got message: {}'.format(msg) + "from stream " + message_context.stream+ "offset: " + str(message_context.offset))
-        
-async def consume():
-    print("consume")
-    consumer = SuperStreamConsumer(
-        host='localhost',
-        port=5552,
-        vhost='/',
-        username='guest',
-        password='guest',
-        super_stream='mixing'
-    )
-
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
-
-    await consumer.start()
-    await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_type=OffsetType.FIRST)
-    await consumer.run()
-
-# main coroutine
-async def main():
-    # schedule the task
-    task = asyncio.create_task(consume())
-    # suspend a moment
-      # wait a moment
-    await asyncio.sleep(3)
-    # cancel the task
-    was_cancelled = task.cancel()
- 
-# run the asyncio program
-asyncio.run(main())
-```
 ### Single Active Consumer support:
 
-Single active consumer form streams is also supported: https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams/
-See examples in: the docs/single_active_consumer folder
+Single active consumer provides exclusive consumption and consumption continuity on a stream. <br /> 
+See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams) for more info.
+See examples in: 
+
+See the [single active consumer example](https://github.com/qweeze/rstream/blob/master/docs/examples/single_active_consumer/)
+
+### Connecting with SSL:
+
+```python
+import ssl
+
+ssl_context = ssl.SSLContext()
+ssl_context.load_cert_chain('/path/to/certificate.pem', '/path/to/key.pem')
+
+producer = Producer(
+    host='localhost',
+    port=5551,
+    ssl_context=ssl_context,
+    username='guest',
+    password='guest',
+)
+```
+
+### Managing disconnections:
+
+The client does not support auto-reconnect at the moment.
+
+When the TCP connection is disconnected unexpectedly, the client raises an event:
+
+```python
+def on_connection_closed(reason: Exception) -> None:
+    print("connection has been closed for reason: " + str(reason))
+
+consumer = Consumer(
+..        
+connection_closed_handler=on_connection_closed,
+)
+```
+
+Please take a look at the complete example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/consumer_handle_connections_issues.py)
+
+## Load Balancer
+
+In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
+
+Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
+
+
+### Client Performances
+
+The RabbitMQ Stream queues can handle high throughput. Currently, the client cannot reach the maximum throughput the server can handle. 
+
+We found some bottlenecks; one of them is the current AMQP 1.0 marshal and unmarshal message format. 
+
+This one:
+```python
+ for i in range(1_000_000):
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+            )
+            # send is asynchronous
+            await producer.send(stream=STREAM, message=amqp_message)
+```
+
+is more or less 50% slower than:
+```python
+ for i in range(1_000_000):
+            # send is asynchronous
+            await producer.send(stream=STREAM, message=b"hello")
+```
+
+You can use the `batch_send` to test the performances.
+
+```python
+$ python docs/examples/basic_producers/producer_send_batch_binary.py
+Sent 1000000 messages in 6.7364 seconds. 148446.9526 messages per second
+````
+
+With AMQP 1.0 parser
+```python
+$ python docs/examples/basic_producers/producer_send_batch.py       
+Sent 1000000 messages in 13.2724 seconds. 75344.4910 messages per second
+```
+
+We are evaluating to rewriting the `AMQP 1.0 codec` optimized for the stream use case.
 
 ### Connecting with SSL:
 
@@ -376,6 +196,12 @@ producer = Producer(
 In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
 
 Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
+
+
+
+
+
+
 
 ## TODO
 
