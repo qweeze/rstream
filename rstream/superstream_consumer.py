@@ -159,6 +159,8 @@ class SuperStreamConsumer:
             )
             self._subscribers[partition] = subscriber
 
+            asyncio.create_task(consumer_partition.run())
+
     async def _create_consumer(self) -> Consumer:
         consumer = Consumer(
             host=self.host,
