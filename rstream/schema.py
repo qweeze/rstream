@@ -10,7 +10,6 @@ from typing import (
     Iterator,
     Optional,
     Type,
-    TypeGuard,
     cast,
 )
 
@@ -559,7 +558,7 @@ class ConsumerUpdateServerResponse(Frame, is_response=True):
     offset_specification: OffsetSpecification
 
 
-def is_struct(obj: Any) -> TypeGuard[type[Struct]]:
+def is_struct(obj: Any) -> bool:
     return hasattr(obj, "flds_meta")
 
 
