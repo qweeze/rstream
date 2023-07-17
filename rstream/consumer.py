@@ -27,6 +27,7 @@ from .schema import OffsetSpecification
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
+CB_CONN = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
 
 
 @dataclass
@@ -70,6 +71,7 @@ class Consumer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
+        connection_closed_handler: Optional[CB_CONN[Exception]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -89,6 +91,7 @@ class Consumer:
         self._subscribers: dict[str, _Subscriber] = {}
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
+        self._connection_closed_handler = connection_closed_handler
 
     @property
     def default_client(self) -> Client:
@@ -104,7 +107,7 @@ class Consumer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get()
+        self._default_client = await self._pool.get(connection_closed_handler=self._connection_closed_handler)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -129,7 +132,9 @@ class Consumer:
         if stream not in self._clients:
             leader, replicas = await self.default_client.query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
-            self._clients[stream] = await self._pool.get(Addr(broker.host, broker.port))
+            self._clients[stream] = await self._pool.get(
+                addr=Addr(broker.host, broker.port), connection_closed_handler=self._connection_closed_handler
+            )
 
         return self._clients[stream]
 

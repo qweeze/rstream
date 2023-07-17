@@ -10,8 +10,33 @@ The client is distributed via [`PIP`](https://pypi.org/project/rstream/):
 	pip install rstream
 ```
 
+## Client Codecs
+Before start using the client is important to read this section.
+The client supports two codecs to store the messages to the server:
+ - `AMQP 1.0`
+ - `Binary`
 
-## Publishing messages: 
+By default you should use `AMQP 1.0` codec:
+```python
+   amqp_message = AMQPMessage(
+    body="hello: {}".format(i),
+  )
+```
+ 
+#### AMQP 1.0 codec  vs Binary
+
+You need to use the `AMQP 1.0` codec to exchange messages with other stream clients like
+[Java](https://github.com/rabbitmq/rabbitmq-stream-java-client), [.NET](https://github.com/rabbitmq/rabbitmq-stream-dotnet-client), [Rust](https://github.com/rabbitmq/rabbitmq-stream-rust-client), [Go](https://github.com/rabbitmq/rabbitmq-stream-go-client) or if you want to use the `AMQP 0.9.1` clients. 
+
+You can use the `Binary` version if you need to exchange messages from Python to Python. 
+
+<b>Note</b>: The messages stored in `Binary` are not compatible with the other clients and with AMQP 0.9.1 clients. <br /> 
+Once the messages are stored to the server, you can't change them. 
+
+Read also the [Client Performances](#client-performances) section 
+
+
+## Publishing messages
 
 You can publish messages with four different methods:
 
@@ -21,8 +46,7 @@ You can publish messages with four different methods:
 * `send_sub_entry`: asynchronous, allow batch in sub-entry mode. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
 
 
-
-[Examples](https://github.com/qweeze/rstream/blob/master/docs/examples/):
+On the [examples](https://github.com/qweeze/rstream/blob/master/docs/examples/) directory you can find diffent way to send the messages:
 - [producer using send](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send.py)
 - [producer using send_wait](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send_wait.py)
 - [producer using send_batch](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send_batch.py)
@@ -39,7 +63,15 @@ Example:
 
 With `send_wait` instead will wait until the confirmation from the server is received.
 
-### Consuming messages:
+## Deduplication
+
+RabbitMQ Stream can detect and filter out duplicated messages, based on 2 client-side elements: the producer name and the message publishing ID.
+All the producer methods to send messages (send, send_batch, send_wait) takes a publisher_name parameter while the message publishing id can be set in the AMQP message.
+
+Example:
+- [producer with deduplication](https://github.com/qweeze/rstream/blob/master/docs/examples/deduplication/producer_ded.py)
+
+## Consuming messages
 
 See [consumer examples](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_consumers)  for basic consumer and consumers with different offsets.
 
@@ -51,7 +83,7 @@ You can use the store_offset (to store an offset in the server) and query_offset
 - [server side offset tracking](https://github.com/qweeze/rstream/blob/master/docs/examples/manual_server_offset_tracking/consumer.py)
 
 
-### Superstreams
+## Superstreams
 
 A super stream is a logical stream made of individual, regular streams. It is a way to scale out publishing and consuming with RabbitMQ Streams: a large logical stream is divided into partition streams, splitting up the storage and the traffic on several cluster nodes.
 
@@ -86,6 +118,24 @@ producer = Producer(
     password='guest',
 )
 ```
+
+### Managing disconnections:
+
+The client does not support auto-reconnect at the moment.
+
+When the TCP connection is disconnected unexpectedly, the client raises an event:
+
+```python
+def on_connection_closed(reason: Exception) -> None:
+    print("connection has been closed for reason: " + str(reason))
+
+consumer = Consumer(
+..        
+connection_closed_handler=on_connection_closed,
+)
+```
+
+Please take a look at the complete example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/consumer_handle_connections_issues.py)
 
 ## Load Balancer
 
@@ -130,17 +180,34 @@ $ python docs/examples/basic_producers/producer_send_batch.py
 Sent 1000000 messages in 13.2724 seconds. 75344.4910 messages per second
 ```
 
-We are evaluating to rewriting the AMQP 1.0 codec optimized for the stream use case.
+We are evaluating to rewriting the `AMQP 1.0 codec` optimized for the stream use case.
 
-## When to use the AMQP 1.0 codec
+### Connecting with SSL:
 
-You need to use the AMQP 1.0 codec to exchange messages with other stream clients like
-[Java](https://github.com/rabbitmq/rabbitmq-stream-java-client), [.NET](https://github.com/rabbitmq/rabbitmq-stream-dotnet-client), [Rust](https://github.com/rabbitmq/rabbitmq-stream-rust-client), [Go](https://github.com/rabbitmq/rabbitmq-stream-go-client) or if you want to use the AMQP 0.9.1 clients. 
+```python
+import ssl
 
-You can use the binary version if you need to exchange messages from Python to Python. 
+ssl_context = ssl.SSLContext()
+ssl_context.load_cert_chain('/path/to/certificate.pem', '/path/to/key.pem')
 
-<b>Note</b>: The messages stored in binary are not compatible with the other clients and with AMQP 0.9.1 clients. <br /> 
-Once the messages are stored to the server, you can't change them. 
+producer = Producer(
+    host='localhost',
+    port=5551,
+    ssl_context=ssl_context,
+    username='guest',
+    password='guest',
+)
+```
+
+## Load Balancer
+
+In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
+
+Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
+
+
+
+
 
 
 
