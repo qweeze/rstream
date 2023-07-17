@@ -14,10 +14,10 @@ from typing import (
     cast,
 )
 
+from . import schema
 from .compression import CompressionHelper, CompressionType
 from .constants import Key, OffsetType, T
 from .exceptions import ServerError
-from . import schema
 
 registry: dict[tuple[bool, Key], Type["Frame"]] = {}
 

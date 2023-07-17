@@ -12,7 +12,7 @@ from typing import (
 )
 
 from .constants import Key, T
-from .schema import Frame, Struct, registry, is_struct
+from .schema import Frame, Struct, is_struct, registry
 
 __all__ = ["encode_frame", "decode_frame"]
 
