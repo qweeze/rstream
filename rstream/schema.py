@@ -23,7 +23,7 @@ registry: dict[tuple[bool, Key], Type["Frame"]] = {}
 
 @dataclass
 class Struct:
-    flds_meta: ClassVar[list[tuple[str, T | None, type[Any] | None]]] = NotImplemented
+    flds_meta: ClassVar[list[tuple[str, T | None, type[Any]]]] = NotImplemented
 
     @classmethod
     def prepare(cls):
