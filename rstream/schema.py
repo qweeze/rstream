@@ -23,13 +23,13 @@ registry: dict[tuple[bool, Key], Type["Frame"]] = {}
 
 @dataclass
 class Struct:
-    flds_meta: ClassVar[list[tuple[str, T, type[Any]]]] = NotImplemented
+    flds_meta: ClassVar[list[tuple[str, Optional[T], type[Any]]]] = NotImplemented
 
     @classmethod
     def prepare(cls):
         cls.flds_meta = [(fld.name, fld.metadata.get("type"), fld.type) for fld in fields(cls)]
 
-    def iter_typed_values(self) -> Iterator[tuple[Any, T | None]]:
+    def iter_typed_values(self) -> Iterator[tuple[Any, Optional[T]]]:
         _self_dict = self.__dict__
         for fld_name, tp, _ in self.flds_meta:
             yield _self_dict[fld_name], tp
