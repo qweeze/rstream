@@ -207,9 +207,27 @@ Producers must connect to the leader node, while consumers can connect to any, p
 
 
 
+### Build and Test
 
+To run the tests, you need to have a running RabbitMQ Stream server. 
+You can use the docker official image.
 
+Run the server with the following command:
+```bash
+docker run -it --rm --name rabbitmq -p 5552:5552 -p 5672:5672 -p 15672:15672 \
+    -e RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS='-rabbitmq_stream advertised_host localhost' \
+    rabbitmq:3.12-management
+```
 
+enable the plugin:
+```bash
+docker exec rabbitmq rabbitmq-plugins enable rabbitmq_stream
+```
+
+and run the tests:
+```bash
+ poetry run pytest
+```
 
 ## TODO
 
