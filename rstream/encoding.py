@@ -1,6 +1,6 @@
 import io
 import typing
-from dataclasses import fields, is_dataclass
+from dataclasses import is_dataclass
 from typing import (
     Annotated,
     Any,
@@ -12,7 +12,7 @@ from typing import (
 )
 
 from .constants import Key, T
-from .schema import Frame, Struct, registry
+from .schema import Frame, Struct, is_struct, registry
 
 __all__ = ["encode_frame", "decode_frame"]
 
@@ -34,6 +34,17 @@ int_specs = {
     T.uint64: IntSpec(length=8, byteorder="big", signed=False),
 }
 
+_encode_int = {
+    T.int8: lambda v: v.to_bytes(length=1, byteorder="big", signed=True),
+    T.int16: lambda v: v.to_bytes(length=2, byteorder="big", signed=True),
+    T.int32: lambda v: v.to_bytes(length=4, byteorder="big", signed=True),
+    T.int64: lambda v: v.to_bytes(length=8, byteorder="big", signed=True),
+    T.uint8: lambda v: v.to_bytes(length=1, byteorder="big", signed=False),
+    T.uint16: lambda v: v.to_bytes(length=2, byteorder="big", signed=False),
+    T.uint32: lambda v: v.to_bytes(length=4, byteorder="big", signed=False),
+    T.uint64: lambda v: v.to_bytes(length=8, byteorder="big", signed=False),
+}
+
 _VT = Union[int, str, bytes, Struct]
 VT = Annotated[Union[_VT, list[_VT]], "Field value"]
 
@@ -42,9 +53,27 @@ TT = Annotated[Union[_TT, list[_TT]], "Field type metadata"]
 
 
 def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
-    if isinstance(tp, T) and tp in int_specs:
+    if isinstance(value, list):
+        assert tp is None or isinstance(tp, list)
+        buffer = bytearray()
+        buffer += len(value).to_bytes(4, "big", signed=False)
+        if tp is None:
+            for item in value:
+                assert isinstance(item, Struct)
+                buffer += _encode_struct(item)
+        elif len(tp) == 1:
+            for item in value:
+                buffer += _encode_field(item, tp[0])
+        else:
+            for item in value:
+                assert isinstance(item, list)
+                for part, subtype in zip(item, tp):
+                    buffer += _encode_field(part, subtype)
+        return buffer
+
+    elif isinstance(tp, T) and tp in int_specs:
         assert isinstance(value, int)
-        return value.to_bytes(**int_specs[tp]._asdict())
+        return _encode_int[tp](value)
 
     elif tp is T.string:
         assert isinstance(value, str)
@@ -68,50 +97,32 @@ def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
         assert isinstance(value, Struct)
         return _encode_struct(value)
 
-    elif isinstance(value, list):
-        assert tp is None or isinstance(tp, list)
-        buffer = bytearray()
-        buffer += len(value).to_bytes(4, "big", signed=False)
-        if tp is None:
-            for item in value:
-                assert isinstance(item, Struct)
-                buffer += _encode_struct(item)
-        elif len(tp) == 1:
-            for item in value:
-                buffer += _encode_field(item, tp[0])
-        else:
-            for item in value:
-                assert isinstance(item, list)
-                for part, subtype in zip(item, tp):
-                    buffer += _encode_field(part, subtype)
-        return buffer
-
     else:
         raise NotImplementedError(f"Unexpected type {tp}, value: {value!r}")
 
 
 def _encode_struct(struct: Struct) -> bytearray:
     buffer = bytearray()
-    for fld in fields(struct):
-        value = getattr(struct, fld.name)
-        tp = fld.metadata.get("type")
+    for value, tp in struct.iter_typed_values():
         buffer += _encode_field(value, tp)
     return buffer
 
 
-def encode_frame(frame: Frame) -> bytearray:
+def encode_frame(frame: Frame) -> bytes:
     try:
         payload = _encode_struct(frame)
     except Exception as e:
         raise ValueError(f"Could not encode frame {frame!r}") from e
 
     length = len(payload) + 2 + 2
-    buffer = bytearray()
-    buffer += length.to_bytes(4, "big", signed=False)
-    buffer += frame.key.value.to_bytes(2, "big", signed=False)
-    buffer += frame.version.to_bytes(2, "big", signed=False)
-    buffer += payload
-    return buffer
+    return b"".join(
+        (
+            length.to_bytes(4, "big", signed=False),
+            frame.key.value.to_bytes(2, "big", signed=False),
+            frame.version.to_bytes(2, "big", signed=False),
+            payload,
+        )
+    )
 
 
 def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
@@ -146,7 +157,7 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
         spec = int_specs[tp]
         return int.from_bytes(buf.read(spec.length), spec.byteorder, signed=spec.signed)
 
-    elif is_dataclass(tp):
+    elif is_struct(tp):
         return _decode_struct(buf, tp)
 
     else:
@@ -155,15 +166,15 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
 
 def _decode_struct(buf: io.BytesIO, tp: Type[Struct]) -> Struct:
     data = {}
-    for f in fields(tp):
-        fld_tp = f.metadata.get("type")
+    fld_tp: Any
+    for fld_name, fld_tp, type_ in tp.flds_meta:
         if fld_tp is None:
-            if typing.get_origin(f.type) is list:
-                fld_tp = list(typing.get_args(f.type))
+            if typing.get_origin(type_) is list:
+                fld_tp = list(typing.get_args(type_))
             else:
-                fld_tp = f.type
+                fld_tp = type_
 
-        data[f.name] = _decode_field(buf, fld_tp)
+        data[fld_name] = _decode_field(buf, fld_tp)
 
     return tp(**data)  # type:ignore[call-arg]
 
