@@ -247,7 +247,7 @@ class Producer:
                 )
 
                 if item.callback is not None:
-                    publishing_ids_callback[item.callback].update([msg.publishing_id])
+                    publishing_ids_callback[item.callback].add(msg.publishing_id)
 
             else:
                 compression_codec = item.entry
@@ -278,7 +278,7 @@ class Producer:
                 publishing_ids.update([publishing_id])
 
                 if item.callback is not None:
-                    publishing_ids_callback[item.callback].update([publishing_id])
+                    publishing_ids_callback[item.callback].add(publishing_id)
 
         if len(messages) > 0:
 
@@ -291,9 +291,11 @@ class Producer:
             publishing_ids.update([m.publishing_id for m in messages])
 
         for callback in publishing_ids_callback:
-            self._waiting_for_confirm[publisher.reference][callback] = publishing_ids_callback[
-                callback
-            ].copy()
+
+            if callback not in self._waiting_for_confirm[publisher.reference]:
+                self._waiting_for_confirm[publisher.reference][callback] = set()
+
+            self._waiting_for_confirm[publisher.reference][callback].update(publishing_ids_callback[callback])
         # this is just called in case of send_wait
         if sync:
             future: asyncio.Future[None] = asyncio.Future()
@@ -403,7 +405,7 @@ class Producer:
         waiting = self._waiting_for_confirm[publisher.reference]
         for confirmation in list(waiting):
             ids = waiting[confirmation]
-            ids_to_call = ids.intersection(frame.publishing_ids)
+            ids_to_call = ids.intersection(set(frame.publishing_ids))
 
             for id in ids_to_call:
                 if not isinstance(confirmation, asyncio.Future):
