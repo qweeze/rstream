@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from rstream import (
     AMQPMessage,
@@ -26,6 +27,7 @@ async def publish():
     async with Producer("localhost", username="guest", password="guest") as producer:
         # create a stream if it doesn't already exist
         await producer.create_stream(STREAM, exists_ok=True)
+        start_time = time.perf_counter()
 
         # sending a million of messages in AMQP format
         for i in range(MESSAGES):
@@ -37,6 +39,12 @@ async def publish():
             await producer.send(
                 stream=STREAM, message=amqp_message, on_publish_confirm=_on_publish_confirm_client
             )
+
+            if (i % 10000) == 0:
+                print(f"Sent {i} messages in {time.perf_counter() - start_time:0.4f} seconds")
+
+        end_time = time.perf_counter()
+        print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
 
         # callbacks live in the same scope of Producer so we need to wait till the messages have been confirmed
         # before exiting Producer scope
