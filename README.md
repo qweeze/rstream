@@ -104,20 +104,9 @@ See the [single active consumer example](https://github.com/qweeze/rstream/blob/
 
 ### Connecting with SSL:
 
-```python
-import ssl
-
-ssl_context = ssl.SSLContext()
-ssl_context.load_cert_chain('/path/to/certificate.pem', '/path/to/key.pem')
-
-producer = Producer(
-    host='localhost',
-    port=5551,
-    ssl_context=ssl_context,
-    username='guest',
-    password='guest',
-)
-```
+You can enable ssl/tls.
+See example here:
+[tls example](https://github.com/qweeze/rstream/blob/master/docs/examples/tls/producer.py)
 
 ### Managing disconnections:
 
