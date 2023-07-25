@@ -171,23 +171,6 @@ Sent 1000000 messages in 13.2724 seconds. 75344.4910 messages per second
 
 We are evaluating to rewriting the `AMQP 1.0 codec` optimized for the stream use case.
 
-### Connecting with SSL:
-
-```python
-import ssl
-
-ssl_context = ssl.SSLContext()
-ssl_context.load_cert_chain('/path/to/certificate.pem', '/path/to/key.pem')
-
-producer = Producer(
-    host='localhost',
-    port=5551,
-    ssl_context=ssl_context,
-    username='guest',
-    password='guest',
-)
-```
-
 ## Load Balancer
 
 In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
