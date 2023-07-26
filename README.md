@@ -133,7 +133,7 @@ In order to handle load balancers, you can use the `load_balancer_mode` paramete
 Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
 
 
-### Client Performances
+## Client Performances
 
 The RabbitMQ Stream queues can handle high throughput. Currently, the client cannot reach the maximum throughput the server can handle. 
 
@@ -171,15 +171,8 @@ Sent 1000000 messages in 13.2724 seconds. 75344.4910 messages per second
 
 We are evaluating to rewriting the `AMQP 1.0 codec` optimized for the stream use case.
 
-## Load Balancer
 
-In order to handle load balancers, you can use the `load_balancer_mode` parameter for producers and consumers. This will always attempt to create a connection via the load balancer, discarding connections that are inappropriate for the client type.
-
-Producers must connect to the leader node, while consumers can connect to any, prioritizing replicas if available.
-
-
-
-### Build and Test
+## Build and Test
 
 To run the tests, you need to have a running RabbitMQ Stream server. 
 You can use the docker official image.
