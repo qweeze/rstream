@@ -12,7 +12,7 @@ LOOP = 10_000
 BATCH = 100
 
 
-def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
+async def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
     if confirmation.is_confirmed:
         if (confirmation.message_id % 5000) == 0:
             print("message id: {} is confirmed".format(confirmation.message_id))
