@@ -1,6 +1,9 @@
 # RabbitMQ Stream Python Client
 
-A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)
+A Python asyncio-based client for [RabbitMQ Streams](https://www.rabbitmq.com/stream.html)
+
+
+The RabbitMQ stream plug-in is required. See the [documentation](https://www.rabbitmq.com/stream.html#enabling-plugin) for enabling it.
 
 
 # Table of Contents
@@ -9,7 +12,7 @@ A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq
 - [Installation](#installation)
 - [Examples](#examples)
 - [Client Codecs](#client-codecs)
-    * [AMQP 1.0 codec  vs Binary](#amqp-1.0-codec-vs-binary)
+    * [AMQP 1.0 codec  vs Binary](#amqp-10-codec--vs-binary)
 - [Publishing messages](#publishing-messages)
     * [Publishing with confirmation](#publishing-with-confirmation)
 - [Deduplication](#deduplication)
@@ -22,9 +25,13 @@ A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq
 - [Load Balancer](#load-balancer)
 - [Client Performances](#client-performances)
 - [Build and Test](#build-and-test)
+- [Project Maturity](#project-maturity)
 
 
 ## Installation
+
+The RabbitMQ stream plug-in is required. See the [documentation](https://www.rabbitmq.com/stream.html#enabling-plugin) for enabling it.
+
 
 The client is distributed via [`PIP`](https://pypi.org/project/rstream/):
 ```bash
@@ -33,7 +40,7 @@ The client is distributed via [`PIP`](https://pypi.org/project/rstream/):
 
 ## Examples
 
-[Here](https://github.com/qweeze/rstream/blob/master/docs/examples/) you can find differnt examples.
+[Here](https://github.com/qweeze/rstream/blob/master/docs/examples/) you can find different examples.
 
 
 ## Client Codecs
@@ -219,3 +226,8 @@ and run the tests:
 ```bash
  poetry run pytest
 ```
+
+
+## Project Maturity
+The project is in stabilization phase. Features and API are subject to change, but breaking changes will be kept to a minimum. </br>
+Any feedback or contribution is welcome
