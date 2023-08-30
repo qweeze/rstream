@@ -77,8 +77,7 @@ You can publish messages with four different methods:
 * `send`: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires.
 * `send_batch`: synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
 * `send_wait`: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
-* `send_sub_entry`: asynchronous, allow batch in sub-entry mode. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
-
+* `send_sub_entry`: asynchronous. See (Sub-entry batching and compression)#sub-entry-batching-and-compression
 
 On the [examples](https://github.com/qweeze/rstream/blob/master/docs/examples/) directory you can find diffent way to send the messages:
 - [producer using send](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send.py)
