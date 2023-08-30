@@ -1,14 +1,48 @@
 # RabbitMQ Stream Python Client
 
-A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)
+A Python asyncio-based client for [RabbitMQ Streams](https://www.rabbitmq.com/stream.html)
 
 
-## Install
+The RabbitMQ stream plug-in is required. See the [documentation](https://www.rabbitmq.com/stream.html#enabling-plugin) for enabling it.
+
+
+# Table of Contents
+
+
+- [Installation](#installation)
+- [Examples](#examples)
+- [Client Codecs](#client-codecs)
+    * [AMQP 1.0 codec  vs Binary](#amqp-10-codec--vs-binary)
+- [Publishing messages](#publishing-messages)
+    * [Publishing with confirmation](#publishing-with-confirmation)
+- [Sub-Entry Batching and Compression](#sub-entry-batching-and-compression)
+- [Deduplication](#deduplication)
+- [Consuming messages](#consuming-messages)
+    * [Server-side offset tracking](#server-side-offset-tracking)
+- [Superstreams](#superstreams)
+- [Single Active Consumer](#single-active-consumer)
+- [Connecting with SSL](#connecting-with-ssl)
+- [Managing disconnections](#managing-disconnections)
+- [Load Balancer](#load-balancer)
+- [Client Performances](#client-performances)
+- [Build and Test](#build-and-test)
+- [Project Notes](#project-notes)
+
+
+## Installation
+
+The RabbitMQ stream plug-in is required. See the [documentation](https://www.rabbitmq.com/stream.html#enabling-plugin) for enabling it.
+
 
 The client is distributed via [`PIP`](https://pypi.org/project/rstream/):
 ```bash
-	pip install rstream
+ pip install rstream
 ```
+
+## Examples
+
+[Here](https://github.com/qweeze/rstream/blob/master/docs/examples/) you can find different examples.
+
 
 ## Client Codecs
 Before start using the client is important to read this section.
@@ -43,8 +77,7 @@ You can publish messages with four different methods:
 * `send`: asynchronous, messages are automatically buffered internally and sent at once after a timeout expires.
 * `send_batch`: synchronous, the user buffers the messages and sends them. This is the fastest publishing method.
 * `send_wait`: synchronous, the caller wait till the message is confirmed. This is the slowest publishing method.
-* `send_sub_entry`: asynchronous, allow batch in sub-entry mode. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
-
+* `send_sub_entry`: asynchronous. See [Sub-entry batching and compression](#sub-entry-batching-and-compression).
 
 On the [examples](https://github.com/qweeze/rstream/blob/master/docs/examples/) directory you can find diffent way to send the messages:
 - [producer using send](https://github.com/qweeze/rstream/blob/master/docs/examples/basic_producers/producer_send.py)
@@ -62,6 +95,27 @@ Example:
 - [producer using send_batch and handling confirmation](https://github.com/qweeze/rstream/blob/master/docs/examples/producers_with_confirmations/send_batch_with_confirmation.py)
 
 With `send_wait` instead will wait until the confirmation from the server is received.
+
+
+## Sub-Entry Batching and Compression
+RabbitMQ Stream provides a special mode to publish, store, and dispatch messages: sub-entry batching. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
+
+Sub-entry batching consists in squeezing several messages – a batch – in the slot that is usually used for one message. This means outbound messages are not only batched in publishing frames, but in sub-entries as well.
+
+```python
+
+  # sending with compression
+   await producer.send_sub_entry(
+        STREAM, compression_type=CompressionType.Gzip, sub_entry_messages=messages
+   )
+```
+[Full example producer using sub-entry batch](https://github.com/qweeze/rstream/blob/master/docs/examples/sub_entry_batch/producer_sub_entry_batch.py)
+
+Consumer side is automatic, so no need configurations. 
+
+The client is shipped with No Compression (`CompressionType.No`) and Gzip Compression (`CompressionType.Gzip`) the other compressions (`Snappy`, `Lz4`, `Zstd`) can be used implementing the `ICompressionCodec` class. 
+
+
 
 ## Deduplication
 
@@ -92,9 +146,9 @@ See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-featur
 You can use `superstream_producer` and `superstream_consumer` classes which internally uses producers and consumers to operate on the componsing streams.
 
 
-See the Super [Stream example](https://github.com/qweeze/rstream/tree/master/docs/examples/super_stream)
+See the [Super Stream example](https://github.com/qweeze/rstream/tree/master/docs/examples/super_stream)
 
-### Single Active Consumer support:
+### Single Active Consumer
 
 Single active consumer provides exclusive consumption and consumption continuity on a stream. <br /> 
 See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams) for more info.
@@ -102,13 +156,13 @@ See examples in:
 
 See the [single active consumer example](https://github.com/qweeze/rstream/blob/master/docs/examples/single_active_consumer/)
 
-### Connecting with SSL:
+### Connecting with SSL
 
 You can enable ssl/tls.
 See example here:
 [tls example](https://github.com/qweeze/rstream/blob/master/docs/examples/tls/producer.py)
 
-### Managing disconnections:
+### Managing disconnections
 
 The client does not support auto-reconnect at the moment.
 
@@ -194,9 +248,7 @@ and run the tests:
  poetry run pytest
 ```
 
-## TODO
 
-- [ ] Documentation
-- [ ] Handle `MetadataUpdate` and reconnect to another broker on stream configuration changes
-- [ ] AsyncIterator protocol for consumer
-- [ ] Add frame size validation
+## Project Notes
+The project is in development and stabilization phase. Features and API are subject to change, but breaking changes will be kept to a minimum. </br>
+Any feedback or contribution is welcome
