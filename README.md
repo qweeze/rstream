@@ -15,7 +15,7 @@ The RabbitMQ stream plug-in is required. See the [documentation](https://www.rab
     * [AMQP 1.0 codec  vs Binary](#amqp-10-codec--vs-binary)
 - [Publishing messages](#publishing-messages)
     * [Publishing with confirmation](#publishing-with-confirmation)
-- [Sub-Entry Batching and Compression](#sub--entry-batching-and-compression)
+- [Sub-Entry Batching and Compression](#sub-entry-batching-and-compression)
 - [Deduplication](#deduplication)
 - [Consuming messages](#consuming-messages)
     * [Server-side offset tracking](#server-side-offset-tracking)
