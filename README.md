@@ -3,12 +3,38 @@
 A Python asyncio-based client for [RabbitMQ Streams](https://github.com/rabbitmq/rabbitmq-server/tree/master/deps/rabbitmq_stream)
 
 
-## Install
+# Table of Contents
+
+
+- [Installation](#installation)
+- [Examples](#examples)
+- [Client Codecs](#client-codecs)
+    * [AMQP 1.0 codec  vs Binary](#amqp-1.0-codec-vs-binary)
+- [Publishing messages](#publishing-messages)
+    * [Publishing with confirmation](#publishing-with-confirmation)
+- [Deduplication](#deduplication)
+- [Consuming messages](#consuming-messages)
+    * [Server-side offset tracking](#server-side-offset-tracking)
+- [Superstreams](#superstreams)
+- [Single Active Consumer](#single-active-consumer)
+- [Connecting with SSL](#connecting-with-ssl)
+- [Managing disconnections](#managing-disconnections)
+- [Load Balancer](#load-balancer)
+- [Client Performances](#client-performances)
+- [Build and Test](#build-and-test)
+
+
+## Installation
 
 The client is distributed via [`PIP`](https://pypi.org/project/rstream/):
 ```bash
-	pip install rstream
+ pip install rstream
 ```
+
+## Examples
+
+[Here](https://github.com/qweeze/rstream/blob/master/docs/examples/) you can find differnt examples.
+
 
 ## Client Codecs
 Before start using the client is important to read this section.
@@ -94,7 +120,7 @@ You can use `superstream_producer` and `superstream_consumer` classes which inte
 
 See the Super [Stream example](https://github.com/qweeze/rstream/tree/master/docs/examples/super_stream)
 
-### Single Active Consumer support:
+### Single Active Consumer
 
 Single active consumer provides exclusive consumption and consumption continuity on a stream. <br /> 
 See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-feature-preview-single-active-consumer-for-streams) for more info.
@@ -102,13 +128,13 @@ See examples in:
 
 See the [single active consumer example](https://github.com/qweeze/rstream/blob/master/docs/examples/single_active_consumer/)
 
-### Connecting with SSL:
+### Connecting with SSL
 
 You can enable ssl/tls.
 See example here:
 [tls example](https://github.com/qweeze/rstream/blob/master/docs/examples/tls/producer.py)
 
-### Managing disconnections:
+### Managing disconnections
 
 The client does not support auto-reconnect at the moment.
 
@@ -193,10 +219,3 @@ and run the tests:
 ```bash
  poetry run pytest
 ```
-
-## TODO
-
-- [ ] Documentation
-- [ ] Handle `MetadataUpdate` and reconnect to another broker on stream configuration changes
-- [ ] AsyncIterator protocol for consumer
-- [ ] Add frame size validation
