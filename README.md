@@ -15,6 +15,7 @@ The RabbitMQ stream plug-in is required. See the [documentation](https://www.rab
     * [AMQP 1.0 codec  vs Binary](#amqp-10-codec--vs-binary)
 - [Publishing messages](#publishing-messages)
     * [Publishing with confirmation](#publishing-with-confirmation)
+- [Sub-Entry Batching and Compression](#sub--entry-batching-and-compression)
 - [Deduplication](#deduplication)
 - [Consuming messages](#consuming-messages)
     * [Server-side offset tracking](#server-side-offset-tracking)
@@ -25,7 +26,7 @@ The RabbitMQ stream plug-in is required. See the [documentation](https://www.rab
 - [Load Balancer](#load-balancer)
 - [Client Performances](#client-performances)
 - [Build and Test](#build-and-test)
-- [Project Maturity](#project-maturity)
+- [Project Notes](#project-notes)
 
 
 ## Installation
@@ -96,6 +97,27 @@ Example:
 
 With `send_wait` instead will wait until the confirmation from the server is received.
 
+
+## Sub-Entry Batching and Compression
+RabbitMQ Stream provides a special mode to publish, store, and dispatch messages: sub-entry batching. This mode increases throughput at the cost of increased latency and potential duplicated messages even when deduplication is enabled. It also allows using compression to reduce bandwidth and storage if messages are reasonably similar, at the cost of increasing CPU usage on the client side.
+
+Sub-entry batching consists in squeezing several messages – a batch – in the slot that is usually used for one message. This means outbound messages are not only batched in publishing frames, but in sub-entries as well.
+
+```python
+
+  # sending with compression
+   await producer.send_sub_entry(
+        STREAM, compression_type=CompressionType.Gzip, sub_entry_messages=messages
+   )
+```
+[Full example producer using sub-entry batch](https://github.com/qweeze/rstream/blob/master/docs/examples/sub_entry_batch/producer_sub_entry_batch.py)
+
+Consumer side is automatic, so no need configurations. 
+
+The client is shipped with No Compression (`CompressionType.No`) and Gzip Compression (`CompressionType.Gzip`) the other compressions (`Snappy`, `Lz4`, `Zstd`) can be used implementing the `ICompressionCodec` class. 
+
+
+
 ## Deduplication
 
 RabbitMQ Stream can detect and filter out duplicated messages, based on 2 client-side elements: the producer name and the message publishing ID.
@@ -125,7 +147,7 @@ See the [blog post](https://blog.rabbitmq.com/posts/2022/07/rabbitmq-3-11-featur
 You can use `superstream_producer` and `superstream_consumer` classes which internally uses producers and consumers to operate on the componsing streams.
 
 
-See the Super [Stream example](https://github.com/qweeze/rstream/tree/master/docs/examples/super_stream)
+See the [Super Stream example](https://github.com/qweeze/rstream/tree/master/docs/examples/super_stream)
 
 ### Single Active Consumer
 
@@ -228,6 +250,6 @@ and run the tests:
 ```
 
 
-## Project Maturity
-The project is in stabilization phase. Features and API are subject to change, but breaking changes will be kept to a minimum. </br>
+## Project Notes
+The project is in development and stabilization phase. Features and API are subject to change, but breaking changes will be kept to a minimum. </br>
 Any feedback or contribution is welcome
