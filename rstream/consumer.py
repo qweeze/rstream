@@ -275,8 +275,8 @@ class Consumer:
         offset = frame.chunk_first_offset
 
         for index, message in enumerate(self._filter_messages(frame, subscriber)):
-            offset = offset + index
             message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
+            offset = offset + 1
 
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
             if maybe_coro is not None:
