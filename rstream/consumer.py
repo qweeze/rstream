@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 import ssl
+import typing
 from dataclasses import dataclass
 from functools import partial
 from typing import (
@@ -250,7 +251,7 @@ class Consumer:
         )
 
     @staticmethod
-    def _filter_messages(frame: schema.Deliver, subscriber: _Subscriber) -> Iterator[(int, bytes)]:
+    def _filter_messages(frame: schema.Deliver, subscriber: _Subscriber) -> Iterator[tuple[int, bytes]]:
         min_deliverable_offset = -1
         if subscriber.offset_type is OffsetType.OFFSET:
             min_deliverable_offset = subscriber.offset
@@ -262,7 +263,7 @@ class Consumer:
             if offset < min_deliverable_offset:
                 continue
 
-            yield offset, message
+            yield (offset, message)
 
         subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
@@ -273,7 +274,7 @@ class Consumer:
 
         await subscriber.client.credit(subscriber.subscription_id, 1)
 
-        for index, (offset, message) in enumerate(self._filter_messages(frame, subscriber)):
+        for (offset, message) in self._filter_messages(frame, subscriber):
             message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
 
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
