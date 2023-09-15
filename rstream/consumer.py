@@ -250,7 +250,7 @@ class Consumer:
         )
 
     @staticmethod
-    def _filter_messages(frame: schema.Deliver, subscriber: _Subscriber) -> Iterator[bytes]:
+    def _filter_messages(frame: schema.Deliver, subscriber: _Subscriber) -> Iterator[(int, bytes)]:
         min_deliverable_offset = -1
         if subscriber.offset_type is OffsetType.OFFSET:
             min_deliverable_offset = subscriber.offset
@@ -262,7 +262,7 @@ class Consumer:
             if offset < min_deliverable_offset:
                 continue
 
-            yield message
+            yield offset, message
 
         subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
@@ -272,24 +272,13 @@ class Consumer:
             return
 
         await subscriber.client.credit(subscriber.subscription_id, 1)
-        offset = frame.chunk_first_offset
 
-        for index, message in enumerate(self._filter_messages(frame, subscriber)):
-            can_dispatch = True
-            if subscriber.offset_type is OffsetType.OFFSET:
-                # When the offset type is OFFSET, the subscriber will receive the chunk of messages that
-                # contains the offset specified in the subscribe request.
-                # so here we skip the previous messages until we reach the offset specified in the subscribe request
-                # this control is valid only for OffsetType.OFFSET
-                can_dispatch = offset >= subscriber.offset
+        for index, (offset, message) in enumerate(self._filter_messages(frame, subscriber)):
+            message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
 
-            if can_dispatch:
-                message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
-
-                maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
-                if maybe_coro is not None:
-                    await maybe_coro
-            offset = offset + 1
+            maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
+            if maybe_coro is not None:
+                await maybe_coro
 
     async def _on_consumer_update_query_response(
         self,
