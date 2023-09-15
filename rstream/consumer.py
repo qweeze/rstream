@@ -59,19 +59,19 @@ class _Subscriber:
 
 class Consumer:
     def __init__(
-            self,
-            host: str,
-            port: int = 5552,
-            *,
-            ssl_context: Optional[ssl.SSLContext] = None,
-            vhost: str = "/",
-            username: str,
-            password: str,
-            frame_max: int = 1 * 1024 * 1024,
-            heartbeat: int = 60,
-            load_balancer_mode: bool = False,
-            max_retries: int = 20,
-            connection_closed_handler: Optional[CB_CONN[Exception]] = None,
+        self,
+        host: str,
+        port: int = 5552,
+        *,
+        ssl_context: Optional[ssl.SSLContext] = None,
+        vhost: str = "/",
+        username: str,
+        password: str,
+        frame_max: int = 1 * 1024 * 1024,
+        heartbeat: int = 60,
+        load_balancer_mode: bool = False,
+        max_retries: int = 20,
+        connection_closed_handler: Optional[CB_CONN[Exception]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -139,13 +139,13 @@ class Consumer:
         return self._clients[stream]
 
     async def _create_subscriber(
-            self,
-            stream: str,
-            subscriber_name: Optional[str],
-            callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
-            decoder: Optional[Callable[[bytes], Any]],
-            offset_type: OffsetType,
-            offset: Optional[int],
+        self,
+        stream: str,
+        subscriber_name: Optional[str],
+        callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
+        decoder: Optional[Callable[[bytes], Any]],
+        offset_type: OffsetType,
+        offset: Optional[int],
     ) -> _Subscriber:
         client = await self._get_or_create_client(stream)
 
@@ -167,16 +167,16 @@ class Consumer:
         return subscriber
 
     async def subscribe(
-            self,
-            stream: str,
-            callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
-            *,
-            decoder: Optional[Callable[[bytes], MT]] = None,
-            offset_specification: Optional[ConsumerOffsetSpecification] = None,
-            initial_credit: int = 10,
-            properties: Optional[dict[str, Any]] = None,
-            subscriber_name: Optional[str] = None,
-            consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
+        self,
+        stream: str,
+        callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
+        *,
+        decoder: Optional[Callable[[bytes], MT]] = None,
+        offset_specification: Optional[ConsumerOffsetSpecification] = None,
+        initial_credit: int = 10,
+        properties: Optional[dict[str, Any]] = None,
+        subscriber_name: Optional[str] = None,
+        consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
     ) -> str:
 
         if offset_specification is None:
@@ -292,11 +292,11 @@ class Consumer:
             offset = offset + 1
 
     async def _on_consumer_update_query_response(
-            self,
-            frame: schema.ConsumerUpdateResponse,
-            subscriber: _Subscriber,
-            reference: str,
-            consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
+        self,
+        frame: schema.ConsumerUpdateResponse,
+        subscriber: _Subscriber,
+        reference: str,
+        consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
     ) -> None:
 
         # event the consumer is not active, we need to send a ConsumerUpdateResponse
@@ -312,10 +312,10 @@ class Consumer:
             await subscriber.client.consumer_update(frame.correlation_id, offset_specification)
 
     async def create_stream(
-            self,
-            stream: str,
-            arguments: Optional[dict[str, Any]] = None,
-            exists_ok: bool = False,
+        self,
+        stream: str,
+        arguments: Optional[dict[str, Any]] = None,
+        exists_ok: bool = False,
     ) -> None:
         try:
             await self.default_client.create_stream(stream, arguments)
