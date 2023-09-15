@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import random
 import ssl
-import typing
 from dataclasses import dataclass
 from functools import partial
 from typing import (
