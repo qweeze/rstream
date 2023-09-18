@@ -11,6 +11,7 @@ from rstream import (
     AMQPMessage,
     Consumer,
     ConsumerOffsetSpecification,
+    MessageContext,
     OffsetType,
     Producer,
     SuperStreamConsumer,
@@ -64,30 +65,44 @@ async def test_consume(stream: str, consumer: Consumer, producer: Producer) -> N
 
 async def test_offset_type_first(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
+    captured_offset: list[int] = []
+
+    async def on_message_first(msg: AMQPMessage, message_context: MessageContext):
+        captured_offset.append(message_context.offset)
+        captured.append(bytes(msg))
+
     await consumer.subscribe(
         stream,
-        callback=lambda message, message_context: captured.append(bytes(message)),
+        callback=on_message_first,
         offset_specification=ConsumerOffsetSpecification(OffsetType.FIRST, None),
     )
-    messages = [str(i).encode() for i in range(1, 11)]
+    messages = [str(i).encode() for i in range(0, 10)]
     await producer.send_batch(stream, messages)
 
     await wait_for(lambda: len(captured) >= 10)
     assert captured == messages
+    assert captured_offset == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
 async def test_offset_type_offset(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
+    captured_offset: list[int] = []
+
+    async def on_message_offset(msg: AMQPMessage, message_context: MessageContext):
+        captured_offset.append(message_context.offset)
+        captured.append(bytes(msg))
+
     await consumer.subscribe(
         stream,
-        callback=lambda message, message_context: captured.append(bytes(message)),
+        callback=on_message_offset,
         offset_specification=ConsumerOffsetSpecification(OffsetType.OFFSET, 7),
     )
-    messages = [str(i).encode() for i in range(1, 11)]
+    messages = [str(i).encode() for i in range(0, 10)]
     await producer.send_batch(stream, messages)
 
     await wait_for(lambda: len(captured) >= 3)
     assert captured == messages[7:]
+    assert captured_offset == [7, 8, 9]
 
 
 async def test_offset_type_last(stream: str, consumer: Consumer, producer: Producer) -> None:
@@ -126,7 +141,6 @@ async def test_offset_manual_setting(stream: str, consumer: Consumer, producer: 
 
 
 async def test_consumer_callback(stream: str, consumer: Consumer, producer: Producer) -> None:
-
     streams: list[str] = []
     offsets: list[int] = []
 
@@ -279,7 +293,6 @@ async def test_consume_superstream_with_sac_all_active(
     super_stream_consumer_for_sac3: SuperStreamConsumer,
     super_stream_producer_for_sac: SuperStreamProducer,
 ) -> None:
-
     consumer_stream_list1: list[str] = []
     consumer_stream_list2: list[str] = []
     consumer_stream_list3: list[str] = []
@@ -323,7 +336,6 @@ async def test_consume_superstream_with_sac_one_non_active(
     super_stream_consumer_for_sac4: SuperStreamConsumer,
     super_stream_producer_for_sac: SuperStreamProducer,
 ) -> None:
-
     consumer_stream_list1: list[str] = []
     consumer_stream_list2: list[str] = []
     consumer_stream_list3: list[str] = []
@@ -373,7 +385,6 @@ async def test_consume_superstream_with_callback_next(
     super_stream_consumer_for_sac3: SuperStreamConsumer,
     super_stream_producer_for_sac: SuperStreamProducer,
 ) -> None:
-
     consumer_stream_list1: list[str] = []
     consumer_stream_list2: list[str] = []
     consumer_stream_list3: list[str] = []
@@ -416,7 +427,6 @@ async def test_consume_superstream_with_callback_first(
     super_stream_consumer_for_sac3: SuperStreamConsumer,
     super_stream_producer_for_sac: SuperStreamProducer,
 ) -> None:
-
     consumer_stream_list1: list[str] = []
     consumer_stream_list2: list[str] = []
     consumer_stream_list3: list[str] = []
@@ -459,7 +469,6 @@ async def test_consume_superstream_with_callback_offset(
     super_stream_consumer_for_sac3: SuperStreamConsumer,
     super_stream_producer_for_sac: SuperStreamProducer,
 ) -> None:
-
     consumer_stream_list1: list[str] = []
     consumer_stream_list2: list[str] = []
     consumer_stream_list3: list[str] = []
