@@ -11,11 +11,12 @@ from rstream import (
     AMQPMessage,
     Consumer,
     ConsumerOffsetSpecification,
+    MessageContext,
     OffsetType,
     Producer,
     SuperStreamConsumer,
     SuperStreamProducer,
-    exceptions, MessageContext,
+    exceptions,
 )
 
 from .util import (
