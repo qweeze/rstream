@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import ssl
 from collections import defaultdict
 from dataclasses import dataclass
@@ -397,7 +398,7 @@ class Producer:
                 await self._send_batch(stream, self._buffered_messages[stream], sync=False)
                 self._buffered_messages[stream].clear()
 
-    def _on_publish_confirm(self, frame: schema.PublishConfirm, publisher: _Publisher) -> None:
+    async def _on_publish_confirm(self, frame: schema.PublishConfirm, publisher: _Publisher) -> None:
 
         if frame.publisher_id != publisher.id:
             return
@@ -410,14 +411,16 @@ class Producer:
             for id in ids_to_call:
                 if not isinstance(confirmation, asyncio.Future):
                     confirmation_status: ConfirmationStatus = ConfirmationStatus(id, True)
-                    confirmation(confirmation_status)
+                    result = confirmation(confirmation_status)
+                    if result is not None and hasattr(result, "__await__"):
+                        await result
             ids.difference_update(frame.publishing_ids)
             if not ids:
                 del waiting[confirmation]
                 if isinstance(confirmation, asyncio.Future):
                     confirmation.set_result(None)
 
-    def _on_publish_error(self, frame: schema.PublishError, publisher: _Publisher) -> None:
+    async def _on_publish_error(self, frame: schema.PublishError, publisher: _Publisher) -> None:
 
         if frame.publisher_id != publisher.id:
             return
@@ -432,7 +435,9 @@ class Producer:
                         confirmation_status = ConfirmationStatus(
                             error.publishing_id, False, error.response_code
                         )
-                        confirmation(confirmation_status)
+                        result = confirmation(confirmation_status)
+                        if result is not None and inspect.isawaitable(result):
+                            await result
                         ids.remove(error.publishing_id)
 
                 if not ids:

@@ -42,7 +42,7 @@ async def wait_for(condition, timeout=1):
     await asyncio.wait_for(_wait(), timeout)
 
 
-def on_publish_confirm_client_callback(
+async def on_publish_confirm_client_callback(
     confirmation: ConfirmationStatus, confirmed_messages: list[int], errored_messages: list[int]
 ) -> None:
 
@@ -52,7 +52,7 @@ def on_publish_confirm_client_callback(
         errored_messages.append(confirmation.message_id)
 
 
-def on_publish_confirm_client_callback2(
+async def on_publish_confirm_client_callback2(
     confirmation: ConfirmationStatus, confirmed_messages: list[int], errored_messages: list[int]
 ) -> None:
 

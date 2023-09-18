@@ -7,7 +7,7 @@ STREAM = "my-test-stream"
 MESSAGES = 1000000
 
 
-def on_connection_closed(reason: Exception) -> None:
+async def on_connection_closed(reason: Exception) -> None:
     print("connection has been closed for reason: " + str(reason))
 
 

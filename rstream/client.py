@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import socket
 import ssl
@@ -139,7 +140,9 @@ class BaseClient:
             if self._connection_closed_handler is None:
                 print("TCP connection closed")
             else:
-                self._connection_closed_handler(e)
+                result = self._connection_closed_handler(e)
+                if result is not None and inspect.isawaitable(result):
+                    await result
 
     def wait_frame(
         self,
@@ -179,13 +182,17 @@ class BaseClient:
                 frame = await self._conn.read_frame()
             except ConnectionClosed as e:
                 if self._connection_closed_handler is not None:
-                    self._connection_closed_handler(e)
+                    result = self._connection_closed_handler(e)
+                    if result is not None and inspect.isawaitable(result):
+                        await result
                 else:
                     print("TCP connection closed")
                 break
             except socket.error as e:
                 if self._connection_closed_handler is not None:
-                    self._connection_closed_handler(e)
+                    result = self._connection_closed_handler(e)
+                    if result is not None and inspect.isawaitable(result):
+                        await result
                 else:
                     print("TCP connection closed")
                 break

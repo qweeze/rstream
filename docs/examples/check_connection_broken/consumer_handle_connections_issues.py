@@ -11,7 +11,7 @@ from rstream import (
 STREAM = "my-test-stream"
 
 
-def on_connection_closed(reason: Exception) -> None:
+async def on_connection_closed(reason: Exception) -> None:
     print("connection has been closed for reason: " + str(reason))
 
 
