@@ -25,6 +25,7 @@ from .constants import (
 )
 from .consumer import Consumer, EventContext, MessageContext
 from .superstream import DefaultSuperstreamMetadata
+from .utils import DisconnectionErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
@@ -45,7 +46,7 @@ class SuperStreamConsumer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         super_stream: str,
-        connection_closed_handler: Optional[CB[Exception]] = None,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -171,6 +172,7 @@ class SuperStreamConsumer:
             heartbeat=self.heartbeat,
             load_balancer_mode=False,
             max_retries=self.max_retries,
+            connection_closed_handler=self._connection_closed_handler,
         )
 
         await consumer.start()

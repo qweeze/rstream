@@ -39,3 +39,9 @@ class TimeoutWrapper:
 
     def __await__(self) -> Generator[Any, None, Any]:
         return self._wait().__await__()
+
+
+@dataclass
+class DisconnectionErrorInfo:
+    reason: Exception
+    streams: list[str]

@@ -3,6 +3,8 @@
 
 from importlib import metadata
 
+from .utils import DisconnectionErrorInfo
+
 try:
     __version__ = metadata.version(__package__)
     __license__ = metadata.metadata(__package__)["license"]
@@ -59,4 +61,5 @@ __all__ = [
     "StreamDoesNotExist",
     "OffsetSpecification",
     "EventContext",
+    "DisconnectionErrorInfo",
 ]

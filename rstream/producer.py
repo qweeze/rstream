@@ -29,7 +29,7 @@ from .compression import (
     CompressionType,
     ICompressionCodec,
 )
-from .utils import RawMessage
+from .utils import DisconnectionErrorInfo, RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 MT = TypeVar("MT")
@@ -75,7 +75,7 @@ class Producer:
         max_retries: int = 20,
         default_batch_publishing_delay: float = 0.2,
         default_context_switch_value: int = 1000,
-        connection_closed_handler: Optional[CB[Exception]] = None,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -125,7 +125,6 @@ class Producer:
     async def close(self) -> None:
         # flush messages still in buffer
         if self.task is not None:
-
             for stream in self._buffered_messages:
                 await self._publish_buffered_messages(stream)
             self.task.cancel()
@@ -392,6 +391,10 @@ class Producer:
                 await self._publish_buffered_messages(stream)
 
     async def _publish_buffered_messages(self, stream: str) -> None:
+
+        if stream in self._clients:
+            if self._clients[stream].get_connection() is None:
+                return
 
         async with self._buffered_messages_lock:
             if len(self._buffered_messages[stream]):
