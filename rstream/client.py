@@ -206,9 +206,9 @@ class BaseClient:
 
             for _, handler in self._handlers.get(frame.__class__, {}).items():
                 try:
-                    maybe_coro = handler(frame)
-                    if maybe_coro is not None:
-                        await maybe_coro
+                    asyncio.create_task(handler(frame))
+                    #if maybe_coro is not None:
+                    #    await maybe_coro
                 except Exception:
                     logger.exception("Error while running handler %s of frame %s", handler, frame)
 
