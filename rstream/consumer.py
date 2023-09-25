@@ -72,6 +72,7 @@ class Consumer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         connection_closed_handler: Optional[CB_CONN[Exception]] = None,
+        max_callback_tasks: int = 50
     ):
         self._pool = ClientPool(
             host,
@@ -92,6 +93,7 @@ class Consumer:
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
         self._connection_closed_handler = connection_closed_handler
+        self._callback_sem = asyncio.Semaphore(max_callback_tasks)
 
     @property
     def default_client(self) -> Client:
@@ -266,6 +268,10 @@ class Consumer:
 
         subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
+    def _release_callback_semaphore(self, context):
+        self._callback_sem.release()
+
+
     async def _on_deliver(self, frame: schema.Deliver, subscriber: _Subscriber) -> None:
 
         if frame.subscription_id != subscriber.subscription_id:
@@ -276,9 +282,11 @@ class Consumer:
         for (offset, message) in self._filter_messages(frame, subscriber):
             message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
 
-            maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
-            if maybe_coro is not None:
-                await maybe_coro
+            await self._callback_sem.acquire()
+            callback_task = asyncio.create_task(subscriber.callback(subscriber.decoder(message), message_context))
+            callback_task.add_done_callback(self._release_callback_semaphore)
+            #if maybe_coro is not None:
+            #    await maybe_coro
 
     async def _on_consumer_update_query_response(
         self,

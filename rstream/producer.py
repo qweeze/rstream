@@ -76,6 +76,7 @@ class Producer:
         default_batch_publishing_delay: float = 0.2,
         default_context_switch_value: int = 1000,
         connection_closed_handler: Optional[CB[Exception]] = None,
+        max_callback_tasks: int = 50
     ):
         self._pool = ClientPool(
             host,
@@ -105,6 +106,7 @@ class Producer:
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
         self._connection_closed_handler = connection_closed_handler
+        self._callback_sem = asyncio.Semaphore(max_callback_tasks)
 
     @property
     def default_client(self) -> Client:
@@ -391,6 +393,9 @@ class Producer:
             for stream in self._buffered_messages:
                 await self._publish_buffered_messages(stream)
 
+    def _release_callback_semaphore(self, context):
+        self._callback_sem.release()
+
     async def _publish_buffered_messages(self, stream: str) -> None:
 
         async with self._buffered_messages_lock:
@@ -411,9 +416,10 @@ class Producer:
             for id in ids_to_call:
                 if not isinstance(confirmation, asyncio.Future):
                     confirmation_status: ConfirmationStatus = ConfirmationStatus(id, True)
-                    result = confirmation(confirmation_status)
-                    if result is not None and hasattr(result, "__await__"):
-                        await result
+                    await self._callback_sem.acquire()
+                    result = asyncio.create_task(confirmation(confirmation_status))
+                    result.add_done_callback(self._release_callback_semaphore)
+
             ids.difference_update(frame.publishing_ids)
             if not ids:
                 del waiting[confirmation]
@@ -435,9 +441,8 @@ class Producer:
                         confirmation_status = ConfirmationStatus(
                             error.publishing_id, False, error.response_code
                         )
-                        result = confirmation(confirmation_status)
-                        if result is not None and inspect.isawaitable(result):
-                            await result
+                        result = asyncio.create_task(confirmation(confirmation_status))
+
                         ids.remove(error.publishing_id)
 
                 if not ids:

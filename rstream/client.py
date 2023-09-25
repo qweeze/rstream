@@ -127,7 +127,8 @@ class BaseClient:
 
     def remove_handler(self, frame_cls: Type[FT], name: Optional[str] = None) -> None:
         if name is not None:
-            del self._handlers[frame_cls][name]
+            if name in self._handlers[frame_cls]:
+                del self._handlers[frame_cls][name]
         else:
             self._handlers[frame_cls].clear()
 
