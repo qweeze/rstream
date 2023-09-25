@@ -108,6 +108,24 @@ async def consumer(pytestconfig, ssl_context):
 
 
 @pytest.fixture()
+async def test_consumer_close(pytestconfig, ssl_context):
+    consumer = Consumer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+    )
+    await consumer.start()
+    try:
+        yield consumer
+    finally:
+        await consumer.close()
+
+
+@pytest.fixture()
 async def producer(pytestconfig, ssl_context):
     producer = Producer(
         host=pytestconfig.getoption("rmq_host"),

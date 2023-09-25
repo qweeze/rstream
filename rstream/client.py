@@ -11,6 +11,7 @@ import ssl
 import time
 from collections import defaultdict
 from contextlib import suppress
+from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
@@ -57,6 +58,12 @@ class Addr(NamedTuple):
     port: int
 
 
+@dataclass
+class FrameEntry:
+    handler: HT[Any]
+    frame: schema.Frame
+
+
 class BaseClient:
     def __init__(
         self,
@@ -95,6 +102,7 @@ class BaseClient:
 
         self._last_heartbeat: float = 0
         self._connection_closed_handler = connection_closed_handler
+        self._frames: asyncio.Queue = asyncio.Queue()
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -172,8 +180,21 @@ class BaseClient:
         self._conn = Connection(self.host, self.port, self._ssl_context)
         await self._conn.open()
         self.start_task("listener", self._listener())
+        self.start_task("run_delivery_handlers", self._run_delivery_handlers())
         self.add_handler(schema.Heartbeat, self._on_heartbeat)
         self.add_handler(schema.Close, self._on_close)
+
+    async def _run_delivery_handlers(self):
+
+        while True:
+            try:
+                frame_entry = await self._frames.get()
+                maybe_coro = await frame_entry.handler(frame_entry.frame)
+                if maybe_coro is not None:
+                    await maybe_coro
+            except Exception as e:
+                logger.debug("Error reading item from _run_delivery_handlers: " + str(e))
+                break
 
     async def _listener(self) -> None:
         assert self._conn
@@ -206,9 +227,12 @@ class BaseClient:
 
             for _, handler in self._handlers.get(frame.__class__, {}).items():
                 try:
-                    asyncio.create_task(handler(frame))
-                    #if maybe_coro is not None:
-                    #    await maybe_coro
+                    if frame.__class__ == schema.Deliver:
+                        await self._frames.put(FrameEntry(handler, frame))
+                    else:
+                        maybe_coro = handler(frame)
+                        if maybe_coro is not None:
+                            await maybe_coro
                 except Exception:
                     logger.exception("Error while running handler %s of frame %s", handler, frame)
 
@@ -243,6 +267,7 @@ class BaseClient:
 
     async def close(self) -> None:
         logger.info("Stopping client %s:%s", self.host, self.port)
+
         if self._conn is None:
             return
 
@@ -256,6 +281,7 @@ class BaseClient:
                 resp_schema=schema.CloseResponse,
             )
 
+        await self.stop_task("run_delivery_handlers")
         await self.stop_task("listener")
 
         await self._conn.close()
