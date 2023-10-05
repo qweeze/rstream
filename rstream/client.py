@@ -187,14 +187,14 @@ class BaseClient:
     async def _run_delivery_handlers(self):
 
         while True:
+            frame_entry = None
             try:
                 frame_entry = await self._frames.get()
-                maybe_coro = await frame_entry.handler(frame_entry.frame)
+                maybe_coro = frame_entry.handler(frame_entry.frame)
                 if maybe_coro is not None:
                     await maybe_coro
-            except Exception as e:
-                logger.debug("Error reading item from _run_delivery_handlers: " + str(e))
-                break
+            except Exception:
+                logger.exception("Error while handling %s frame " + str(frame_entry.frame.__class__))
 
     async def _listener(self) -> None:
         assert self._conn

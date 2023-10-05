@@ -504,14 +504,14 @@ async def test_consume_superstream_with_callback_offset(
     assert len(consumers_set) == 3
 
 
-async def test_callback_sync_request(stream: str, test_consumer_close: Consumer, producer: Producer) -> None:
+async def test_callback_sync_request(stream: str, consumer: Consumer, producer: Producer) -> None:
     captured: list[bytes] = []
 
     async def on_message_first(msg: AMQPMessage, message_context: MessageContext):
         captured.append(bytes(msg))
-        await test_consumer_close.close()
+        await consumer.close()
 
-    await test_consumer_close.subscribe(stream, callback=on_message_first)
+    await consumer.subscribe(stream, callback=on_message_first)
     messages = [str(i).encode() for i in range(0, 1)]
     await producer.send_batch(stream, messages)
 
