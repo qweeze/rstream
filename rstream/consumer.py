@@ -192,6 +192,8 @@ class Consumer:
                 offset=offset_specification.offset,
             )
 
+            await subscriber.client.run_queue_listener_task(subscriber_name=subscriber.reference)
+
         subscriber.client.add_handler(
             schema.Deliver,
             partial(self._on_deliver, subscriber=subscriber),
