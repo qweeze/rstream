@@ -11,7 +11,6 @@ import ssl
 import time
 from collections import defaultdict
 from contextlib import suppress
-from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
@@ -56,12 +55,6 @@ class BrokerResolutionMaxRetryError(Exception):
 class Addr(NamedTuple):
     host: str
     port: int
-
-
-@dataclass
-class FrameEntry:
-    handler: HT[Any]
-    frame: schema.Frame
 
 
 class BaseClient:
@@ -184,25 +177,26 @@ class BaseClient:
         self.add_handler(schema.Heartbeat, self._on_heartbeat)
         self.add_handler(schema.Close, self._on_close)
 
-    async def run_queue_listener_task(self, subscriber_name: str):
+    async def run_queue_listener_task(self, subscriber_name: str, handler: HT[FT]):
 
         if subscriber_name not in self._frames:
             self.start_task(
-                "run_delivery_handlers" + subscriber_name, self._run_delivery_handlers(subscriber_name)
+                "run_delivery_handlers" + subscriber_name,
+                self._run_delivery_handlers(subscriber_name, handler),
             )
 
-    async def _run_delivery_handlers(self, subscriber_name: str):
+    async def _run_delivery_handlers(self, subscriber_name: str, handler: HT[FT]):
 
         while True:
             frame_entry = None
             try:
                 frame_entry = await self._frames[subscriber_name].get()
-                maybe_coro = frame_entry.handler(frame_entry.frame)
+                maybe_coro = handler(frame_entry)
                 if maybe_coro is not None:
                     await maybe_coro
             except Exception as e:
                 if frame_entry is not None:
-                    logger.exception("Error while handling %s frame ", str(frame_entry.frame.__class__))
+                    logger.exception("Error while handling %s frame ", str(frame_entry.__class__))
                 else:
                     logger.exception("Error while handling a frame " + str(e))
                     break
@@ -239,7 +233,7 @@ class BaseClient:
             for subscriber_name, handler in self._handlers.get(frame.__class__, {}).items():
                 try:
                     if frame.__class__ == schema.Deliver:
-                        await self._frames[subscriber_name].put(FrameEntry(handler, frame))
+                        await self._frames[subscriber_name].put(frame)
                     else:
                         maybe_coro = handler(frame)
                         if maybe_coro is not None:
