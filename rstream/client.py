@@ -96,6 +96,7 @@ class BaseClient:
         self._last_heartbeat: float = 0
         self._connection_closed_handler = connection_closed_handler
         self._frames: dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
+        self._is_not_closed: bool = True
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -187,15 +188,16 @@ class BaseClient:
 
     async def _run_delivery_handlers(self, subscriber_name: str, handler: HT[FT]):
 
-        while True:
-            frame_entry = None
+        while self._is_not_closed:
+            frame_entry = await self._frames[subscriber_name].get()
             try:
-                frame_entry = await self._frames[subscriber_name].get()
                 maybe_coro = handler(frame_entry)
                 if maybe_coro is not None:
                     await maybe_coro
-            except Exception:
-                logger.exception("Error while handling %s frame ", str(frame_entry.__class__))
+            except Exception as e:
+                logger.exception(
+                    "Error while handling %s frame exception raised %s", frame_entry.__class__, e
+                )
 
     async def _listener(self) -> None:
         assert self._conn
@@ -283,6 +285,8 @@ class BaseClient:
             )
 
         await self.stop_task("listener")
+
+        self._is_not_closed = False
 
         for subscriber_name in self._frames:
             await self.stop_task(f"run_delivery_handlers_{subscriber_name}")
