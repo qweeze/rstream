@@ -177,11 +177,11 @@ class BaseClient:
         self.add_handler(schema.Heartbeat, self._on_heartbeat)
         self.add_handler(schema.Close, self._on_close)
 
-    async def run_queue_listener_task(self, subscriber_name: str, handler: HT[FT]):
+    async def run_queue_listener_task(self, subscriber_name: str, handler: HT[FT]) -> None:
 
         if subscriber_name not in self._frames:
             self.start_task(
-                "run_delivery_handlers" + subscriber_name,
+                f"run_delivery_handlers_{subscriber_name}",
                 self._run_delivery_handlers(subscriber_name, handler),
             )
 
@@ -194,12 +194,8 @@ class BaseClient:
                 maybe_coro = handler(frame_entry)
                 if maybe_coro is not None:
                     await maybe_coro
-            except Exception as e:
-                if frame_entry is not None:
-                    logger.exception("Error while handling %s frame ", str(frame_entry.__class__))
-                else:
-                    logger.exception("Error while handling a frame " + str(e))
-                    break
+            except Exception:
+                logger.exception("Error while handling %s frame ", str(frame_entry.__class__))
 
     async def _listener(self) -> None:
         assert self._conn
@@ -286,10 +282,10 @@ class BaseClient:
                 resp_schema=schema.CloseResponse,
             )
 
-        for subscriber_name in self._frames:
-            await self.stop_task("run_delivery_handlers" + subscriber_name)
-
         await self.stop_task("listener")
+
+        for subscriber_name in self._frames:
+            await self.stop_task(f"run_delivery_handlers_{subscriber_name}")
 
         await self._conn.close()
         self._conn = None
