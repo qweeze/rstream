@@ -99,7 +99,6 @@ class BaseClient:
         self._is_not_closed: bool = True
 
         self._streams: list[str] = []
-        self._conn_is_closed: bool = False
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -136,8 +135,10 @@ class BaseClient:
         else:
             self._handlers[frame_cls].clear()
 
-    def get_connection(self) -> Optional[Connection]:
-        return self._conn
+    def get_is_connection_active(self) -> bool:
+        if self._conn is None:
+            return False
+        return True
 
     async def send_frame(self, frame: schema.Frame) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -145,9 +146,9 @@ class BaseClient:
         try:
             await self._conn.write_frame(frame)
         except socket.error as e:
-            self._conn_is_closed = True
+            self._conn = None
             if self._connection_closed_handler is None:
-                print("TCP connection closed")
+                logger.exception("TCP connection closed")
             else:
                 connection_error_info = DisconnectionErrorInfo(e, self._streams)
                 result = self._connection_closed_handler(connection_error_info)
@@ -199,9 +200,10 @@ class BaseClient:
         while self._is_not_closed:
             frame_entry = await self._frames[subscriber_name].get()
             try:
-                maybe_coro = handler(frame_entry)
-                if maybe_coro is not None:
-                    await maybe_coro
+                if self._conn is not None:
+                    maybe_coro = handler(frame_entry)
+                    if maybe_coro is not None:
+                        await maybe_coro
             except Exception as e:
                 logger.exception(
                     "Error while handling %s frame exception raised %s", frame_entry.__class__, e
@@ -211,26 +213,30 @@ class BaseClient:
         assert self._conn
         while True:
             try:
-                frame = await self._conn.read_frame()
+                if self._conn is not None:
+                    frame = await self._conn.read_frame()
             except ConnectionClosed as e:
-                self._conn_is_closed = True
 
-                if self._connection_closed_handler is not None:
+                if self._connection_closed_handler is not None and self._conn is not None:
                     connection_error_info = DisconnectionErrorInfo(e, self._streams)
                     result = self._connection_closed_handler(connection_error_info)
                     if result is not None and inspect.isawaitable(result):
                         await result
                 else:
-                    print("TCP connection closed")
+                    logger.exception("TCP connection closed")
+
+                self._conn = None
                 break
             except socket.error as e:
-                if self._connection_closed_handler is not None:
-                    connection_error_info = DisconnectionErrorInfo(e, self._streams)
-                    result = self._connection_closed_handler(connection_error_info)
-                    if result is not None and inspect.isawaitable(result):
-                        await result
-                else:
-                    print("TCP connection closed")
+                if self._conn is not None:
+                    if self._connection_closed_handler is not None and self._conn is not None:
+                        connection_error_info = DisconnectionErrorInfo(e, self._streams)
+                        result = self._connection_closed_handler(connection_error_info)
+                        if result is not None and inspect.isawaitable(result):
+                            await result
+                    else:
+                        print("TCP connection closed")
+                    self._conn = None
                 break
 
             logger.debug("Received frame: %s", frame)
@@ -241,7 +247,7 @@ class BaseClient:
                 fut.set_result(frame)
                 del self._waiters[_key]
 
-            for subscriber_name, handler in self._handlers.get(frame.__class__, {}).items():
+            for subscriber_name, handler in list(self._handlers.get(frame.__class__, {}).items()):
                 try:
                     if frame.__class__ == schema.Deliver:
                         await self._frames[subscriber_name].put(frame)
@@ -285,18 +291,17 @@ class BaseClient:
     async def close(self) -> None:
         logger.info("Stopping client %s:%s", self.host, self.port)
 
-        if self._conn_is_closed is True:
-            return
+        if self._conn is not None:
 
-        if self.is_started:
-            await self.sync_request(
-                schema.Close(
-                    self._corr_id_seq.next(),
-                    code=1,
-                    reason="OK",
-                ),
-                resp_schema=schema.CloseResponse,
-            )
+            if self.is_started:
+                await self.sync_request(
+                    schema.Close(
+                        self._corr_id_seq.next(),
+                        code=1,
+                        reason="OK",
+                    ),
+                    resp_schema=schema.CloseResponse,
+                )
 
         await self.stop_task("listener")
 

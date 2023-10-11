@@ -124,13 +124,17 @@ class Producer:
 
     async def close(self) -> None:
         # flush messages still in buffer
-        if self.task is not None:
-            for stream in self._buffered_messages:
-                await self._publish_buffered_messages(stream)
-            self.task.cancel()
+        if self._default_client is None:
+            return
+        if self.default_client.get_is_connection_active() is True:
+            if self.task is not None:
+                for stream in self._buffered_messages:
+                    await self._publish_buffered_messages(stream)
+                self.task.cancel()
 
         for publisher in self._publishers.values():
-            await publisher.client.delete_publisher(publisher.id)
+            if publisher.client.get_is_connection_active() is True:
+                await publisher.client.delete_publisher(publisher.id)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
 
@@ -393,7 +397,7 @@ class Producer:
     async def _publish_buffered_messages(self, stream: str) -> None:
 
         if stream in self._clients:
-            if self._clients[stream].get_connection() is None:
+            if self._clients[stream].get_is_connection_active() is False:
                 return
 
         async with self._buffered_messages_lock:

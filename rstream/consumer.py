@@ -117,8 +117,8 @@ class Consumer:
         self.stop()
 
         for subscriber in list(self._subscribers.values()):
-            await self.unsubscribe(subscriber.reference)
-            # await self.store_offset(subscriber.stream, subscriber.reference, subscriber.offset)
+            if subscriber.client.get_is_connection_active() is True:
+                await self.unsubscribe(subscriber.reference)
 
         self._subscribers.clear()
 
@@ -337,5 +337,6 @@ class Consumer:
         return self._subscribers[subscriber_name].stream
 
     def get_stream(self, subscriber_name) -> str:
-
+        if subscriber_name not in self._subscribers:
+            return ""
         return self._subscribers[subscriber_name].stream
