@@ -117,7 +117,7 @@ class Consumer:
         self.stop()
 
         for subscriber in list(self._subscribers.values()):
-            if subscriber.client.get_is_connection_active() is True:
+            if subscriber.client.is_connection_alive():
                 await self.unsubscribe(subscriber.reference)
 
         self._subscribers.clear()

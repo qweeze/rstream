@@ -131,14 +131,14 @@ class BaseClient:
 
     def remove_handler(self, frame_cls: Type[FT], name: Optional[str] = None) -> None:
         if name is not None:
-            del self._handlers[frame_cls][name]
+            if frame_cls in self._handlers:
+                del self._handlers[frame_cls][name]
         else:
-            self._handlers[frame_cls].clear()
+            if frame_cls in self._handlers:
+                self._handlers[frame_cls].clear()
 
-    def get_is_connection_active(self) -> bool:
-        if self._conn is None:
-            return False
-        return True
+    def is_connection_alive(self) -> bool:
+        return self._is_not_closed
 
     async def send_frame(self, frame: schema.Frame) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -146,7 +146,7 @@ class BaseClient:
         try:
             await self._conn.write_frame(frame)
         except socket.error as e:
-            self._conn = None
+            self._is_not_closed = False
             if self._connection_closed_handler is None:
                 logger.exception("TCP connection closed")
             else:
@@ -197,10 +197,10 @@ class BaseClient:
 
     async def _run_delivery_handlers(self, subscriber_name: str, handler: HT[FT]):
 
-        while self._is_not_closed:
+        while self.is_connection_alive():
             frame_entry = await self._frames[subscriber_name].get()
             try:
-                if self._conn is not None:
+                if self.is_connection_alive():
                     maybe_coro = handler(frame_entry)
                     if maybe_coro is not None:
                         await maybe_coro
@@ -213,11 +213,11 @@ class BaseClient:
         assert self._conn
         while True:
             try:
-                if self._conn is not None:
+                if self.is_connection_alive():
                     frame = await self._conn.read_frame()
             except ConnectionClosed as e:
 
-                if self._connection_closed_handler is not None and self._conn is not None:
+                if self._connection_closed_handler is not None and self.is_connection_alive():
                     connection_error_info = DisconnectionErrorInfo(e, self._streams)
                     result = self._connection_closed_handler(connection_error_info)
                     if result is not None and inspect.isawaitable(result):
@@ -225,18 +225,18 @@ class BaseClient:
                 else:
                     logger.exception("TCP connection closed")
 
-                self._conn = None
+                self._is_not_closed = False
                 break
             except socket.error as e:
                 if self._conn is not None:
-                    if self._connection_closed_handler is not None and self._conn is not None:
+                    if self._connection_closed_handler is not None and self.is_connection_alive():
                         connection_error_info = DisconnectionErrorInfo(e, self._streams)
                         result = self._connection_closed_handler(connection_error_info)
                         if result is not None and inspect.isawaitable(result):
                             await result
                     else:
                         print("TCP connection closed")
-                    self._conn = None
+                    self._is_not_closed = False
                 break
 
             logger.debug("Received frame: %s", frame)
@@ -291,7 +291,11 @@ class BaseClient:
     async def close(self) -> None:
         logger.info("Stopping client %s:%s", self.host, self.port)
 
-        if self._conn is not None:
+        connection_is_broken = False
+        if self.is_connection_alive() is False:
+            connection_is_broken = True
+
+        if self._conn is not None and self.is_connection_alive():
 
             if self.is_started:
                 await self.sync_request(
@@ -303,14 +307,13 @@ class BaseClient:
                     resp_schema=schema.CloseResponse,
                 )
 
-        await self.stop_task("listener")
-
         self._is_not_closed = False
+        await self.stop_task("listener")
 
         for subscriber_name in self._frames:
             await self.stop_task(f"run_delivery_handlers_{subscriber_name}")
 
-        if self._conn is not None:
+        if self._conn is not None and connection_is_broken is False:
             await self._conn.close()
             self._conn = None
 

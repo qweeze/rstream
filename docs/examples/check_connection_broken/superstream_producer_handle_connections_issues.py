@@ -8,8 +8,10 @@ from rstream import (
     SuperStreamProducer,
 )
 
-SUPER_STREAM = "test_super_stream"
+SUPER_STREAM = "invoices"
 MESSAGES = 10000000
+
+connection_closed = False
 
 
 async def publish():
@@ -25,8 +27,13 @@ async def publish():
             + " for reason: "
             + str(disconnection_info.reason)
         )
+        global connection_closed
+        connection_closed = True
 
-    async with SuperStreamProducer(
+        await super_stream_producer.close()
+
+    # avoiding using async context as we close the producer ourself in on_connection_closed callback
+    super_stream_producer = SuperStreamProducer(
         "localhost",
         username="guest",
         password="guest",
@@ -34,21 +41,26 @@ async def publish():
         routing=RouteType.Hash,
         connection_closed_handler=on_connection_closed,
         super_stream=SUPER_STREAM,
-    ) as super_stream_producer:
+    )
 
-        # sending a million of messages in AMQP format
-        start_time = time.perf_counter()
+    await super_stream_producer.start()
 
-        for i in range(MESSAGES):
-            amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
-                application_properties={"id": "{}".format(i)},
-            )
-            # send is asynchronous
+    # sending a million of messages in AMQP format
+    start_time = time.perf_counter()
+
+    for i in range(MESSAGES):
+        amqp_message = AMQPMessage(
+            body="hello: {}".format(i),
+            application_properties={"id": "{}".format(i)},
+        )
+        # send is asynchronous
+        if connection_closed is False:
             await super_stream_producer.send(message=amqp_message)
+        else:
+            break
 
-        end_time = time.perf_counter()
-        print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
+    end_time = time.perf_counter()
+    print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
 
 
 asyncio.run(publish())

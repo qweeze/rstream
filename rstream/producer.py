@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import ssl
 from collections import defaultdict
 from dataclasses import dataclass
@@ -59,6 +60,9 @@ class ConfirmationStatus:
     response_code: int = 0
 
 
+logger = logging.getLogger(__name__)
+
+
 class Producer:
     def __init__(
         self,
@@ -105,6 +109,7 @@ class Producer:
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
         self._connection_closed_handler = connection_closed_handler
+        self._close_called = False
 
     @property
     def default_client(self) -> Client:
@@ -120,21 +125,28 @@ class Producer:
         await self.close()
 
     async def start(self) -> None:
+        self._close_called = False
         self._default_client = await self._pool.get(connection_closed_handler=self._connection_closed_handler)
 
     async def close(self) -> None:
+        self._close_called = True
         # flush messages still in buffer
         if self._default_client is None:
             return
-        if self.default_client.get_is_connection_active() is True:
+        if self.default_client.is_connection_alive():
             if self.task is not None:
                 for stream in self._buffered_messages:
                     await self._publish_buffered_messages(stream)
                 self.task.cancel()
 
         for publisher in self._publishers.values():
-            if publisher.client.get_is_connection_active() is True:
-                await publisher.client.delete_publisher(publisher.id)
+            if publisher.client.is_connection_alive():
+                try:
+                    await publisher.client.delete_publisher(publisher.id)
+                except asyncio.TimeoutError:
+                    logger.debug("timeout when closing producer and deleting publisher")
+                except BaseException as exc:
+                    logger.debug("delete_publisher in Producer.close:", exc)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
 
@@ -226,6 +238,9 @@ class Producer:
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
+
+        if self._close_called:
+            return []
 
         messages = []
         publishing_ids = set()
@@ -389,15 +404,18 @@ class Producer:
     # After the timeout send the messages in _buffered_messages in batches
     async def _timer(self):
 
-        while True:
+        while not self._close_called:
             await asyncio.sleep(self._default_batch_publishing_delay)
             for stream in self._buffered_messages:
-                await self._publish_buffered_messages(stream)
+                try:
+                    await self._publish_buffered_messages(stream)
+                except BaseException as exc:
+                    logger.debug("producer _timer exception: ", {exc})
 
     async def _publish_buffered_messages(self, stream: str) -> None:
 
         if stream in self._clients:
-            if self._clients[stream].get_is_connection_active() is False:
+            if self._clients[stream].is_connection_alive() is False:
                 return
 
         async with self._buffered_messages_lock:
