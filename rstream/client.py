@@ -298,14 +298,23 @@ class BaseClient:
         if self._conn is not None and self.is_connection_alive():
 
             if self.is_started:
-                await self.sync_request(
-                    schema.Close(
-                        self._corr_id_seq.next(),
-                        code=1,
-                        reason="OK",
-                    ),
-                    resp_schema=schema.CloseResponse,
-                )
+                try:
+                    await asyncio.wait_for(
+                        self.sync_request(
+                            schema.Close(
+                                self._corr_id_seq.next(),
+                                code=1,
+                                reason="OK",
+                            ),
+                            resp_schema=schema.CloseResponse,
+                        ),
+                        5,
+                    )
+
+                except asyncio.TimeoutError:
+                    logger.debug("timeout in client close() sync_request:")
+                except BaseException as exc:
+                    logger.exception("exception in client close() sync_request", exc)
 
         self._is_not_closed = False
         await self.stop_task("listener")

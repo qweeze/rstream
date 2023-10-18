@@ -142,11 +142,11 @@ class Producer:
         for publisher in self._publishers.values():
             if publisher.client.is_connection_alive():
                 try:
-                    await publisher.client.delete_publisher(publisher.id)
+                    await asyncio.wait_for(publisher.client.delete_publisher(publisher.id), 5)
                 except asyncio.TimeoutError:
                     logger.debug("timeout when closing producer and deleting publisher")
                 except BaseException as exc:
-                    logger.debug("delete_publisher in Producer.close:", exc)
+                    logger.debug("exception in delete_publisher in Producer.close:", exc)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
 
