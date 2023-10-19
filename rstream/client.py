@@ -93,6 +93,8 @@ class BaseClient:
 
         self._last_heartbeat: float = 0
         self._connection_closed_handler = connection_closed_handler
+        self._frames: dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
+        self._is_not_closed: bool = True
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -170,8 +172,30 @@ class BaseClient:
         self._conn = Connection(self.host, self.port, self._ssl_context)
         await self._conn.open()
         self.start_task("listener", self._listener())
+
         self.add_handler(schema.Heartbeat, self._on_heartbeat)
         self.add_handler(schema.Close, self._on_close)
+
+    async def run_queue_listener_task(self, subscriber_name: str, handler: HT[FT]) -> None:
+
+        if subscriber_name not in self._frames:
+            self.start_task(
+                f"run_delivery_handlers_{subscriber_name}",
+                self._run_delivery_handlers(subscriber_name, handler),
+            )
+
+    async def _run_delivery_handlers(self, subscriber_name: str, handler: HT[FT]):
+
+        while self._is_not_closed:
+            frame_entry = await self._frames[subscriber_name].get()
+            try:
+                maybe_coro = handler(frame_entry)
+                if maybe_coro is not None:
+                    await maybe_coro
+            except Exception as e:
+                logger.exception(
+                    "Error while handling %s frame exception raised %s", frame_entry.__class__, e
+                )
 
     async def _listener(self) -> None:
         assert self._conn
@@ -203,11 +227,14 @@ class BaseClient:
                 fut.set_result(frame)
                 del self._waiters[_key]
 
-            for _, handler in self._handlers.get(frame.__class__, {}).items():
+            for subscriber_name, handler in self._handlers.get(frame.__class__, {}).items():
                 try:
-                    maybe_coro = handler(frame)
-                    if maybe_coro is not None:
-                        await maybe_coro
+                    if frame.__class__ == schema.Deliver:
+                        await self._frames[subscriber_name].put(frame)
+                    else:
+                        maybe_coro = handler(frame)
+                        if maybe_coro is not None:
+                            await maybe_coro
                 except Exception:
                     logger.exception("Error while running handler %s of frame %s", handler, frame)
 
@@ -242,6 +269,7 @@ class BaseClient:
 
     async def close(self) -> None:
         logger.info("Stopping client %s:%s", self.host, self.port)
+
         if self._conn is None:
             return
 
@@ -256,6 +284,11 @@ class BaseClient:
             )
 
         await self.stop_task("listener")
+
+        self._is_not_closed = False
+
+        for subscriber_name in self._frames:
+            await self.stop_task(f"run_delivery_handlers_{subscriber_name}")
 
         await self._conn.close()
         self._conn = None
