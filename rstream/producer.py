@@ -79,6 +79,7 @@ class Producer:
         max_retries: int = 20,
         default_batch_publishing_delay: float = 0.2,
         default_context_switch_value: int = 1000,
+        connection_name: str = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ):
         self._pool = ClientPool(
@@ -110,6 +111,9 @@ class Producer:
         self._default_context_switch_value = default_context_switch_value
         self._connection_closed_handler = connection_closed_handler
         self._close_called = False
+        self._connection_name = connection_name
+        if self._connection_name is None:
+            self._connection_name = "rstream-producer"
 
     @property
     def default_client(self) -> Client:
@@ -126,7 +130,9 @@ class Producer:
 
     async def start(self) -> None:
         self._close_called = False
-        self._default_client = await self._pool.get(connection_closed_handler=self._connection_closed_handler)
+        self._default_client = await self._pool.get(
+            connection_closed_handler=self._connection_closed_handler, connection_name=self._connection_name
+        )
 
     async def close(self) -> None:
         self._close_called = True
@@ -161,7 +167,9 @@ class Producer:
         if stream not in self._clients:
             leader, _ = await self.default_client.query_leader_and_replicas(stream)
             self._clients[stream] = await self._pool.get(
-                Addr(leader.host, leader.port), self._connection_closed_handler
+                connection_name=self._connection_name,
+                addr=Addr(leader.host, leader.port),
+                connection_closed_handler=self._connection_closed_handler,
             )
 
         return self._clients[stream]
