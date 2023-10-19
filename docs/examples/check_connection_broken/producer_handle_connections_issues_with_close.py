@@ -27,7 +27,7 @@ async def publish():
         connection_is_closed = True
 
     async with Producer(
-            "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
+        "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
     ) as producer:
         # create a stream if it doesn't already exist
         await producer.create_stream(STREAM, exists_ok=True)

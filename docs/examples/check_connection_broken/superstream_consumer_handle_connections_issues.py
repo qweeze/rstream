@@ -32,7 +32,6 @@ async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> No
     )
 
 
-
 async def consume():
     consumer = SuperStreamConsumer(
         host="localhost",
