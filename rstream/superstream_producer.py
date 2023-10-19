@@ -21,6 +21,7 @@ from .superstream import (
     RoutingKeyRoutingStrategy,
     RoutingStrategy,
 )
+from .utils import DisconnectionErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
@@ -51,7 +52,7 @@ class SuperStreamProducer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         default_batch_publishing_delay: float = 0.2,
-        connection_closed_handler: Optional[CB[Exception]] = None
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None
     ):
         self._pool = ClientPool(
             host,
@@ -97,6 +98,7 @@ class SuperStreamProducer:
                 heartbeat=self.heartbeat,
                 load_balancer_mode=self.load_balancer_mode,
                 default_batch_publishing_delay=self.default_batch_publishing_delay,
+                connection_closed_handler=self._connection_closed_handler,
             )
             await producer.start()
             self._producer = producer
