@@ -11,13 +11,16 @@ from rstream import (
     amqp_decoder,
 )
 
-cont = 0
+count = 0
 
 
 async def on_message(msg: AMQPMessage, message_context: MessageContext):
-    stream = await message_context.consumer.stream(message_context.subscriber_name)
-    offset = message_context.offset
-    print("Received message: {} from stream: {} - message offset: {}".format(msg, stream, offset))
+    global count
+    count += 1
+    if (count % 100000) == 0:
+        stream = await message_context.consumer.stream(message_context.subscriber_name)
+        offset = message_context.offset
+        print("Received message: {} from stream: {} - message offset: {}".format(msg, stream, offset))
 
 
 async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
@@ -29,6 +32,7 @@ async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> No
     )
 
 
+
 async def consume():
     consumer = SuperStreamConsumer(
         host="localhost",
@@ -36,7 +40,7 @@ async def consume():
         vhost="/",
         username="guest",
         password="guest",
-        super_stream="test_super_stream",
+        super_stream="invoices",
         connection_closed_handler=on_connection_closed,
     )
 

@@ -27,13 +27,14 @@ async def publish():
         connection_is_closed = True
 
     async with Producer(
-        "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
+            "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
     ) as producer:
         # create a stream if it doesn't already exist
         await producer.create_stream(STREAM, exists_ok=True)
 
         # sending a million of messages in AMQP format
         start_time = time.perf_counter()
+        global connection_is_closed
 
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(

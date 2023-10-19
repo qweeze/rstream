@@ -11,7 +11,7 @@ from rstream import (
 SUPER_STREAM = "invoices"
 MESSAGES = 10000000
 
-connection_closed = False
+connection_is_closed = False
 
 
 async def publish():
@@ -27,8 +27,8 @@ async def publish():
             + " for reason: "
             + str(disconnection_info.reason)
         )
-        global connection_closed
-        connection_closed = True
+        global connection_is_closed
+        connection_is_closed = True
 
         await super_stream_producer.close()
 
@@ -47,14 +47,16 @@ async def publish():
 
     # sending a million of messages in AMQP format
     start_time = time.perf_counter()
+    global connection_is_closed
 
     for i in range(MESSAGES):
         amqp_message = AMQPMessage(
             body="hello: {}".format(i),
             application_properties={"id": "{}".format(i)},
         )
+
         # send is asynchronous
-        if connection_closed is False:
+        if connection_is_closed is False:
             await super_stream_producer.send(message=amqp_message)
         else:
             break
