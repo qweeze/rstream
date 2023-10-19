@@ -73,6 +73,7 @@ class Consumer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         connection_closed_handler: Optional[CB_CONN[DisconnectionErrorInfo]] = None,
+        connection_name: str = None,
     ):
         self._pool = ClientPool(
             host,
@@ -93,6 +94,9 @@ class Consumer:
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
         self._connection_closed_handler = connection_closed_handler
+        self._connection_name = connection_name
+        if self._connection_name is None:
+            self._connection_name = "rstream-consumer"
 
     @property
     def default_client(self) -> Client:
@@ -108,7 +112,9 @@ class Consumer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get(connection_closed_handler=self._connection_closed_handler)
+        self._default_client = await self._pool.get(
+            connection_closed_handler=self._connection_closed_handler, connection_name=self._connection_name
+        )
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -134,7 +140,9 @@ class Consumer:
             leader, replicas = await self.default_client.query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
-                addr=Addr(broker.host, broker.port), connection_closed_handler=self._connection_closed_handler
+                addr=Addr(broker.host, broker.port),
+                connection_closed_handler=self._connection_closed_handler,
+                connection_name=self._connection_name,
             )
 
         return self._clients[stream]
