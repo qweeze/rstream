@@ -4,6 +4,7 @@ import signal
 from rstream import (
     AMQPMessage,
     Consumer,
+    DisconnectionErrorInfo,
     MessageContext,
     amqp_decoder,
 )
@@ -11,8 +12,13 @@ from rstream import (
 STREAM = "my-test-stream"
 
 
-async def on_connection_closed(reason: Exception) -> None:
-    print("connection has been closed for reason: " + str(reason))
+async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    print(
+        "connection has been closed from stream: "
+        + str(disconnection_info.streams)
+        + " for reason: "
+        + disconnection_info.reason
+    )
 
 
 async def consume():

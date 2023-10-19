@@ -24,6 +24,7 @@ from .constants import (
     OffsetType,
 )
 from .schema import OffsetSpecification
+from .utils import DisconnectionErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
@@ -71,7 +72,7 @@ class Consumer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
-        connection_closed_handler: Optional[CB_CONN[Exception]] = None,
+        connection_closed_handler: Optional[CB_CONN[DisconnectionErrorInfo]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -116,8 +117,8 @@ class Consumer:
         self.stop()
 
         for subscriber in list(self._subscribers.values()):
-            await self.unsubscribe(subscriber.reference)
-            # await self.store_offset(subscriber.stream, subscriber.reference, subscriber.offset)
+            if subscriber.client.is_connection_alive():
+                await self.unsubscribe(subscriber.reference)
 
         self._subscribers.clear()
 
@@ -331,9 +332,11 @@ class Consumer:
         return await self.default_client.stream_exists(stream)
 
     async def stream(self, subscriber_name) -> str:
-
+        if subscriber_name not in self._subscribers:
+            return ""
         return self._subscribers[subscriber_name].stream
 
     def get_stream(self, subscriber_name) -> str:
-
+        if subscriber_name not in self._subscribers:
+            return ""
         return self._subscribers[subscriber_name].stream
