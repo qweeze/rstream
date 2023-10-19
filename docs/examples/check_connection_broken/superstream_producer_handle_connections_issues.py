@@ -25,7 +25,7 @@ async def publish():
             "connection has been closed from stream: "
             + str(disconnection_info.streams)
             + " for reason: "
-            + str(disconnection_info.reason)
+            + disconnection_info.reason
         )
         global connection_is_closed
         connection_is_closed = True

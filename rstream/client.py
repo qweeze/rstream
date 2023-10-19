@@ -145,12 +145,12 @@ class BaseClient:
         assert self._conn
         try:
             await self._conn.write_frame(frame)
-        except socket.error as e:
+        except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is None:
                 logger.exception("TCP connection closed")
             else:
-                connection_error_info = DisconnectionErrorInfo(e, self._streams)
+                connection_error_info = DisconnectionErrorInfo("Socket Error", self._streams)
                 result = self._connection_closed_handler(connection_error_info)
                 if result is not None and inspect.isawaitable(result):
                     await result
@@ -215,10 +215,10 @@ class BaseClient:
             try:
                 if self.is_connection_alive():
                     frame = await self._conn.read_frame()
-            except ConnectionClosed as e:
+            except ConnectionClosed:
 
                 if self._connection_closed_handler is not None and self.is_connection_alive():
-                    connection_error_info = DisconnectionErrorInfo(e, self._streams)
+                    connection_error_info = DisconnectionErrorInfo("Connection Closed", self._streams)
                     result = self._connection_closed_handler(connection_error_info)
                     if result is not None and inspect.isawaitable(result):
                         await result
@@ -227,15 +227,15 @@ class BaseClient:
 
                 self._is_not_closed = False
                 break
-            except socket.error as e:
+            except socket.error:
                 if self._conn is not None:
                     if self._connection_closed_handler is not None and self.is_connection_alive():
-                        connection_error_info = DisconnectionErrorInfo(e, self._streams)
+                        connection_error_info = DisconnectionErrorInfo("Socket Error", self._streams)
                         result = self._connection_closed_handler(connection_error_info)
                         if result is not None and inspect.isawaitable(result):
                             await result
                     else:
-                        print("TCP connection closed")
+                        logger.debug("TCP connection closed")
                     self._is_not_closed = False
                 break
 

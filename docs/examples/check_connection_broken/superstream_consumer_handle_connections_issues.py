@@ -23,16 +23,16 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
         print("Received message: {} from stream: {} - message offset: {}".format(msg, stream, offset))
 
 
-async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
-    print(
-        "connection has been closed from stream: "
-        + str(disconnection_info.streams)
-        + " for reason: "
-        + str(disconnection_info.reason)
-    )
-
-
 async def consume():
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        print(
+            "connection has been closed from stream: "
+            + str(disconnection_info.streams)
+            + " for reason: "
+            + disconnection_info.reason
+        )
+        await consumer.close()
+
     consumer = SuperStreamConsumer(
         host="localhost",
         port=5552,

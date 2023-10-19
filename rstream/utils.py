@@ -43,5 +43,5 @@ class TimeoutWrapper:
 
 @dataclass
 class DisconnectionErrorInfo:
-    reason: Exception
+    reason: str
     streams: list[str]

@@ -17,7 +17,7 @@ async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> No
         "connection has been closed from stream: "
         + str(disconnection_info.streams)
         + " for reason: "
-        + str(disconnection_info.reason)
+        + disconnection_info.reason
     )
 
 
