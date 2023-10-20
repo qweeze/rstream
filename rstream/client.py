@@ -67,6 +67,7 @@ class BaseClient:
         ssl_context: Optional[ssl.SSLContext] = None,
         frame_max: int,
         heartbeat: int,
+        connection_name: Optional[str] = "",
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ):
         self.host = host
@@ -79,7 +80,9 @@ class BaseClient:
         self._conn: Optional[Connection] = None
 
         self.server_properties: Optional[dict[str, str]] = None
+
         self._client_properties = {
+            "connection_name": str(connection_name),
             "product": "RabbitMQ Stream",
             "platform": "Python",
             "version": __version__,
@@ -621,6 +624,7 @@ class ClientPool:
 
     async def get(
         self,
+        connection_name: Optional[str],
         addr: Optional[Addr] = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ) -> Client:
@@ -637,25 +641,36 @@ class ClientPool:
         if desired_addr not in self._clients:
             if addr and self.load_balancer_mode:
                 self._clients[desired_addr] = await self._resolve_broker(
-                    desired_addr, connection_closed_handler
+                    addr=desired_addr,
+                    connection_closed_handler=connection_closed_handler,
+                    connection_name=connection_name,
                 )
             else:
                 self._clients[desired_addr] = await self.new(
-                    addr=desired_addr, connection_closed_handler=connection_closed_handler
+                    addr=desired_addr,
+                    connection_closed_handler=connection_closed_handler,
+                    connection_name=connection_name,
                 )
 
         assert self._clients[desired_addr].is_started
         return self._clients[desired_addr]
 
     async def _resolve_broker(
-        self, addr: Addr, connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None
+        self,
+        connection_name: Optional[str],
+        addr: Addr,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ) -> Client:
         desired_host, desired_port = addr.host, str(addr.port)
 
         connection_attempts = 0
 
         while connection_attempts < self.max_retries:
-            client = await self.new(addr=self.addr, connection_closed_handler=connection_closed_handler)
+            client = await self.new(
+                addr=self.addr,
+                connection_closed_handler=connection_closed_handler,
+                connection_name=connection_name,
+            )
 
             assert client.server_properties is not None
 
@@ -675,7 +690,10 @@ class ClientPool:
         )
 
     async def new(
-        self, addr: Addr, connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None
+        self,
+        connection_name: Optional[str],
+        addr: Addr,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ) -> Client:
         host, port = addr
         client = Client(
@@ -684,6 +702,7 @@ class ClientPool:
             ssl_context=self.ssl_context,
             frame_max=self._frame_max,
             heartbeat=self._heartbeat,
+            connection_name=connection_name,
             connection_closed_handler=connection_closed_handler,
         )
         await client.start()
