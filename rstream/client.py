@@ -134,11 +134,13 @@ class BaseClient:
 
     def remove_handler(self, frame_cls: Type[FT], name: Optional[str] = None) -> None:
         if name is not None:
-            if frame_cls in self._handlers:
-                del self._handlers[frame_cls][name]
+            if name in self._handlers[frame_cls]:
+                if frame_cls in self._handlers:
+                    del self._handlers[frame_cls][name]
         else:
-            if frame_cls in self._handlers:
-                self._handlers[frame_cls].clear()
+            if name in self._handlers[frame_cls]:
+                if frame_cls in self._handlers:
+                    self._handlers[frame_cls].clear()
 
     def is_connection_alive(self) -> bool:
         return self._is_not_closed
@@ -147,7 +149,8 @@ class BaseClient:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
         try:
-            await self._conn.write_frame(frame)
+            if self.is_connection_alive():
+                await self._conn.write_frame(frame)
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is None:

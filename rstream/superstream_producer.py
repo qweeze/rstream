@@ -148,4 +148,5 @@ class SuperStreamProducer:
         await self._pool.close()
         if self._producer is not None:
             await self._producer.close()
+        await self._default_client.close()
         self._default_client = None

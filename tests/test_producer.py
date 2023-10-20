@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+import logging
 from functools import partial
 
 import pytest
@@ -10,6 +11,7 @@ from rstream import (
     AMQPMessage,
     CompressionType,
     Consumer,
+    DisconnectionErrorInfo,
     Producer,
     RawMessage,
     SuperStreamConsumer,
@@ -21,9 +23,11 @@ from rstream import (
 from .util import (
     on_publish_confirm_client_callback,
     on_publish_confirm_client_callback2,
+    task_to_delete_connection,
     wait_for,
 )
 
+logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.asyncio
 
 
@@ -431,3 +435,40 @@ async def test_publishing_sequence_superstream_with_callback(
     await publish_with_ids(1, 2, 3)
 
     await wait_for(lambda: len(confirmed_messages) == 3)
+
+
+async def test_producer_connection_broke(stream: str) -> None:
+
+    connection_broke = False
+    stream_disconnected = None
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        nonlocal connection_broke
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal stream_disconnected
+        stream_disconnected = disconnection_info.streams.pop()
+
+        await producer_broke.close()
+        producer_broke = None
+
+    producer_broke = Producer(
+        "localhost",
+        username="guest",
+        password="guest",
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+    )
+
+    await producer_broke.start()
+    asyncio.create_task(task_to_delete_connection("test-connection"))
+
+    while connection_broke is False:
+        await producer_broke.send(stream, b"one")
+        await asyncio.sleep(0)
+
+    await asyncio.sleep(1)
+
+    assert connection_broke is True
+    assert stream_disconnected == stream
