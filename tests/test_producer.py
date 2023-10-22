@@ -441,6 +441,7 @@ async def test_producer_connection_broke(stream: str) -> None:
 
     connection_broke = False
     stream_disconnected = None
+    producer_broke: Producer
 
     async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
         nonlocal connection_broke
@@ -451,7 +452,6 @@ async def test_producer_connection_broke(stream: str) -> None:
         stream_disconnected = disconnection_info.streams.pop()
 
         await producer_broke.close()
-        producer_broke = None
 
     producer_broke = Producer(
         "localhost",

@@ -18,36 +18,42 @@ async def publish():
             "connection has been closed from stream: "
             + str(disconnection_info.streams)
             + " for reason: "
-            + disconnection_info.reason
+            + str(disconnection_info.reason)
         )
 
-        # clean close or reconnect
-        await producer.close()
         global connection_is_closed
         connection_is_closed = True
 
-    async with Producer(
+        await producer.close()
+
+    # avoid to use async context in this case as we are closing the producer ourself in the callback
+    # in this case we avoid double cls
+    producer = Producer(
         "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
-    ) as producer:
-        # create a stream if it doesn't already exist
-        await producer.create_stream(STREAM, exists_ok=True)
+    )
 
-        # sending a million of messages in AMQP format
-        start_time = time.perf_counter()
-        global connection_is_closed
+    await producer.start()
+    # create a stream if it doesn't already exist
+    await producer.create_stream(STREAM, exists_ok=True)
 
-        for i in range(MESSAGES):
-            amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
-            )
-            # send is asynchronous
-            if connection_is_closed is False:
-                await producer.send(stream=STREAM, message=amqp_message)
-            else:
-                break
+    # sending a million of messages in AMQP format
+    start_time = time.perf_counter()
 
-        end_time = time.perf_counter()
-        print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
+    for i in range(MESSAGES):
+        amqp_message = AMQPMessage(
+            body="hello: {}".format(i),
+        )
+        # send is asynchronous
+        if connection_is_closed is False:
+            await producer.send(stream=STREAM, message=amqp_message)
+        else:
+            break
+
+    if connection_is_closed is False:
+        await producer.close()
+
+    end_time = time.perf_counter()
+    print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
 
 
 asyncio.run(publish())

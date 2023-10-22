@@ -27,9 +27,6 @@ def create_binding(exchange_name: str, routing_key: str, stream_name: str):
     return response.status_code
 
 
-import requests
-
-
 def get_connections() -> list:
     request = "http://localhost:15672/api/connections"
     response = requests.get(request, auth=HTTPBasicAuth("guest", "guest"))

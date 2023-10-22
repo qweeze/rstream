@@ -525,6 +525,7 @@ async def test_consumer_connection_broke(stream: str) -> None:
 
     connection_broke = False
     stream_disconnected = None
+    consumer_broke: Consumer
 
     async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
         nonlocal connection_broke
@@ -533,9 +534,7 @@ async def test_consumer_connection_broke(stream: str) -> None:
         nonlocal stream_disconnected
         stream_disconnected = disconnection_info.streams.pop()
 
-        if consumer_broke is not None:
-            await consumer_broke.close()
-            consumer_broke = None
+        await consumer_broke.close()
 
     consumer_broke = Consumer(
         host="localhost",
@@ -548,8 +547,7 @@ async def test_consumer_connection_broke(stream: str) -> None:
     )
 
     async def on_message(msg: AMQPMessage, message_context: MessageContext):
-        stream = message_context.consumer.get_stream(message_context.subscriber_name)
-        offset = message_context.offset
+        message_context.consumer.get_stream(message_context.subscriber_name)
 
     asyncio.create_task(task_to_delete_connection("test-connection"))
 

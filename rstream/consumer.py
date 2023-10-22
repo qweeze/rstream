@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 import ssl
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ from .utils import DisconnectionErrorInfo
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
 CB_CONN = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -243,7 +245,12 @@ class Consumer:
             schema.Deliver,
             name=subscriber.reference,
         )
-        await subscriber.client.unsubscribe(subscriber.subscription_id)
+        try:
+            await asyncio.wait_for(subscriber.client.unsubscribe(subscriber.subscription_id), 5)
+        except asyncio.TimeoutError:
+            logger.debug("timeout when closing consumer and deleting publisher")
+        except BaseException as exc:
+            logger.exception("exception in delete_publisher in Producer.close:", exc)
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:

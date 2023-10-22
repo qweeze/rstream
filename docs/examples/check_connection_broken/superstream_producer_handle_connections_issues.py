@@ -61,6 +61,9 @@ async def publish():
         else:
             break
 
+    if connection_is_closed is False:
+        await super_stream_producer.close()
+
     end_time = time.perf_counter()
     print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
 

@@ -145,8 +145,9 @@ class SuperStreamProducer:
             self._routing_strategy = RoutingKeyRoutingStrategy(self.routing_extractor)
 
     async def close(self) -> None:
+        if self._default_client is not None:
+            await self._default_client.close()
+            self._default_client = None
         await self._pool.close()
         if self._producer is not None:
             await self._producer.close()
-        await self._default_client.close()
-        self._default_client = None

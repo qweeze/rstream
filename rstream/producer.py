@@ -135,15 +135,28 @@ class Producer:
         )
 
     async def close(self) -> None:
-        self._close_called = True
+
+        # check if we are in a server disconnection situation:
+        # in this case we need avoid other send
+        # otherwise if is a normal close() we need to send the last item in batch
+        for publisher in self._publishers.values():
+            if publisher.client.is_connection_alive() is False:
+                self._close_called = True
+                # just in this special case give time to all the tasks to complete
+                await asyncio.sleep(0.2)
+                break
+
         # flush messages still in buffer
         if self._default_client is None:
             return
+
         if self.default_client.is_connection_alive():
             if self.task is not None:
                 for stream in self._buffered_messages:
                     await self._publish_buffered_messages(stream)
                 self.task.cancel()
+
+        self._close_called = True
 
         for publisher in self._publishers.values():
             if publisher.client.is_connection_alive():
