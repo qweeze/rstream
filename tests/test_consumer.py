@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+import logging
 from functools import partial
 
 import pytest
@@ -32,6 +33,7 @@ from .util import (
 )
 
 pytestmark = pytest.mark.asyncio
+logger = logging.getLogger(__name__)
 
 
 async def test_create_stream_already_exists(stream: str, consumer: Consumer) -> None:
@@ -561,7 +563,7 @@ async def test_consumer_connection_broke(stream: str) -> None:
     await asyncio.sleep(1)
 
 
-async def test_super_stream_consumer_connection_broke(super_stream: str) -> None:
+async def test_super_stream_consumer_connection_broke_locator(super_stream: str) -> None:
 
     connection_broke = False
     streams_disconnected: set[str] = set()
@@ -599,3 +601,51 @@ async def test_super_stream_consumer_connection_broke(super_stream: str) -> None
     await super_stream_consumer_broke.run()
 
     assert connection_broke is True
+
+
+async def test_super_stream_consumer_connection_broke(super_stream: str) -> None:
+
+    connection_broke = False
+    streams_disconnected: set[str] = set()
+    consumer_broke: Consumer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        nonlocal connection_broke
+        nonlocal streams_disconnected
+        # avoiding multiple connection closed to hit
+        if connection_broke is True:
+            for stream in disconnection_info.streams:
+                streams_disconnected.add(stream)
+            return None
+
+        connection_broke = True
+
+        for stream in disconnection_info.streams:
+            streams_disconnected.add(stream)
+
+        await super_stream_consumer_broke.close()
+
+    super_stream_consumer_broke = SuperStreamConsumer(
+        host="localhost",
+        port=5552,
+        vhost="/",
+        username="guest",
+        password="guest",
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+        super_stream=super_stream,
+    )
+
+    async def on_message(msg: AMQPMessage, message_context: MessageContext):
+        message_context.consumer.get_stream(message_context.subscriber_name)
+
+    asyncio.create_task(task_to_delete_connection("test-connection"))
+
+    await super_stream_consumer_broke.start()
+    await super_stream_consumer_broke.subscribe(callback=on_message, decoder=amqp_decoder)
+    await super_stream_consumer_broke.run()
+
+    assert connection_broke is True
+    assert "test-super-stream-0" in streams_disconnected
+    assert "test-super-stream-1" in streams_disconnected
+    assert "test-super-stream-2" in streams_disconnected

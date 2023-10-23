@@ -538,3 +538,53 @@ async def test_super_stream_producer_connection_broke(super_stream: str) -> None
     assert "test-super-stream-0" in streams_disconnected
     assert "test-super-stream-1" in streams_disconnected
     assert "test-super-stream-2" in streams_disconnected
+
+
+async def test_super_stream_producer_connection_broke_locator(super_stream: str) -> None:
+
+    connection_broke = False
+    streams_disconnected: set[str] = set()
+    producer_broke: Producer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        nonlocal connection_broke
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal streams_disconnected
+        for stream in disconnection_info.streams:
+            streams_disconnected.add(stream)
+
+        await super_stream_producer_broke.close()
+
+    super_stream_producer_broke = SuperStreamProducer(
+        "localhost",
+        username="guest",
+        password="guest",
+        routing_extractor=routing_extractor_generic,
+        routing=RouteType.Hash,
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+        super_stream=super_stream,
+    )
+
+    await super_stream_producer_broke.start()
+
+    asyncio.create_task(task_to_delete_connection("rstream-locator"))
+    i = 0
+    while connection_broke is False:
+        amqp_message = AMQPMessage(
+            body="hello: {}".format(i),
+            application_properties={"id": "{}".format(i)},
+        )
+        i = i + 1
+        # send is asynchronous
+        await super_stream_producer_broke.send(message=amqp_message)
+
+    if connection_broke is False:
+        await super_stream_producer_broke.close()
+
+    await asyncio.sleep(1)
+
+    assert connection_broke is True
+    assert len(streams_disconnected) == 0
