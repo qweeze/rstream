@@ -22,9 +22,11 @@ async def publish():
         )
 
         global connection_is_closed
-        connection_is_closed = True
 
-        await producer.close()
+        # avoid multiple simultaneous disconnections to close the producer
+        if connection_is_closed is False:
+            await producer.close()
+            connection_is_closed = True
 
     # avoid to use async context in this case as we are closing the producer ourself in the callback
     # in this case we avoid double cls

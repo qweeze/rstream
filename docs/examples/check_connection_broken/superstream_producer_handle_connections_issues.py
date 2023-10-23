@@ -30,7 +30,10 @@ async def publish():
         global connection_is_closed
         connection_is_closed = True
 
-        await super_stream_producer.close()
+        # avoid multiple simultaneous disconnection to call close multiple times
+        if connection_is_closed is False:
+            await super_stream_producer.close()
+            connection_is_closed = True
 
     # avoiding using async context as we close the producer ourself in on_connection_closed callback
     super_stream_producer = SuperStreamProducer(

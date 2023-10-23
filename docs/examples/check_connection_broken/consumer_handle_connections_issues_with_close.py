@@ -11,6 +11,7 @@ from rstream import (
 
 STREAM = "my-test-stream"
 COUNT = 0
+connection_is_closed = False
 
 
 async def consume():
@@ -22,8 +23,12 @@ async def consume():
             + str(disconnection_info.reason)
         )
 
-        # clean close or reconnect
-        await consumer.close()
+        global connection_is_closed
+
+        # avoid multiple simultaneous disconnection to call close multiple times
+        if connection_is_closed is False:
+            await consumer.close()
+            connection_is_closed = True
 
     consumer = Consumer(
         host="localhost",

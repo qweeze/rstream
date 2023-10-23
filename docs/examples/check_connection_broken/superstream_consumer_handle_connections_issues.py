@@ -12,6 +12,7 @@ from rstream import (
 )
 
 count = 0
+connection_is_closed = False
 
 
 async def on_message(msg: AMQPMessage, message_context: MessageContext):
@@ -31,7 +32,12 @@ async def consume():
             + " for reason: "
             + disconnection_info.reason
         )
-        await consumer.close()
+
+        global connection_is_closed
+        if connection_is_closed is False:
+            connection_is_closed = True
+            # avoid multiple simultaneous disconnection to call close multiple times
+            await consumer.close()
 
     consumer = SuperStreamConsumer(
         host="localhost",
