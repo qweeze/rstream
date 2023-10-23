@@ -75,6 +75,10 @@ async def routing_extractor(message: AMQPMessage) -> str:
     return "0"
 
 
+async def routing_extractor_generic(message: AMQPMessage) -> str:
+    return message.application_properties["id"]
+
+
 async def routing_extractor_for_sac(message: AMQPMessage) -> str:
     return str(message.properties.message_id)
 

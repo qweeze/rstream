@@ -14,6 +14,7 @@ from rstream import (
     DisconnectionErrorInfo,
     Producer,
     RawMessage,
+    RouteType,
     SuperStreamConsumer,
     SuperStreamProducer,
     amqp_decoder,
@@ -23,6 +24,7 @@ from rstream import (
 from .util import (
     on_publish_confirm_client_callback,
     on_publish_confirm_client_callback2,
+    routing_extractor_generic,
     task_to_delete_connection,
     wait_for,
 )
@@ -61,6 +63,18 @@ async def test_publishing_sequence(stream: str, producer: Producer, consumer: Co
     assert await producer.send_batch(stream, [b"two", b"three"]) == [2, 3]
     await wait_for(lambda: len(captured) == 3)
     assert captured == [b"one", b"two", b"three"]
+
+
+async def test_publishing_several_messages(stream: str, producer: Producer, consumer: Consumer) -> None:
+    captured: list[bytes] = []
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
+
+    for i in range(0, 100000):
+        await producer.send(stream, b"one")
+
+    await wait_for(lambda: len(captured) == 100000)
 
 
 async def test_publishing_sequence_subbatching_nocompression(
@@ -472,3 +486,55 @@ async def test_producer_connection_broke(stream: str) -> None:
 
     assert connection_broke is True
     assert stream_disconnected == stream
+
+
+async def test_super_stream_producer_connection_broke(super_stream: str) -> None:
+
+    connection_broke = False
+    streams_disconnected: set[str] = set()
+    producer_broke: Producer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        nonlocal connection_broke
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal streams_disconnected
+        for stream in disconnection_info.streams:
+            streams_disconnected.add(stream)
+
+        await super_stream_producer_broke.close()
+
+    super_stream_producer_broke = SuperStreamProducer(
+        "localhost",
+        username="guest",
+        password="guest",
+        routing_extractor=routing_extractor_generic,
+        routing=RouteType.Hash,
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+        super_stream=super_stream,
+    )
+
+    await super_stream_producer_broke.start()
+
+    asyncio.create_task(task_to_delete_connection("test-connection"))
+    i = 0
+    while connection_broke is False:
+        amqp_message = AMQPMessage(
+            body="hello: {}".format(i),
+            application_properties={"id": "{}".format(i)},
+        )
+        i = i + 1
+        # send is asynchronous
+        await super_stream_producer_broke.send(message=amqp_message)
+
+    if connection_broke is False:
+        await super_stream_producer_broke.close()
+
+    await asyncio.sleep(1)
+
+    assert connection_broke is True
+    assert "test-super-stream-0" in streams_disconnected
+    assert "test-super-stream-1" in streams_disconnected
+    assert "test-super-stream-2" in streams_disconnected

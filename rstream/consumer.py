@@ -250,7 +250,7 @@ class Consumer:
         except asyncio.TimeoutError:
             logger.debug("timeout when closing consumer and deleting publisher")
         except BaseException as exc:
-            logger.exception("exception in delete_publisher in Producer.close:", exc)
+            logger.debug("exception in delete_publisher in Producer.close:", exc)
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
