@@ -139,7 +139,7 @@ class Producer:
         # check if we are in a server disconnection situation:
         # in this case we need avoid other send
         # otherwise if is a normal close() we need to send the last item in batch
-        for publisher in self._publishers.values():
+        for publisher in list(self._publishers.values()):
             if publisher.client.is_connection_alive() is False:
                 self._close_called = True
                 # just in this special case give time to all the tasks to complete
@@ -158,7 +158,7 @@ class Producer:
 
         self._close_called = True
 
-        for publisher in self._publishers.values():
+        for publisher in list(self._publishers.values()):
             if publisher.client.is_connection_alive():
                 try:
                     await asyncio.wait_for(publisher.client.delete_publisher(publisher.id), 5)
@@ -241,6 +241,9 @@ class Producer:
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
+
+        if self._close_called:
+            return []
 
         wrapped_batch = []
         for item in batch:

@@ -717,7 +717,7 @@ class ClientPool:
         return client
 
     async def close(self) -> None:
-        for client in self._clients.values():
+        for client in list(self._clients.values()):
             await client.close()
 
         self._clients.clear()
