@@ -242,6 +242,9 @@ class Producer:
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
+        if self._close_called:
+            return []
+
         wrapped_batch = []
         for item in batch:
             wrapped_item = _MessageNotification(

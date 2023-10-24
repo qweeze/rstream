@@ -482,7 +482,50 @@ async def test_producer_connection_broke(stream: str) -> None:
         await producer_broke.send(stream, b"one")
         await asyncio.sleep(0)
 
-    await asyncio.sleep(1)
+    assert connection_broke is True
+    assert stream_disconnected == stream
+
+
+async def test_producer_connection_broke_with_send_batch(stream: str) -> None:
+
+    connection_broke = False
+    stream_disconnected = None
+    producer_broke: Producer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+
+        nonlocal connection_broke
+        if connection_broke is True:
+            return None
+
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal stream_disconnected
+        stream_disconnected = disconnection_info.streams.pop()
+
+        await producer_broke.close()
+
+    producer_broke = Producer(
+        "localhost",
+        username="guest",
+        password="guest",
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+    )
+
+    await producer_broke.start()
+    asyncio.create_task(task_to_delete_connection("test-connection"))
+
+    while connection_broke is False:
+        batch = []
+        for i in range(10000):
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+            )
+            batch.append(amqp_message)
+        await producer_broke.send_batch(stream, batch)  # type: ignore
+        batch.clear()
 
     assert connection_broke is True
     assert stream_disconnected == stream
@@ -531,8 +574,6 @@ async def test_super_stream_producer_connection_broke(super_stream: str) -> None
 
     if connection_broke is False:
         await super_stream_producer_broke.close()
-
-    await asyncio.sleep(1)
 
     assert connection_broke is True
     assert "test-super-stream-0" in streams_disconnected
@@ -583,8 +624,6 @@ async def test_super_stream_producer_connection_broke_locator(super_stream: str)
 
     if connection_broke is False:
         await super_stream_producer_broke.close()
-
-    await asyncio.sleep(1)
 
     assert connection_broke is True
     assert len(streams_disconnected) == 0
