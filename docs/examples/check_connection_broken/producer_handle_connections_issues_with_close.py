@@ -28,6 +28,7 @@ async def publish():
             await producer.close()
             connection_is_closed = True
 
+    print("Creating producer")
     # avoid to use async context in this case as we are closing the producer ourself in the callback
     # in this case we avoid double cls
     producer = Producer(
@@ -40,11 +41,16 @@ async def publish():
 
     # sending a million of messages in AMQP format
     start_time = time.perf_counter()
-
+    global connection_is_closed
+    print("Sending messages")
     for i in range(MESSAGES):
         amqp_message = AMQPMessage(
             body="hello: {}".format(i),
         )
+
+        if i % 100000 == 0:
+            print("sent {}  messages".format(i))
+
         # send is asynchronous
         if connection_is_closed is False:
             await producer.send(stream=STREAM, message=amqp_message)
@@ -53,6 +59,7 @@ async def publish():
 
     if connection_is_closed is False:
         await producer.close()
+
 
     end_time = time.perf_counter()
     print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
