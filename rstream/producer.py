@@ -65,22 +65,22 @@ logger = logging.getLogger(__name__)
 
 class Producer:
     def __init__(
-            self,
-            host: str,
-            port: int = 5552,
-            *,
-            ssl_context: Optional[ssl.SSLContext] = None,
-            vhost: str = "/",
-            username: str,
-            password: str,
-            frame_max: int = 1 * 1024 * 1024,
-            heartbeat: int = 60,
-            load_balancer_mode: bool = False,
-            max_retries: int = 20,
-            default_batch_publishing_delay: float = 0.2,
-            default_context_switch_value: int = 1000,
-            connection_name: str = None,
-            connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        self,
+        host: str,
+        port: int = 5552,
+        *,
+        ssl_context: Optional[ssl.SSLContext] = None,
+        vhost: str = "/",
+        username: str,
+        password: str,
+        frame_max: int = 1 * 1024 * 1024,
+        heartbeat: int = 60,
+        load_balancer_mode: bool = False,
+        max_retries: int = 20,
+        default_batch_publishing_delay: float = 0.2,
+        default_context_switch_value: int = 1000,
+        connection_name: str = None,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -188,9 +188,9 @@ class Producer:
         return self._clients[stream]
 
     async def _get_or_create_publisher(
-            self,
-            stream: str,
-            publisher_name: Optional[str] = None,
+        self,
+        stream: str,
+        publisher_name: Optional[str] = None,
     ) -> _Publisher:
         if stream in self._publishers:
             publisher = self._publishers[stream]
@@ -235,11 +235,11 @@ class Producer:
         return publisher
 
     async def send_batch(
-            self,
-            stream: str,
-            batch: list[MessageT],
-            publisher_name: Optional[str] = None,
-            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+        self,
+        stream: str,
+        batch: list[MessageT],
+        publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
         if self._close_called:
@@ -255,10 +255,10 @@ class Producer:
         return await self._send_batch(stream, wrapped_batch, sync=False)
 
     async def _send_batch(
-            self,
-            stream: str,
-            batch: list[_MessageNotification],
-            sync: bool = True,
+        self,
+        stream: str,
+        batch: list[_MessageNotification],
+        sync: bool = True,
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -347,10 +347,10 @@ class Producer:
         return list(publishing_ids)
 
     async def send_wait(
-            self,
-            stream: str,
-            message: MessageT,
-            publisher_name: Optional[str] = None,
+        self,
+        stream: str,
+        message: MessageT,
+        publisher_name: Optional[str] = None,
     ) -> int:
 
         wrapped_message: _MessageNotification = _MessageNotification(
@@ -373,11 +373,11 @@ class Producer:
         return 0
 
     async def send(
-            self,
-            stream: str,
-            message: MessageT,
-            publisher_name: Optional[str] = None,
-            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+        self,
+        stream: str,
+        message: MessageT,
+        publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
         # start the background thread to send buffered messages
@@ -398,12 +398,12 @@ class Producer:
             self._default_context_switch_counter = 0
 
     async def send_sub_entry(
-            self,
-            stream: str,
-            sub_entry_messages: list[MessageT],
-            compression_type: CompressionType = CompressionType.No,
-            publisher_name: Optional[str] = None,
-            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+        self,
+        stream: str,
+        sub_entry_messages: list[MessageT],
+        compression_type: CompressionType = CompressionType.No,
+        publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
         if len(sub_entry_messages) == 0:
@@ -494,10 +494,10 @@ class Producer:
                         confirmation.set_exception(exc)
 
     async def create_stream(
-            self,
-            stream: str,
-            arguments: Optional[dict[str, Any]] = None,
-            exists_ok: bool = False,
+        self,
+        stream: str,
+        arguments: Optional[dict[str, Any]] = None,
+        exists_ok: bool = False,
     ) -> None:
 
         try:

@@ -482,6 +482,8 @@ async def test_producer_connection_broke(stream: str) -> None:
         await producer_broke.send(stream, b"one")
         await asyncio.sleep(0)
 
+    await producer_broke.close()
+
     assert connection_broke is True
     assert stream_disconnected == stream
 
@@ -504,8 +506,6 @@ async def test_producer_connection_broke_with_send_batch(stream: str) -> None:
         nonlocal stream_disconnected
         stream_disconnected = disconnection_info.streams.pop()
 
-        await producer_broke.close()
-
     producer_broke = Producer(
         "localhost",
         username="guest",
@@ -527,6 +527,7 @@ async def test_producer_connection_broke_with_send_batch(stream: str) -> None:
         await producer_broke.send_batch(stream, batch)  # type: ignore
         batch.clear()
 
+    await producer_broke.close()
     assert connection_broke is True
     assert stream_disconnected == stream
 
@@ -545,8 +546,6 @@ async def test_super_stream_producer_connection_broke(super_stream: str) -> None
         nonlocal streams_disconnected
         for stream in disconnection_info.streams:
             streams_disconnected.add(stream)
-
-        await super_stream_producer_broke.close()
 
     super_stream_producer_broke = SuperStreamProducer(
         "localhost",
@@ -572,8 +571,7 @@ async def test_super_stream_producer_connection_broke(super_stream: str) -> None
         # send is asynchronous
         await super_stream_producer_broke.send(message=amqp_message)
 
-    if connection_broke is False:
-        await super_stream_producer_broke.close()
+    await super_stream_producer_broke.close()
 
     assert connection_broke is True
     assert "test-super-stream-0" in streams_disconnected
@@ -595,8 +593,6 @@ async def test_super_stream_producer_connection_broke_locator(super_stream: str)
         nonlocal streams_disconnected
         for stream in disconnection_info.streams:
             streams_disconnected.add(stream)
-
-        await super_stream_producer_broke.close()
 
     super_stream_producer_broke = SuperStreamProducer(
         "localhost",
@@ -622,8 +618,7 @@ async def test_super_stream_producer_connection_broke_locator(super_stream: str)
         # send is asynchronous
         await super_stream_producer_broke.send(message=amqp_message)
 
-    if connection_broke is False:
-        await super_stream_producer_broke.close()
+    await super_stream_producer_broke.close()
 
     assert connection_broke is True
     assert len(streams_disconnected) == 0

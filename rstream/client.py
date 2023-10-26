@@ -60,15 +60,15 @@ class Addr(NamedTuple):
 
 class BaseClient:
     def __init__(
-            self,
-            host: str,
-            port: int,
-            *,
-            ssl_context: Optional[ssl.SSLContext] = None,
-            frame_max: int,
-            heartbeat: int,
-            connection_name: Optional[str] = "",
-            connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        self,
+        host: str,
+        port: int,
+        *,
+        ssl_context: Optional[ssl.SSLContext] = None,
+        frame_max: int,
+        heartbeat: int,
+        connection_name: Optional[str] = "",
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ):
         self.host = host
         self.port = port
@@ -123,10 +123,10 @@ class BaseClient:
                 await task
 
     def add_handler(
-            self,
-            frame_cls: Type[FT],
-            handler: HT[FT],
-            name: Optional[str] = None,
+        self,
+        frame_cls: Type[FT],
+        handler: HT[FT],
+        name: Optional[str] = None,
     ) -> None:
         if name is None:
             name = handler.__name__
@@ -153,19 +153,13 @@ class BaseClient:
                 await self._conn.write_frame(frame)
         except socket.error:
             self._is_not_closed = False
-            # if self._connection_closed_handler is None:
-            #     logger.exception("TCP connection closed")
-            # else:
-            #     connection_error_info = DisconnectionErrorInfo("Socket Error", self._streams)
-            #     result = self._connection_closed_handler(connection_error_info)
-            #     if result is not None and inspect.isawaitable(result):
-            #         await result
+            logger.debug("TCP connection closed")
 
     def wait_frame(
-            self,
-            frame_cls: Type[FT],
-            corr_id: Optional[int] = None,
-            timeout: Optional[int] = None,
+        self,
+        frame_cls: Type[FT],
+        corr_id: Optional[int] = None,
+        timeout: Optional[int] = None,
     ) -> Awaitable[FT]:
         if timeout is None:
             timeout = DEFAULT_REQUEST_TIMEOUT
@@ -241,21 +235,15 @@ class BaseClient:
                             if maybe_coro is not None:
                                 await maybe_coro
 
-                    except Exception:
-                        logger.exception("Error while running handler %s of frame %s", handler, frame)
-        except:
-            logger.exception("TCP connection closed")
-            self._is_not_closed = False
-        finally:
+                    except BaseException:
+                        logger.debug("Error while running handler %s of frame %s", handler, frame)
+        except (ConnectionClosed, socket.error):
             if self._connection_closed_handler is not None:
                 self._is_not_closed = False
                 connection_error_info = DisconnectionErrorInfo("Connection Closed", self._streams)
                 result = self._connection_closed_handler(connection_error_info)
                 if result is not None and inspect.isawaitable(result):
                     await result
-            else:
-                logger.debug("TCP connection closed")
-
 
     def _start_heartbeat(self) -> None:
         self.start_task("heartbeat_sender", self._heartbeat_sender())
@@ -315,6 +303,7 @@ class BaseClient:
                     logger.exception("exception in client close() sync_request", exc)
 
         self._is_not_closed = False
+        await asyncio.sleep(0.2)
         await self.stop_task("listener")
 
         for subscriber_name in self._frames:
@@ -435,8 +424,8 @@ class Client(BaseClient):
         return True
 
     async def query_leader_and_replicas(
-            self,
-            stream: str,
+        self,
+        stream: str,
     ) -> tuple[schema.Broker, list[schema.Broker]]:
         metadata_resp = await self.sync_request(
             schema.Metadata(
@@ -456,12 +445,12 @@ class Client(BaseClient):
         return leader, replicas
 
     async def subscribe(
-            self,
-            stream: str,
-            subscription_id: int,
-            offset_spec: schema.OffsetSpec = schema.OffsetSpec(constants.OffsetType.FIRST),
-            initial_credit: int = 10,
-            properties: Optional[dict[str, Any]] = None,
+        self,
+        stream: str,
+        subscription_id: int,
+        offset_spec: schema.OffsetSpec = schema.OffsetSpec(constants.OffsetType.FIRST),
+        initial_credit: int = 10,
+        properties: Optional[dict[str, Any]] = None,
     ) -> None:
         await self.sync_request(
             schema.Subscribe(
@@ -592,18 +581,18 @@ class Client(BaseClient):
 
 class ClientPool:
     def __init__(
-            self,
-            host: str,
-            port: int,
-            *,
-            ssl_context: Optional[ssl.SSLContext] = None,
-            vhost: str,
-            username: str,
-            password: str,
-            frame_max: int,
-            heartbeat: int,
-            load_balancer_mode: bool,
-            max_retries: int,
+        self,
+        host: str,
+        port: int,
+        *,
+        ssl_context: Optional[ssl.SSLContext] = None,
+        vhost: str,
+        username: str,
+        password: str,
+        frame_max: int,
+        heartbeat: int,
+        load_balancer_mode: bool,
+        max_retries: int,
     ):
         self.addr = Addr(host=host, port=port)
         self.ssl_context = ssl_context
@@ -618,10 +607,10 @@ class ClientPool:
         self._clients: dict[Addr, Client] = {}
 
     async def get(
-            self,
-            connection_name: Optional[str],
-            addr: Optional[Addr] = None,
-            connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        self,
+        connection_name: Optional[str],
+        addr: Optional[Addr] = None,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ) -> Client:
         """Get a client according to `addr` parameter
 
@@ -651,10 +640,10 @@ class ClientPool:
         return self._clients[desired_addr]
 
     async def _resolve_broker(
-            self,
-            connection_name: Optional[str],
-            addr: Addr,
-            connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        self,
+        connection_name: Optional[str],
+        addr: Addr,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ) -> Client:
         desired_host, desired_port = addr.host, str(addr.port)
 
@@ -685,10 +674,10 @@ class ClientPool:
         )
 
     async def new(
-            self,
-            connection_name: Optional[str],
-            addr: Addr,
-            connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        self,
+        connection_name: Optional[str],
+        addr: Addr,
+        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
     ) -> Client:
         host, port = addr
         client = Client(
