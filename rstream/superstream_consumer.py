@@ -181,6 +181,7 @@ class SuperStreamConsumer:
             load_balancer_mode=False,
             max_retries=self.max_retries,
             connection_closed_handler=self._connection_closed_handler,
+            connection_name=self._connection_name,
         )
 
         await consumer.start()

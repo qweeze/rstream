@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+import logging
 from functools import partial
 
 import pytest
@@ -10,8 +11,10 @@ from rstream import (
     AMQPMessage,
     CompressionType,
     Consumer,
+    DisconnectionErrorInfo,
     Producer,
     RawMessage,
+    RouteType,
     SuperStreamConsumer,
     SuperStreamProducer,
     amqp_decoder,
@@ -21,9 +24,12 @@ from rstream import (
 from .util import (
     on_publish_confirm_client_callback,
     on_publish_confirm_client_callback2,
+    routing_extractor_generic,
+    task_to_delete_connection,
     wait_for,
 )
 
+logger = logging.getLogger(__name__)
 pytestmark = pytest.mark.asyncio
 
 
@@ -57,6 +63,18 @@ async def test_publishing_sequence(stream: str, producer: Producer, consumer: Co
     assert await producer.send_batch(stream, [b"two", b"three"]) == [2, 3]
     await wait_for(lambda: len(captured) == 3)
     assert captured == [b"one", b"two", b"three"]
+
+
+async def test_publishing_several_messages(stream: str, producer: Producer, consumer: Consumer) -> None:
+    captured: list[bytes] = []
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
+
+    for i in range(0, 100000):
+        await producer.send(stream, b"one")
+
+    await wait_for(lambda: len(captured) == 100000)
 
 
 async def test_publishing_sequence_subbatching_nocompression(
@@ -431,3 +449,131 @@ async def test_publishing_sequence_superstream_with_callback(
     await publish_with_ids(1, 2, 3)
 
     await wait_for(lambda: len(confirmed_messages) == 3)
+
+
+async def test_producer_connection_broke(stream: str) -> None:
+
+    connection_broke = False
+    stream_disconnected = None
+    producer_broke: Producer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        nonlocal connection_broke
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal stream_disconnected
+        stream_disconnected = disconnection_info.streams.pop()
+
+        await producer_broke.close()
+
+    producer_broke = Producer(
+        "localhost",
+        username="guest",
+        password="guest",
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+    )
+
+    await producer_broke.start()
+    asyncio.create_task(task_to_delete_connection("test-connection"))
+
+    while connection_broke is False:
+        await producer_broke.send(stream, b"one")
+        await asyncio.sleep(0)
+
+    await producer_broke.close()
+
+    assert connection_broke is True
+    assert stream_disconnected == stream
+
+
+async def test_producer_connection_broke_with_send_batch(stream: str) -> None:
+
+    connection_broke = False
+    stream_disconnected = None
+    producer_broke: Producer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+
+        nonlocal connection_broke
+        if connection_broke is True:
+            return None
+
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal stream_disconnected
+        stream_disconnected = disconnection_info.streams.pop()
+
+    producer_broke = Producer(
+        "localhost",
+        username="guest",
+        password="guest",
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+    )
+
+    await producer_broke.start()
+    asyncio.create_task(task_to_delete_connection("test-connection"))
+
+    while connection_broke is False:
+        batch = []
+        for i in range(10000):
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+            )
+            batch.append(amqp_message)
+        await producer_broke.send_batch(stream, batch)  # type: ignore
+        batch.clear()
+
+    await producer_broke.close()
+    assert connection_broke is True
+    assert stream_disconnected == stream
+
+
+async def test_super_stream_producer_connection_broke(super_stream: str) -> None:
+
+    connection_broke = False
+    streams_disconnected: set[str] = set()
+    producer_broke: Producer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        nonlocal connection_broke
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal streams_disconnected
+        for stream in disconnection_info.streams:
+            streams_disconnected.add(stream)
+
+    super_stream_producer_broke = SuperStreamProducer(
+        "localhost",
+        username="guest",
+        password="guest",
+        routing_extractor=routing_extractor_generic,
+        routing=RouteType.Hash,
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection",
+        super_stream=super_stream,
+    )
+
+    await super_stream_producer_broke.start()
+
+    asyncio.create_task(task_to_delete_connection("test-connection"))
+    i = 0
+    while connection_broke is False:
+        amqp_message = AMQPMessage(
+            body="hello: {}".format(i),
+            application_properties={"id": "{}".format(i)},
+        )
+        i = i + 1
+        # send is asynchronous
+        await super_stream_producer_broke.send(message=amqp_message)
+
+    await super_stream_producer_broke.close()
+
+    assert connection_broke is True
+    assert "test-super-stream-0" in streams_disconnected
+    assert "test-super-stream-1" in streams_disconnected
+    assert "test-super-stream-2" in streams_disconnected

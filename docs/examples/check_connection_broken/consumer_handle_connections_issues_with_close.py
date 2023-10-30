@@ -1,56 +1,59 @@
 import asyncio
-import time
+import signal
 
 from rstream import (
     AMQPMessage,
+    Consumer,
     DisconnectionErrorInfo,
-    Producer,
+    MessageContext,
+    amqp_decoder,
 )
 
 STREAM = "my-test-stream"
-MESSAGES = 10000000
+COUNT = 0
 connection_is_closed = False
 
 
-async def publish():
+async def consume():
     async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
         print(
             "connection has been closed from stream: "
             + str(disconnection_info.streams)
             + " for reason: "
-            + disconnection_info.reason
+            + str(disconnection_info.reason)
         )
 
         global connection_is_closed
-        connection_is_closed = True
 
-        await producer.close()
+        # avoid multiple simultaneous disconnection to call close multiple times
+        if connection_is_closed is False:
+            await consumer.close()
+            connection_is_closed = True
 
-    # avoid to use async context in this case as we are closing the producer ourself in the callback
-    # in this case we avoid double closing
-    producer = Producer(
-        "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
+    consumer = Consumer(
+        host="localhost",
+        port=5552,
+        vhost="/",
+        username="guest",
+        password="guest",
+        connection_closed_handler=on_connection_closed,
     )
 
-    await producer.start()
-    # create a stream if it doesn't already exist
-    await producer.create_stream(STREAM, exists_ok=True)
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(consumer.close()))
 
-    # sending a million of messages in AMQP format
-    start_time = time.perf_counter()
+    async def on_message(msg: AMQPMessage, message_context: MessageContext):
+        stream = message_context.consumer.get_stream(message_context.subscriber_name)
+        offset = message_context.offset
+        global COUNT
+        COUNT = COUNT + 1
+        if COUNT % 1000000 == 0:
+            # print("Got message: {} from stream {}, offset {}".format(msg, stream, offset))
+            print("consumed 1 million messages")
 
-    for i in range(MESSAGES):
-        amqp_message = AMQPMessage(
-            body="hello: {}".format(i),
-        )
-        # send is asynchronous
-        if connection_is_closed is False:
-            await producer.send(stream=STREAM, message=amqp_message)
-        else:
-            break
-
-    end_time = time.perf_counter()
-    print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
+    await consumer.start()
+    await consumer.subscribe(stream=STREAM, callback=on_message, decoder=amqp_decoder)
+    await consumer.run()
 
 
-asyncio.run(publish())
+asyncio.run(consume())
