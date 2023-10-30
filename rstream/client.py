@@ -153,7 +153,10 @@ class BaseClient:
                 await self._conn.write_frame(frame)
         except socket.error:
             self._is_not_closed = False
-            logger.debug("TCP connection closed")
+            if self._connection_closed_handler is not None:
+                logger.debug("TCP connection closed")
+            else:
+                logger.exception("TCP connection closed")
 
     def wait_frame(
         self,
@@ -238,14 +241,16 @@ class BaseClient:
                     except BaseException:
                         logger.debug("Error while running handler %s of frame %s", handler, frame)
         except (ConnectionClosed, socket.error):
+            self._is_not_closed = False
             if self._connection_closed_handler is not None:
-                self._is_not_closed = False
                 # don't raise for locator connections without streams
                 if len(self._streams) > 0:
                     connection_error_info = DisconnectionErrorInfo("Connection Closed", self._streams)
                     result = self._connection_closed_handler(connection_error_info)
                     if result is not None and inspect.isawaitable(result):
                         await result
+            else:
+                logger.exception("Connection Closed Error")
 
     def _start_heartbeat(self) -> None:
         self.start_task("heartbeat_sender", self._heartbeat_sender())
