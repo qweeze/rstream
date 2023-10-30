@@ -135,17 +135,30 @@ class Producer:
         )
 
     async def close(self) -> None:
-        self._close_called = True
+
+        # check if we are in a server disconnection situation:
+        # in this case we need avoid other send
+        # otherwise if is a normal close() we need to send the last item in batch
+        for publisher in self._publishers.values():
+            if publisher.client.is_connection_alive() is False:
+                self._close_called = True
+                # just in this special case give time to all the tasks to complete
+                await asyncio.sleep(0.2)
+                break
+
         # flush messages still in buffer
         if self._default_client is None:
             return
+
         if self.default_client.is_connection_alive():
             if self.task is not None:
                 for stream in self._buffered_messages:
                     await self._publish_buffered_messages(stream)
                 self.task.cancel()
 
-        for publisher in self._publishers.values():
+        self._close_called = True
+
+        for publisher in list(self._publishers.values()):
             if publisher.client.is_connection_alive():
                 try:
                     await asyncio.wait_for(publisher.client.delete_publisher(publisher.id), 5)
@@ -229,6 +242,9 @@ class Producer:
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
+        if self._close_called:
+            return []
+
         wrapped_batch = []
         for item in batch:
             wrapped_item = _MessageNotification(
@@ -308,7 +324,6 @@ class Producer:
                     publishing_ids_callback[item.callback].add(publishing_id)
 
         if len(messages) > 0:
-
             await publisher.client.send_frame(
                 schema.Publish(
                     publisher_id=publisher.id,

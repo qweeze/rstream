@@ -30,10 +30,10 @@ async def publish():
         global connection_is_closed
         connection_is_closed = True
 
-        await super_stream_producer.close()
-
-    # avoiding using async context as we close the producer ourself in on_connection_closed callback
-    super_stream_producer = SuperStreamProducer(
+    # super_stream_producer will be closed by the async context manager
+    # both if connection is still alive or not
+    print("creating super_stream producer")
+    async with SuperStreamProducer(
         "localhost",
         username="guest",
         password="guest",
@@ -41,25 +41,27 @@ async def publish():
         routing=RouteType.Hash,
         connection_closed_handler=on_connection_closed,
         super_stream=SUPER_STREAM,
-    )
+    ) as super_stream_producer:
 
-    await super_stream_producer.start()
+        # sending a million of messages in AMQP format
+        start_time = time.perf_counter()
+        global connection_is_closed
 
-    # sending a million of messages in AMQP format
-    start_time = time.perf_counter()
-    global connection_is_closed
+        print("sending messages")
+        for i in range(MESSAGES):
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+                application_properties={"id": "{}".format(i)},
+            )
 
-    for i in range(MESSAGES):
-        amqp_message = AMQPMessage(
-            body="hello: {}".format(i),
-            application_properties={"id": "{}".format(i)},
-        )
+            # send is asynchronous
+            if connection_is_closed is False:
+                await super_stream_producer.send(message=amqp_message)
+            else:
+                break
 
-        # send is asynchronous
-        if connection_is_closed is False:
-            await super_stream_producer.send(message=amqp_message)
-        else:
-            break
+            if i % 10000 == 0:
+                print("sent 10000 MESSAGES")
 
     end_time = time.perf_counter()
     print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")

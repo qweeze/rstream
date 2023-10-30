@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import asyncio
+import logging
 from collections import defaultdict
 from typing import Any, Awaitable, Callable, Optional
 
@@ -16,7 +17,23 @@ from rstream import (
     amqp_decoder,
 )
 
+from .http_requests import (
+    delete_connection,
+    get_connection,
+    get_connection_present,
+    get_connections,
+)
+
 captured: list[bytes] = []
+logger = logging.getLogger(__name__)
+
+
+async def wait_for(condition, timeout=1):
+    async def _wait():
+        while not condition():
+            await asyncio.sleep(0.01)
+
+    await asyncio.wait_for(_wait(), timeout)
 
 
 async def consumer_update_handler_next(is_active: bool, event_context: EventContext) -> OffsetSpecification:
@@ -32,14 +49,6 @@ async def consumer_update_handler_first(is_active: bool, event_context: EventCon
 async def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
 
     return OffsetSpecification(OffsetType.OFFSET, 10)
-
-
-async def wait_for(condition, timeout=1):
-    async def _wait():
-        while not condition():
-            await asyncio.sleep(0.01)
-
-    await asyncio.wait_for(_wait(), timeout)
 
 
 async def on_publish_confirm_client_callback(
@@ -64,6 +73,10 @@ async def on_publish_confirm_client_callback2(
 
 async def routing_extractor(message: AMQPMessage) -> str:
     return "0"
+
+
+async def routing_extractor_generic(message: AMQPMessage) -> str:
+    return message.application_properties["id"]
 
 
 async def routing_extractor_for_sac(message: AMQPMessage) -> str:
@@ -109,3 +122,18 @@ async def run_consumer(
         properties=properties,
         consumer_update_listener=consumer_update_listener,
     )
+
+
+async def task_to_delete_connection(connection_name: str) -> None:
+
+    # delay a few seconds before deleting the connection
+    await asyncio.sleep(5)
+
+    connections = get_connections()
+
+    await wait_for(lambda: get_connection_present(connection_name, connections) is True)
+
+    for connection in connections:
+        if connection["client_properties"]["connection_name"] == connection_name:
+            delete_connection(connection["name"])
+            await wait_for(lambda: get_connection(connection["name"]) is False)
