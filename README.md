@@ -169,8 +169,13 @@ The client does not support auto-reconnect at the moment.
 When the TCP connection is disconnected unexpectedly, the client raises an event:
 
 ```python
-def on_connection_closed(reason: Exception) -> None:
-    print("connection has been closed for reason: " + str(reason))
+async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    print(
+        "connection has been closed from stream: "
+        + str(disconnection_info.streams)
+        + " for reason: "
+        + str(disconnection_info.reason)
+    )
 
 consumer = Consumer(
 ..        
@@ -178,7 +183,7 @@ connection_closed_handler=on_connection_closed,
 )
 ```
 
-Please take a look at the complete example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/consumer_handle_connections_issues.py)
+Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/)
 
 ## Load Balancer
 
