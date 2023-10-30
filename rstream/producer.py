@@ -263,6 +263,7 @@ class Producer:
         if len(batch) == 0:
             raise ValueError("Empty batch")
 
+        await self.check_connection()
         if self._close_called:
             return []
 
@@ -379,6 +380,8 @@ class Producer:
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
+
+        await self.check_connection()
 
         # start the background thread to send buffered messages
         if self.task is None:
@@ -522,3 +525,8 @@ class Producer:
 
     async def stream_exists(self, stream: str) -> bool:
         return await self.default_client.stream_exists(stream)
+
+    async def check_connection(self):
+
+        if self._default_client.is_connection_alive() is False:
+            raise Exception("connection Closed")
