@@ -482,7 +482,7 @@ async def test_producer_connection_broke(stream: str) -> None:
         try:
             await producer_broke.send(stream, b"one")
         # Connection broke
-        except:
+        except BaseException:
             break
 
     await producer_broke.close()
@@ -531,7 +531,7 @@ async def test_producer_connection_broke_with_send_batch(stream: str) -> None:
             else:
                 break
         # Connection closed
-        except:
+        except BaseException:
             break
 
     await producer_broke.close()
@@ -582,7 +582,7 @@ async def test_super_stream_producer_connection_broke(super_stream: str) -> None
             else:
                 break
         # Connection closed
-        except:
+        except BaseException:
             break
 
     await super_stream_producer_broke.close()
@@ -630,7 +630,7 @@ async def test_producer_connection_broke_with_reconnect(stream: str) -> None:
                 connection_broke = False
                 break
         # Connection broke wait for reconnection
-        except:
+        except BaseException:
             disconnected_once = True
             # wait for reconnection
             await asyncio.sleep(2)
@@ -688,7 +688,7 @@ async def test_super_stream_producer_connection_broke_with_reconnect(super_strea
                 connection_broke = False
                 break
             # Connection broke wait for reconnection
-        except:
+        except BaseException:
             disconnected_once = True
             # wait for reconnection
             await asyncio.sleep(2)

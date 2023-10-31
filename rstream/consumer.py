@@ -365,10 +365,8 @@ class Consumer:
     async def reconnect_stream(self, stream: str, offset: int) -> None:
 
         curr_subscriber = None
-        sub_id = None
         for subscriber_id in self._subscribers:
             if stream == self._subscribers[subscriber_id].stream:
-                sub_id = subscriber_id
                 curr_subscriber = self._subscribers[subscriber_id]
 
         # close previous clients and re-create a publisher (with a new client)
@@ -376,16 +374,19 @@ class Consumer:
             await self._clients[stream].close()
             del self._clients[stream]
 
-        await self._default_client.close()
-        self._default_client = None
+        if self._default_client is not None:
+            if self._default_client.is_connection_alive() is False:
+                await self._default_client.close()
+                self._default_client = None
 
         offset_specification = ConsumerOffsetSpecification(OffsetType.OFFSET, offset)
-        asyncio.create_task(
-            self.subscribe(
-                stream=curr_subscriber.stream,
-                subscriber_name=curr_subscriber.reference,
-                callback=curr_subscriber.callback,
-                decoder=curr_subscriber.decoder,
-                offset_specification=offset_specification,
+        if curr_subscriber is not None:
+            asyncio.create_task(
+                self.subscribe(
+                    stream=curr_subscriber.stream,
+                    subscriber_name=curr_subscriber.reference,
+                    callback=curr_subscriber.callback,
+                    decoder=curr_subscriber.decoder,
+                    offset_specification=offset_specification,
+                )
             )
-        )

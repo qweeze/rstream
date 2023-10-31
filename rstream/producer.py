@@ -538,15 +538,17 @@ class Producer:
 
     async def reconnect_stream(self, stream: str) -> None:
 
-        # close previous clients and re-create a publisher (with a new client)
         if stream in self._clients:
             del self._clients[stream]
         if stream in self._publishers:
             async with self._lock:
+                await self._publishers[stream].client.close()
                 del self._publishers[stream]
 
-        await self._default_client.close()
-        self._default_client = None
+        if self._default_client is not None:
+            if self._default_client.is_connection_alive() is False:
+                await self._default_client.close()
+                self._default_client = None
 
         async with self._lock:
             await self._get_or_create_publisher(stream)
