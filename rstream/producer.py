@@ -178,6 +178,11 @@ class Producer:
 
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
+            if self._default_client is None:
+                self._default_client = await self._pool.get(
+                    connection_closed_handler=self._connection_closed_handler,
+                    connection_name=self._connection_name,
+                )
             leader, _ = await self.default_client.query_leader_and_replicas(stream)
             self._clients[stream] = await self._pool.get(
                 connection_name=self._connection_name,
@@ -530,3 +535,18 @@ class Producer:
 
         if self._default_client.is_connection_alive() is False:
             raise Exception("connection Closed")
+
+    async def reconnect_stream(self, stream: str) -> None:
+
+        # close previous clients and re-create a publisher (with a new client)
+        if stream in self._clients:
+            del self._clients[stream]
+        if stream in self._publishers:
+            async with self._lock:
+                del self._publishers[stream]
+
+        await self._default_client.close()
+        self._default_client = None
+
+        async with self._lock:
+            await self._get_or_create_publisher(stream)

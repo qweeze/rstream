@@ -129,6 +129,10 @@ class SuperStreamConsumer:
 
         return self._clients[stream]
 
+    async def get_consumer(self, partition: str):
+
+        return self._consumers[partition]
+
     async def subscribe(
         self,
         callback: Callable[[AMQPMessage, MessageContext], Union[None, Awaitable[None]]],
@@ -197,3 +201,6 @@ class SuperStreamConsumer:
 
             consumer = self._consumers[partition]
             await consumer.unsubscribe(self._subscribers[partition])
+
+    async def reconnect_stream(self, stream: str, offset: int) -> None:
+        await self._consumers[stream].reconnect_stream(stream, offset)

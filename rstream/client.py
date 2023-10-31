@@ -629,7 +629,7 @@ class ClientPool:
         """
         desired_addr = addr or self.addr
 
-        if desired_addr not in self._clients:
+        if desired_addr not in self._clients or self._clients[desired_addr].is_connection_alive() is False:
             if addr and self.load_balancer_mode:
                 self._clients[desired_addr] = await self._resolve_broker(
                     addr=desired_addr,

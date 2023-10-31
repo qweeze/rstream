@@ -151,3 +151,8 @@ class SuperStreamProducer:
         await self._pool.close()
         if self._producer is not None:
             await self._producer.close()
+
+    async def reconnect_stream(self, stream: str) -> None:
+
+        # close previous clients and re-create a publisher (with a new client)
+        await self._producer.reconnect_stream(stream)

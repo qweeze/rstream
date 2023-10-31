@@ -139,6 +139,11 @@ class Consumer:
 
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
+            if self._default_client is None:
+                self._default_client = await self._pool.get(
+                    connection_closed_handler=self._connection_closed_handler,
+                    connection_name=self._connection_name,
+                )
             leader, replicas = await self.default_client.query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
@@ -251,6 +256,7 @@ class Consumer:
             logger.debug("timeout when closing consumer and deleting publisher")
         except BaseException as exc:
             logger.debug("exception in delete_publisher in Producer.close:", exc)
+
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
@@ -355,3 +361,31 @@ class Consumer:
         if subscriber_name not in self._subscribers:
             return ""
         return self._subscribers[subscriber_name].stream
+
+    async def reconnect_stream(self, stream: str, offset: int) -> None:
+
+        curr_subscriber = None
+        sub_id = None
+        for subscriber_id in self._subscribers:
+            if stream == self._subscribers[subscriber_id].stream:
+                sub_id = subscriber_id
+                curr_subscriber = self._subscribers[subscriber_id]
+
+        # close previous clients and re-create a publisher (with a new client)
+        if stream in self._clients:
+            await self._clients[stream].close()
+            del self._clients[stream]
+
+        await self._default_client.close()
+        self._default_client = None
+
+        offset_specification = ConsumerOffsetSpecification(OffsetType.OFFSET, offset)
+        asyncio.create_task(
+            self.subscribe(
+                stream=curr_subscriber.stream,
+                subscriber_name=curr_subscriber.reference,
+                callback=curr_subscriber.callback,
+                decoder=curr_subscriber.decoder,
+                offset_specification=offset_specification,
+            )
+        )
