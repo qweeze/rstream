@@ -97,9 +97,7 @@ class SuperStreamConsumer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler, connection_name="rstream-locator"
-        )
+        self._default_client = None
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -147,6 +145,11 @@ class SuperStreamConsumer:
 
         if offset_specification is None:
             offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
+
+        if self._default_client is None or self._default_client.is_connection_alive() is False:
+            self._default_client = await self._pool.get(
+                connection_closed_handler=self._connection_closed_handler, connection_name="rstream-locator"
+            )
 
         self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self.default_client)
         partitions = await self._super_stream_metadata.partitions()
