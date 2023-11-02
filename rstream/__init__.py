@@ -19,7 +19,9 @@ from .compression import CompressionType  # noqa: E402
 from .constants import OffsetType  # noqa: E402
 from .constants import (  # noqa: E402
     ConsumerOffsetSpecification,
+    SlasMechanism,
 )
+
 from .consumer import (  # noqa: E402
     Consumer,
     EventContext,
@@ -62,4 +64,5 @@ __all__ = [
     "OffsetSpecification",
     "EventContext",
     "DisconnectionErrorInfo",
+    "SlasMechanism",
 ]

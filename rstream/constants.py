@@ -55,6 +55,11 @@ class OffsetType(int, enum.Enum):
     TIMESTAMP = 5
 
 
+class SlasMechanism(str, enum.Enum):
+    MechanismPlain = "PLAIN"
+    MechanismExternal = "EXTERNAL"
+
+
 @dataclass
 class ConsumerOffsetSpecification:
     offset_type: OffsetType = OffsetType.FIRST
