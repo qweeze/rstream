@@ -362,7 +362,7 @@ class Consumer:
             return ""
         return self._subscribers[subscriber_name].stream
 
-    async def reconnect_stream(self, stream: str, offset: int) -> None:
+    async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
 
         curr_subscriber = None
         for subscriber_id in self._subscribers:
@@ -378,6 +378,10 @@ class Consumer:
             if self._default_client.is_connection_alive() is False:
                 await self._default_client.close()
                 self._default_client = None
+
+        if offset is None:
+            if curr_subscriber is not None:
+                offset = curr_subscriber.offset
 
         offset_specification = ConsumerOffsetSpecification(OffsetType.OFFSET, offset)
         if curr_subscriber is not None:

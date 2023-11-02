@@ -12,7 +12,6 @@ from rstream import (
 STREAM = "my-test-stream"
 COUNT = 0
 connection_is_closed = False
-offset_to_restart = 0
 
 
 async def consume():
@@ -27,7 +26,9 @@ async def consume():
         global connection_is_closed
 
         for stream in disconnection_info.streams:
-            await consumer.reconnect_stream(stream, offset_to_restart)
+            # restart from last offset in subscriber
+            # alternatively you can specify an offset to reconnect
+            await consumer.reconnect_stream(stream)
 
     consumer = Consumer(
         host="localhost",

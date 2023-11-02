@@ -205,5 +205,5 @@ class SuperStreamConsumer:
             consumer = self._consumers[partition]
             await consumer.unsubscribe(self._subscribers[partition])
 
-    async def reconnect_stream(self, stream: str, offset: int) -> None:
+    async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
         await self._consumers[stream].reconnect_stream(stream, offset)

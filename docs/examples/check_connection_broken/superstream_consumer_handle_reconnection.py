@@ -13,7 +13,6 @@ from rstream import (
 
 count = 0
 connection_is_closed = False
-offset_to_restart = 10
 
 
 async def on_message(msg: AMQPMessage, message_context: MessageContext):
@@ -35,7 +34,9 @@ async def consume():
         )
 
         for stream in disconnection_info.streams:
-            await consumer.reconnect_stream(stream, offset_to_restart)
+            # restart from last offset in subscriber
+            # alternatively you can specify an offset to reconnect
+            await consumer.reconnect_stream(stream)
 
     consumer = SuperStreamConsumer(
         host="localhost",
