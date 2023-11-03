@@ -21,7 +21,6 @@ from .constants import (  # noqa: E402
     ConsumerOffsetSpecification,
     SlasMechanism,
 )
-
 from .consumer import (  # noqa: E402
     Consumer,
     EventContext,
