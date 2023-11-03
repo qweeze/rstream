@@ -22,6 +22,7 @@ The RabbitMQ stream plug-in is required. See the [documentation](https://www.rab
 - [Superstreams](#superstreams)
 - [Single Active Consumer](#single-active-consumer)
 - [Connecting with SSL](#connecting-with-ssl)
+- [Sasl Mechanisms](#sasl-mechanisms)
 - [Managing disconnections](#managing-disconnections)
 - [Load Balancer](#load-balancer)
 - [Client Performances](#client-performances)
@@ -161,6 +162,50 @@ See the [single active consumer example](https://github.com/qweeze/rstream/blob/
 You can enable ssl/tls.
 See example here:
 [tls example](https://github.com/qweeze/rstream/blob/master/docs/examples/tls/producer.py)
+
+### Sasl Mechanisms
+
+You can use the following sasl mechanisms:
+- PLAIN
+- EXTERNAL
+
+The client uses `PLAIN` mechanism by default.
+
+The `EXTERNAL` mechanism is used to authenticate a user based on a certificate presented by the client.
+Example:
+```python
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    # put the root certificate of the ca
+    ssl_context.load_verify_locations("certs/ca_certificate.pem")
+    ssl_context.load_cert_chain(
+        "certs/client_HOSTNAME_certificate.pem",
+        "certs/client_HOSTNAME_key.pem",
+    )
+
+    async with Producer(
+        "HOSTNAME",
+        username="not_important",
+        password="not_important",
+        port=5551,
+        ssl_context=ssl_context,
+        sasl_configuration_mechanism=SlasMechanism.MechanismExternal ## <--- here EXTERNAL configuration
+```
+The plugin `rabbitmq_auth_mechanism_ssl` needs to be enabled on the server side, and `ssl_options.fail_if_no_peer_cert` needs to set to `true`
+config example:
+```
+auth_mechanisms.3 = PLAIN
+auth_mechanisms.2 = AMQPLAIN
+auth_mechanisms.1 = EXTERNAL
+
+ssl_options.cacertfile = certs/ca_certificate.pem
+ssl_options.certfile = certs/server_certificate.pem
+ssl_options.keyfile = certs/server_key.pem
+listeners.ssl.default = 5671
+stream.listeners.ssl.default = 5551
+ssl_options.verify               = verify_peer
+ssl_options.fail_if_no_peer_cert = true
+```
+
 
 ### Managing disconnections
 
