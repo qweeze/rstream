@@ -2,11 +2,7 @@ import asyncio
 import ssl
 import time
 
-from rstream import (
-    AMQPMessage,
-    Producer,
-    SlasMechanism,
-)
+from rstream import AMQPMessage, Producer
 
 STREAM = "my-test-stream"
 LOOP = 10000
