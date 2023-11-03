@@ -145,6 +145,9 @@ class BaseClient:
     def is_connection_alive(self) -> bool:
         return self._is_not_closed
 
+    def add_stream(self, stream: str):
+        self._streams.append(stream)
+
     async def send_frame(self, frame: schema.Frame) -> None:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
@@ -444,7 +447,6 @@ class Client(BaseClient):
         assert len(metadata_resp.metadata) == 1
         metadata = metadata_resp.metadata[0]
         assert metadata.name == stream
-        self._streams.append(stream)
 
         brokers = {broker.reference: broker for broker in metadata_resp.brokers}
         leader = brokers[metadata.leader_ref]
@@ -618,6 +620,7 @@ class ClientPool:
         connection_name: Optional[str],
         addr: Optional[Addr] = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        stream: Optional[str] = None,
     ) -> Client:
         """Get a client according to `addr` parameter
 
@@ -643,6 +646,8 @@ class ClientPool:
                     connection_name=connection_name,
                 )
 
+        if stream is not None:
+            self._clients[desired_addr].add_stream(stream)
         assert self._clients[desired_addr].is_started
         return self._clients[desired_addr]
 

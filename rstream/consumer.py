@@ -150,6 +150,7 @@ class Consumer:
                 addr=Addr(broker.host, broker.port),
                 connection_closed_handler=self._connection_closed_handler,
                 connection_name=self._connection_name,
+                stream=stream,
             )
 
         return self._clients[stream]

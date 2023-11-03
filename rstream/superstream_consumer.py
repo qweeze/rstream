@@ -123,6 +123,7 @@ class SuperStreamConsumer:
                 addr=Addr(broker.host, broker.port),
                 connection_closed_handler=self._connection_closed_handler,
                 connection_name=self._connection_name,
+                stream=stream,
             )
 
         return self._clients[stream]
@@ -185,7 +186,7 @@ class SuperStreamConsumer:
             ssl_context=self.ssl_context,
             frame_max=self.frame_max,
             heartbeat=self.heartbeat,
-            load_balancer_mode=False,
+            load_balancer_mode=self.load_balancer_mode,
             max_retries=self.max_retries,
             connection_closed_handler=self._connection_closed_handler,
             connection_name=self._connection_name,

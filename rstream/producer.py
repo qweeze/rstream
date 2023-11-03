@@ -188,6 +188,7 @@ class Producer:
                 connection_name=self._connection_name,
                 addr=Addr(leader.host, leader.port),
                 connection_closed_handler=self._connection_closed_handler,
+                stream=stream,
             )
 
         return self._clients[stream]
@@ -533,8 +534,9 @@ class Producer:
 
     async def check_connection(self):
 
-        if self._default_client.is_connection_alive() is False:
-            raise Exception("connection Closed")
+        for publisher in self._publishers.values():
+            if publisher.client.is_connection_alive() is False:
+                raise Exception("connection Closed")
 
     async def reconnect_stream(self, stream: str) -> None:
 
