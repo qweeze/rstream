@@ -16,19 +16,10 @@ BATCH = 100
 async def publish():
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     # put the root certificate of the ca
-    ssl_context.load_verify_locations("/Users/gas/sw/rabbitmq_server-3.12.8/certs/ca_certificate.pem")
-    ssl_context.load_cert_chain(
-        "/Users/gas/sw/rabbitmq_server-3.12.8/certs/client_gsantomagg6LVDM_certificate.pem",
-        "/Users/gas/sw/rabbitmq_server-3.12.8/certs/client_gsantomagg6LVDM_key.pem",
-    )
+    ssl_context.load_verify_locations("/yourpath/ca_certificate.pem")
 
     async with Producer(
-        "gsantomagg6LVDM",
-        username="asdada",
-        password="asdsadasd",
-        port=5551,
-        ssl_context=ssl_context,
-        sasl_configuration_mechanism=SlasMechanism.MechanismExternal,
+        "localhost", username="guest", password="guest", port=5551, ssl_context=ssl_context
     ) as producer:
         # create a stream if it doesn't already exist
         await producer.create_stream(STREAM, exists_ok=True)
