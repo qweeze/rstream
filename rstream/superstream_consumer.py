@@ -97,9 +97,7 @@ class SuperStreamConsumer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler, connection_name="rstream-locator"
-        )
+        self._default_client = None
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -125,9 +123,14 @@ class SuperStreamConsumer:
                 addr=Addr(broker.host, broker.port),
                 connection_closed_handler=self._connection_closed_handler,
                 connection_name=self._connection_name,
+                stream=stream,
             )
 
         return self._clients[stream]
+
+    async def get_consumer(self, partition: str):
+
+        return self._consumers[partition]
 
     async def subscribe(
         self,
@@ -143,6 +146,11 @@ class SuperStreamConsumer:
 
         if offset_specification is None:
             offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
+
+        if self._default_client is None or self._default_client.is_connection_alive() is False:
+            self._default_client = await self._pool.get(
+                connection_closed_handler=self._connection_closed_handler, connection_name="rstream-locator"
+            )
 
         self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self.default_client)
         partitions = await self._super_stream_metadata.partitions()
@@ -178,7 +186,7 @@ class SuperStreamConsumer:
             ssl_context=self.ssl_context,
             frame_max=self.frame_max,
             heartbeat=self.heartbeat,
-            load_balancer_mode=False,
+            load_balancer_mode=self.load_balancer_mode,
             max_retries=self.max_retries,
             connection_closed_handler=self._connection_closed_handler,
             connection_name=self._connection_name,
@@ -197,3 +205,6 @@ class SuperStreamConsumer:
 
             consumer = self._consumers[partition]
             await consumer.unsubscribe(self._subscribers[partition])
+
+    async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
+        await self._consumers[stream].reconnect_stream(stream, offset)

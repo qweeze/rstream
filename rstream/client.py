@@ -148,6 +148,9 @@ class BaseClient:
     def is_connection_alive(self) -> bool:
         return self._is_not_closed
 
+    def add_stream(self, stream: str):
+        self._streams.append(stream)
+
     async def send_frame(self, frame: schema.Frame) -> None:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
@@ -447,7 +450,6 @@ class Client(BaseClient):
         assert len(metadata_resp.metadata) == 1
         metadata = metadata_resp.metadata[0]
         assert metadata.name == stream
-        self._streams.append(stream)
 
         brokers = {broker.reference: broker for broker in metadata_resp.brokers}
         leader = brokers[metadata.leader_ref]
@@ -622,6 +624,7 @@ class ClientPool:
         connection_name: Optional[str],
         addr: Optional[Addr] = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        stream: Optional[str] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ) -> Client:
         """Get a client according to `addr` parameter
@@ -634,7 +637,7 @@ class ClientPool:
         """
         desired_addr = addr or self.addr
 
-        if desired_addr not in self._clients:
+        if desired_addr not in self._clients or self._clients[desired_addr].is_connection_alive() is False:
             if addr and self.load_balancer_mode:
                 self._clients[desired_addr] = await self._resolve_broker(
                     addr=desired_addr,
@@ -650,6 +653,8 @@ class ClientPool:
                     sasl_configuration_mechanism=sasl_configuration_mechanism,
                 )
 
+        if stream is not None:
+            self._clients[desired_addr].add_stream(stream)
         assert self._clients[desired_addr].is_started
         return self._clients[desired_addr]
 

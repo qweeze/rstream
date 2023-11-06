@@ -21,8 +21,9 @@ async def publish():
             + str(disconnection_info.reason)
         )
 
-        global connection_is_closed
-        connection_is_closed = True
+        for stream in disconnection_info.streams:
+            print("reconnecting stream: " + stream)
+            await producer.reconnect_stream(stream)
 
     print("creating Producer")
     # producer will be closed at the end by the async context manager
@@ -43,16 +44,12 @@ async def publish():
                 body="hello: {}".format(i),
             )
             # send is asynchronous
-            global connection_is_closed
             try:
-                if connection_is_closed is False:
-                    await producer.send(stream=STREAM, message=amqp_message)
-                else:
-                    break
-            # manage exception
+                await producer.send(stream=STREAM, message=amqp_message)
             except:
-                print("Connection Closed")
-                break
+                # wait for reconnection to happen
+                await asyncio.sleep(2)
+                continue
 
             if i % 10000 == 0:
                 print("sent 10000 messages")

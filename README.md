@@ -228,6 +228,8 @@ connection_closed_handler=on_connection_closed,
 )
 ```
 
+After the event is raised you can decide to close the Consumers/Poducers doing a correct clean-up or try to reconnect 
+using reconnect_stream.
 Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/)
 
 ## Load Balancer
