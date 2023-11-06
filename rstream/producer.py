@@ -276,6 +276,7 @@ class Producer:
         publisher_name: Optional[str] = None,
         callback: Optional[CB[ConfirmationStatus]] = None,
         sync: bool = True,
+        timeout: Optional[int] = None,
     ) -> list[int]:
 
         messages = []
@@ -318,7 +319,7 @@ class Producer:
         else:
             future: asyncio.Future[None] = asyncio.Future()
             self._waiting_for_confirm[publisher.reference][future] = publishing_ids.copy()
-            await future
+            await asyncio.wait_for(future, timeout)
 
         return list(publishing_ids)
 
@@ -415,6 +416,7 @@ class Producer:
         stream: str,
         message: MessageT,
         publisher_name: Optional[str] = None,
+        timeout: Optional[int] = 5,
     ) -> int:
 
         await self.check_connection()
@@ -424,6 +426,7 @@ class Producer:
             [message],
             publisher_name=publisher_name,
             sync=True,
+            timeout=timeout,
         )
         return publishing_ids[0]
 
