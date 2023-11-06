@@ -256,23 +256,77 @@ class Producer:
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
+        await self.check_connection()
+
+        if len(batch) == 0:
+            raise ValueError("Empty batch")
+
         if self._close_called:
             return []
 
-        wrapped_batch = []
-        for item in batch:
-            wrapped_item = _MessageNotification(
-                entry=item, callback=on_publish_confirm, publisher_name=publisher_name
-            )
-            wrapped_batch.append(wrapped_item)
+        return await self._send_batch(
+            stream=stream, batch=batch, publisher_name=publisher_name, callback=on_publish_confirm, sync=False
+        )
 
-        return await self._send_batch(stream, wrapped_batch, sync=False)
-
+    # used by send_batch and send_wait
     async def _send_batch(
         self,
         stream: str,
-        batch: list[_MessageNotification],
+        batch: list[MessageT],
+        publisher_name: Optional[str] = None,
+        callback: Optional[CB[ConfirmationStatus]] = None,
         sync: bool = True,
+    ) -> list[int]:
+
+        messages = []
+        publishing_ids = set()
+
+        async with self._lock:
+            publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
+
+        for item in batch:
+
+            msg = RawMessage(item) if isinstance(item, bytes) else item
+
+            if msg.publishing_id is None:
+                msg.publishing_id = publisher.sequence.next()
+
+            messages.append(
+                schema.Message(
+                    publishing_id=msg.publishing_id,
+                    data=bytes(msg),
+                )
+            )
+
+        if len(messages) > 0:
+            await publisher.client.send_frame(
+                schema.Publish(
+                    publisher_id=publisher.id,
+                    messages=messages,
+                ),
+            )
+            publishing_ids.update([m.publishing_id for m in messages])
+
+        if not sync:
+            if callback is not None:
+                if callback not in self._waiting_for_confirm[publisher.reference]:
+                    self._waiting_for_confirm[publisher.reference][callback] = set()
+
+                self._waiting_for_confirm[publisher.reference][callback].update(publishing_ids)
+
+        # this is just called in case of send_wait
+        else:
+            future: asyncio.Future[None] = asyncio.Future()
+            self._waiting_for_confirm[publisher.reference][future] = publishing_ids.copy()
+            await future
+
+        return list(publishing_ids)
+
+    # used by send, send_sub_batch (with compression)
+    async def _send_batch_async(
+        self,
+        stream: str,
+        batch: list[_MessageNotification],
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -353,11 +407,6 @@ class Producer:
                 self._waiting_for_confirm[publisher.reference][callback] = set()
 
             self._waiting_for_confirm[publisher.reference][callback].update(publishing_ids_callback[callback])
-        # this is just called in case of send_wait
-        if sync:
-            future: asyncio.Future[None] = asyncio.Future()
-            self._waiting_for_confirm[publisher.reference][future] = publishing_ids.copy()
-            await future
 
         return list(publishing_ids)
 
@@ -368,13 +417,12 @@ class Producer:
         publisher_name: Optional[str] = None,
     ) -> int:
 
-        wrapped_message: _MessageNotification = _MessageNotification(
-            entry=message, callback=None, publisher_name=publisher_name
-        )
+        await self.check_connection()
 
         publishing_ids = await self._send_batch(
             stream,
-            [wrapped_message],
+            [message],
+            publisher_name=publisher_name,
             sync=True,
         )
         return publishing_ids[0]
@@ -460,7 +508,7 @@ class Producer:
 
         async with self._buffered_messages_lock:
             if len(self._buffered_messages[stream]):
-                await self._send_batch(stream, self._buffered_messages[stream], sync=False)
+                await self._send_batch_async(stream, self._buffered_messages[stream])
                 self._buffered_messages[stream].clear()
 
     async def _on_publish_confirm(self, frame: schema.PublishConfirm, publisher: _Publisher) -> None:
