@@ -23,6 +23,7 @@ from .client import Addr, Client, ClientPool
 from .constants import (
     ConsumerOffsetSpecification,
     OffsetType,
+    SlasMechanism,
 )
 from .schema import OffsetSpecification
 from .utils import DisconnectionErrorInfo
@@ -76,6 +77,7 @@ class Consumer:
         max_retries: int = 20,
         connection_closed_handler: Optional[CB_CONN[DisconnectionErrorInfo]] = None,
         connection_name: str = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
         self._pool = ClientPool(
             host,
@@ -88,6 +90,7 @@ class Consumer:
             heartbeat=heartbeat,
             load_balancer_mode=load_balancer_mode,
             max_retries=max_retries,
+            sasl_configuration_mechanism=sasl_configuration_mechanism,
         )
 
         self._default_client: Optional[Client] = None
@@ -97,6 +100,7 @@ class Consumer:
         self._lock = asyncio.Lock()
         self._connection_closed_handler = connection_closed_handler
         self._connection_name = connection_name
+        self._sasl_configuration_mechanism = sasl_configuration_mechanism
         if self._connection_name is None:
             self._connection_name = "rstream-consumer"
 
@@ -115,7 +119,9 @@ class Consumer:
 
     async def start(self) -> None:
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler, connection_name=self._connection_name
+            connection_closed_handler=self._connection_closed_handler,
+            connection_name=self._connection_name,
+            sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
 
     def stop(self) -> None:
