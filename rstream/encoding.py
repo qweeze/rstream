@@ -12,7 +12,8 @@ from typing import (
 )
 
 from .constants import Key, T
-from .schema import Frame, Struct, is_struct, registry
+from .schema import Frame, Struct, is_struct, registry, Publish
+from io import BytesIO
 
 __all__ = ["encode_frame", "decode_frame"]
 
@@ -123,6 +124,33 @@ def encode_frame(frame: Frame) -> bytes:
             payload,
         )
     )
+
+
+def encode_publish(frame: Publish) -> bytes:
+    with BytesIO() as fp:
+        fp_write = fp.write
+
+        fp.seek(8)
+        fp_write(frame.publisher_id.to_bytes(length=1, byteorder="big", signed=True))
+
+        messages = frame.messages
+        fp_write(len(messages).to_bytes(4, "big", signed=False))
+        for msg in messages:
+            fp_write(msg.publishing_id.to_bytes(length=8, byteorder="big", signed=False))
+
+            data = msg.data
+            fp_write(len(data).to_bytes(4, "big", signed=False))
+            fp_write(data)
+
+        fp.seek(0)
+        length = fp.getbuffer().nbytes + 4
+        fp_write(length.to_bytes(4, "big", signed=False))
+        fp_write(frame.key.value.to_bytes(2, "big", signed=False))
+        fp_write(frame.version.to_bytes(2, "big", signed=False))
+
+        print("bytes: {} ".format(fp.getvalue()))
+
+        return fp.getvalue()
 
 
 def _decode_field(buf: io.BytesIO, tp: Any) -> Any:

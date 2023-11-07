@@ -3,7 +3,7 @@ import ssl
 from typing import Optional
 
 from . import schema
-from .encoding import decode_frame, encode_frame
+from .encoding import decode_frame, encode_frame, encode_publish
 
 CHUNK_SIZE = 256
 CONNECT_TIMEOUT = 3
@@ -68,6 +68,10 @@ class Connection:
 
     async def write_frame(self, frame: schema.Frame) -> None:
         await self._write_frame_raw(encode_frame(frame))
+
+    async def write_frame_publish(self, frame: schema.Publish) -> None:
+        await self._write_frame_raw(encode_publish(frame))
+
 
     async def read_frame(self) -> schema.Frame:
         return decode_frame(await self._read_frame_raw())
