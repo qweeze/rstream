@@ -30,6 +30,7 @@ from .compression import (
     CompressionType,
     ICompressionCodec,
 )
+from .constants import SlasMechanism
 from .utils import DisconnectionErrorInfo, RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
@@ -81,6 +82,7 @@ class Producer:
         default_context_switch_value: int = 1000,
         connection_name: str = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
         self._pool = ClientPool(
             host,
@@ -93,6 +95,7 @@ class Producer:
             heartbeat=heartbeat,
             load_balancer_mode=load_balancer_mode,
             max_retries=max_retries,
+            sasl_configuration_mechanism=sasl_configuration_mechanism,
         )
         self._default_client: Optional[Client] = None
         self._clients: dict[str, Client] = {}
@@ -110,8 +113,10 @@ class Producer:
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
         self._connection_closed_handler = connection_closed_handler
+        self._sasl_configuration_mechanism = sasl_configuration_mechanism
         self._close_called = False
         self._connection_name = connection_name
+
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
 
@@ -131,7 +136,9 @@ class Producer:
     async def start(self) -> None:
         self._close_called = False
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler, connection_name=self._connection_name
+            connection_closed_handler=self._connection_closed_handler,
+            connection_name=self._connection_name,
+            sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
 
     async def close(self) -> None:
@@ -178,11 +185,18 @@ class Producer:
 
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
+            if self._default_client is None:
+                self._default_client = await self._pool.get(
+                    connection_closed_handler=self._connection_closed_handler,
+                    connection_name=self._connection_name,
+                )
             leader, _ = await self.default_client.query_leader_and_replicas(stream)
             self._clients[stream] = await self._pool.get(
                 connection_name=self._connection_name,
                 addr=Addr(leader.host, leader.port),
                 connection_closed_handler=self._connection_closed_handler,
+                stream=stream,
+                sasl_configuration_mechanism=self._sasl_configuration_mechanism,
             )
 
         return self._clients[stream]
@@ -528,5 +542,23 @@ class Producer:
 
     async def check_connection(self):
 
-        if self._default_client.is_connection_alive() is False:
-            raise Exception("connection Closed")
+        for publisher in self._publishers.values():
+            if publisher.client.is_connection_alive() is False:
+                raise Exception("connection Closed")
+
+    async def reconnect_stream(self, stream: str) -> None:
+
+        if stream in self._clients:
+            del self._clients[stream]
+        if stream in self._publishers:
+            async with self._lock:
+                await self._publishers[stream].client.close()
+                del self._publishers[stream]
+
+        if self._default_client is not None:
+            if self._default_client.is_connection_alive() is False:
+                await self._default_client.close()
+                self._default_client = None
+
+        async with self._lock:
+            await self._get_or_create_publisher(stream)

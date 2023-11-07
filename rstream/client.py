@@ -32,6 +32,7 @@ from . import (
     utils,
 )
 from .connection import Connection, ConnectionClosed
+from .constants import SlasMechanism
 from .schema import OffsetSpecification
 from .utils import DisconnectionErrorInfo
 
@@ -69,6 +70,7 @@ class BaseClient:
         heartbeat: int,
         connection_name: Optional[str] = "",
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
         self.host = host
         self.port = port
@@ -97,6 +99,7 @@ class BaseClient:
 
         self._last_heartbeat: float = 0
         self._connection_closed_handler = connection_closed_handler
+        self._sasl_configuration_mechanism = sasl_configuration_mechanism
 
         self._frames: dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
         self._is_not_closed: bool = True
@@ -144,6 +147,9 @@ class BaseClient:
 
     def is_connection_alive(self) -> bool:
         return self._is_not_closed
+
+    def add_stream(self, stream: str):
+        self._streams.append(stream)
 
     async def send_frame(self, frame: schema.Frame) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -359,7 +365,7 @@ class Client(BaseClient):
             ),
             resp_schema=schema.SaslHandshakeResponse,
         )
-        assert "PLAIN" in handshake_resp.mechanisms
+        assert self._sasl_configuration_mechanism in handshake_resp.mechanisms
 
         auth_data = b"".join(
             (
@@ -373,7 +379,7 @@ class Client(BaseClient):
         await self.sync_request(
             schema.SaslAuthenticate(
                 self._corr_id_seq.next(),
-                mechanism="PLAIN",
+                mechanism=self._sasl_configuration_mechanism,
                 data=auth_data,
             ),
             resp_schema=schema.SaslAuthenticateResponse,
@@ -444,7 +450,6 @@ class Client(BaseClient):
         assert len(metadata_resp.metadata) == 1
         metadata = metadata_resp.metadata[0]
         assert metadata.name == stream
-        self._streams.append(stream)
 
         brokers = {broker.reference: broker for broker in metadata_resp.brokers}
         leader = brokers[metadata.leader_ref]
@@ -600,6 +605,7 @@ class ClientPool:
         heartbeat: int,
         load_balancer_mode: bool,
         max_retries: int,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
         self.addr = Addr(host=host, port=port)
         self.ssl_context = ssl_context
@@ -618,6 +624,8 @@ class ClientPool:
         connection_name: Optional[str],
         addr: Optional[Addr] = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        stream: Optional[str] = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ) -> Client:
         """Get a client according to `addr` parameter
 
@@ -629,20 +637,24 @@ class ClientPool:
         """
         desired_addr = addr or self.addr
 
-        if desired_addr not in self._clients:
+        if desired_addr not in self._clients or self._clients[desired_addr].is_connection_alive() is False:
             if addr and self.load_balancer_mode:
                 self._clients[desired_addr] = await self._resolve_broker(
                     addr=desired_addr,
                     connection_closed_handler=connection_closed_handler,
                     connection_name=connection_name,
+                    sasl_configuration_mechanism=sasl_configuration_mechanism,
                 )
             else:
                 self._clients[desired_addr] = await self.new(
                     addr=desired_addr,
                     connection_closed_handler=connection_closed_handler,
                     connection_name=connection_name,
+                    sasl_configuration_mechanism=sasl_configuration_mechanism,
                 )
 
+        if stream is not None:
+            self._clients[desired_addr].add_stream(stream)
         assert self._clients[desired_addr].is_started
         return self._clients[desired_addr]
 
@@ -651,6 +663,7 @@ class ClientPool:
         connection_name: Optional[str],
         addr: Addr,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ) -> Client:
         desired_host, desired_port = addr.host, str(addr.port)
 
@@ -661,6 +674,7 @@ class ClientPool:
                 addr=self.addr,
                 connection_closed_handler=connection_closed_handler,
                 connection_name=connection_name,
+                sasl_configuration_mechanism=sasl_configuration_mechanism,
             )
 
             assert client.server_properties is not None
@@ -685,6 +699,7 @@ class ClientPool:
         connection_name: Optional[str],
         addr: Addr,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ) -> Client:
         host, port = addr
         client = Client(
@@ -695,6 +710,7 @@ class ClientPool:
             heartbeat=self._heartbeat,
             connection_name=connection_name,
             connection_closed_handler=connection_closed_handler,
+            sasl_configuration_mechanism=sasl_configuration_mechanism,
         )
         await client.start()
         await client.authenticate(

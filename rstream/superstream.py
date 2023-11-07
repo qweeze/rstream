@@ -44,6 +44,8 @@ class DefaultSuperstreamMetadata(Metadata):
                 raise ValueError(
                     "the number of partitions of the stream is <= to 0, the superstream doesn't probably exist"
                 )
+            # locator not necessary anymore
+            await self.client.close()
 
         return self._partitions
 

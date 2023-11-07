@@ -23,6 +23,7 @@ from .client import Addr, Client, ClientPool
 from .constants import (
     ConsumerOffsetSpecification,
     OffsetType,
+    SlasMechanism,
 )
 from .schema import OffsetSpecification
 from .utils import DisconnectionErrorInfo
@@ -76,6 +77,7 @@ class Consumer:
         max_retries: int = 20,
         connection_closed_handler: Optional[CB_CONN[DisconnectionErrorInfo]] = None,
         connection_name: str = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
         self._pool = ClientPool(
             host,
@@ -88,6 +90,7 @@ class Consumer:
             heartbeat=heartbeat,
             load_balancer_mode=load_balancer_mode,
             max_retries=max_retries,
+            sasl_configuration_mechanism=sasl_configuration_mechanism,
         )
 
         self._default_client: Optional[Client] = None
@@ -97,6 +100,7 @@ class Consumer:
         self._lock = asyncio.Lock()
         self._connection_closed_handler = connection_closed_handler
         self._connection_name = connection_name
+        self._sasl_configuration_mechanism = sasl_configuration_mechanism
         if self._connection_name is None:
             self._connection_name = "rstream-consumer"
 
@@ -115,7 +119,9 @@ class Consumer:
 
     async def start(self) -> None:
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler, connection_name=self._connection_name
+            connection_closed_handler=self._connection_closed_handler,
+            connection_name=self._connection_name,
+            sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
 
     def stop(self) -> None:
@@ -139,12 +145,18 @@ class Consumer:
 
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
+            if self._default_client is None:
+                self._default_client = await self._pool.get(
+                    connection_closed_handler=self._connection_closed_handler,
+                    connection_name=self._connection_name,
+                )
             leader, replicas = await self.default_client.query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
                 addr=Addr(broker.host, broker.port),
                 connection_closed_handler=self._connection_closed_handler,
                 connection_name=self._connection_name,
+                stream=stream,
             )
 
         return self._clients[stream]
@@ -251,6 +263,7 @@ class Consumer:
             logger.debug("timeout when closing consumer and deleting publisher")
         except BaseException as exc:
             logger.debug("exception in delete_publisher in Producer.close:", exc)
+
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
@@ -355,3 +368,36 @@ class Consumer:
         if subscriber_name not in self._subscribers:
             return ""
         return self._subscribers[subscriber_name].stream
+
+    async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
+
+        curr_subscriber = None
+        for subscriber_id in self._subscribers:
+            if stream == self._subscribers[subscriber_id].stream:
+                curr_subscriber = self._subscribers[subscriber_id]
+
+        # close previous clients and re-create a publisher (with a new client)
+        if stream in self._clients:
+            await self._clients[stream].close()
+            del self._clients[stream]
+
+        if self._default_client is not None:
+            if self._default_client.is_connection_alive() is False:
+                await self._default_client.close()
+                self._default_client = None
+
+        if offset is None:
+            if curr_subscriber is not None:
+                offset = curr_subscriber.offset
+
+        offset_specification = ConsumerOffsetSpecification(OffsetType.OFFSET, offset)
+        if curr_subscriber is not None:
+            asyncio.create_task(
+                self.subscribe(
+                    stream=curr_subscriber.stream,
+                    subscriber_name=curr_subscriber.reference,
+                    callback=curr_subscriber.callback,
+                    decoder=curr_subscriber.decoder,
+                    offset_specification=offset_specification,
+                )
+            )
