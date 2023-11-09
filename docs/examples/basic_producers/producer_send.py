@@ -4,7 +4,7 @@ import time
 from rstream import AMQPMessage, Producer
 
 STREAM = "my-test-stream"
-MESSAGES = 1000000
+MESSAGES = 1_000_000
 
 
 async def publish():

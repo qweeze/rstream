@@ -310,7 +310,7 @@ class Producer:
             else:
                 compression_codec = item.entry
                 if len(messages) > 0:
-                    await publisher.client.send_frame(
+                    await publisher.client.send_publish_frame(
                         schema.Publish(
                             publisher_id=publisher.id,
                             messages=messages,
@@ -339,7 +339,7 @@ class Producer:
                     publishing_ids_callback[item.callback].add(publishing_id)
 
         if len(messages) > 0:
-            await publisher.client.send_frame(
+            await publisher.client.send_publish_frame(
                 schema.Publish(
                     publisher_id=publisher.id,
                     messages=messages,
