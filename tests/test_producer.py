@@ -77,6 +77,27 @@ async def test_publishing_several_messages(stream: str, producer: Producer, cons
     await wait_for(lambda: len(captured) == 100000)
 
 
+async def test_publishing_several_messages_different_streams(
+    stream: str, stream2: str, producer: Producer, consumer: Consumer
+) -> None:
+    captured_stream_1: list[bytes] = []
+    captured_stream_2: list[bytes] = []
+    await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured_stream_1.append(bytes(message))
+    )
+    await consumer.subscribe(
+        stream2, callback=lambda message, message_context: captured_stream_2.append(bytes(message))
+    )
+
+    for i in range(0, 100000):
+        await producer.send(stream, b"one")
+    for i in range(0, 100000):
+        await producer.send(stream2, b"one")
+
+    await wait_for(lambda: len(captured_stream_1) == 100000)
+    await wait_for(lambda: len(captured_stream_2) == 100000)
+
+
 async def test_publishing_sequence_subbatching_nocompression(
     stream: str, producer: Producer, consumer: Consumer
 ) -> None:

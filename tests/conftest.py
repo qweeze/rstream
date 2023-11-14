@@ -90,6 +90,15 @@ async def stream(client: Client):
 
 
 @pytest.fixture()
+async def stream2(client: Client):
+    await client.create_stream("test-stream-2")
+    try:
+        yield "test-stream-2"
+    finally:
+        await client.delete_stream("test-stream-2")
+
+
+@pytest.fixture()
 async def consumer(pytestconfig, ssl_context):
     consumer = Consumer(
         host=pytestconfig.getoption("rmq_host"),
