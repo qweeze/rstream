@@ -19,13 +19,15 @@ The RabbitMQ stream plug-in is required. See the [documentation](https://www.rab
 - [Deduplication](#deduplication)
 - [Consuming messages](#consuming-messages)
     * [Server-side offset tracking](#server-side-offset-tracking)
-- [Superstreams](#superstreams)
+- [Super Streams](#superstreams)
 - [Single Active Consumer](#single-active-consumer)
 - [Connecting with SSL](#connecting-with-ssl)
 - [Sasl Mechanisms](#sasl-mechanisms)
 - [Managing disconnections](#managing-disconnections)
+	* [Reconnect](#reconnect)
 - [Load Balancer](#load-balancer)
 - [Client Performances](#client-performances)
+   * [Test case](#test-case)
 - [Build and Test](#build-and-test)
 - [Project Notes](#project-notes)
 
@@ -228,8 +230,25 @@ connection_closed_handler=on_connection_closed,
 )
 ```
 
-After the event is raised you can decide to close the Consumers/Poducers doing a correct clean-up or try to reconnect 
-using reconnect_stream.
+### Reconnect
+When the `connection_closed_handler` event is raised, you can close the Consumers/Producers by doing a correct clean-up or try reconnecting using the reconnect stream.
+
+Example:
+```python
+ async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        print(
+            "connection has been closed from stream: "
+            + str(disconnection_info.streams)
+            + " for reason: "
+            + str(disconnection_info.reason)
+        )
+
+        for stream in disconnection_info.streams:
+            print("reconnecting stream: " + stream)
+            await producer.reconnect_stream(stream)
+```
+
+
 Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/)
 
 ## Load Balancer
@@ -255,7 +274,7 @@ This one:
             await producer.send(stream=STREAM, message=amqp_message)
 ```
 
-is more or less 50% slower than:
+is more or less ~55% slower than:
 ```python
  for i in range(1_000_000):
             # send is asynchronous
@@ -264,18 +283,23 @@ is more or less 50% slower than:
 
 You can use the `batch_send` to test the performances.
 
-```python
-$ python docs/examples/basic_producers/producer_send_batch_binary.py
-Sent 1000000 messages in 6.7364 seconds. 148446.9526 messages per second
-````
+We are evaluating rewriting the `AMQP 1.0 codec` optimized for the stream use case.
 
-With AMQP 1.0 parser
+### Test case
+- Linux Ubuntu 4 cores and 8 GB of Ram
+- RabbitMQ installed to the server 
+
+- Send batch with AMQP 1.0 codec:
 ```python
-$ python docs/examples/basic_producers/producer_send_batch.py       
-Sent 1000000 messages in 13.2724 seconds. 75344.4910 messages per second
+$  python3 docs/examples/basic_producers/producer_send_batch.py
+Sent 1.000.000 messages in 9.3218 seconds. 107.275,5970 messages per second
 ```
 
-We are evaluating to rewriting the `AMQP 1.0 codec` optimized for the stream use case.
+- Send batch with binary codec:
+```python
+$ python3 docs/examples/basic_producers/producer_send_batch_binary.py
+Sent 1.000.000 messages in 2.9930 seconds. 334.116,5639 messages per second
+```
 
 
 ## Build and Test
