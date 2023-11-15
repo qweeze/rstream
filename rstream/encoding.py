@@ -136,7 +136,7 @@ def encode_publish(frame: Publish) -> bytes:
     with BytesIO() as fp:
         fp_write = fp.write
         fp.seek(8)
-        fp_write(frame.publisher_id.to_bytes(length=1, byteorder="big", signed=True))
+        fp_write(frame.publisher_id.to_bytes(length=1, byteorder="big", signed=False))
 
         messages = frame.messages
         fp_write(len(messages).to_bytes(4, "big", signed=False))
