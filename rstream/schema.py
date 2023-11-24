@@ -528,6 +528,28 @@ class SuperStreamRouteResponse(Frame, is_response=True):
 
 
 @dataclass
+class FrameHandlerInfo(Struct):
+    key_command: int = field(metadata={"type": T.uint16})
+    min_version: int = field(metadata={"type": T.uint16})
+    max_version: int = field(metadata={"type": T.uint16})
+
+
+@dataclass
+class ExchangeCommandVersionRequest(Frame):
+    key = Key.CommandExchangeCommandVersion
+    correlation_id: int = field(metadata={"type": T.uint32})
+    command_versions: list[FrameHandlerInfo]
+
+
+@dataclass
+class ExchangeCommandVersionResponse(Frame, is_response=True):
+    key = Key.CommandExchangeCommandVersion
+    correlation_id: int = field(metadata={"type": T.uint32})
+    response_code: int = field(metadata={"type": T.uint16})
+    command_versions: list[FrameHandlerInfo]
+
+
+@dataclass
 class SuperStreamPartitions(Frame):
     key = Key.Partitions
     correlation_id: int = field(metadata={"type": T.uint32})
