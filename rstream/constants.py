@@ -44,6 +44,7 @@ class Key(enum.Enum):
     Route = 24
     Partitions = 25
     ConsumerUpdate = 26
+    CommandExchangeCommandVersion = 27
     ConsumerUpdateRequest = 32794
 
 

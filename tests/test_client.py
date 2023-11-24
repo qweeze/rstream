@@ -4,6 +4,7 @@ import pytest
 
 from rstream import schema
 from rstream.client import Client
+from rstream.constants import Key
 
 from .http_requests import (
     create_binding,
@@ -121,3 +122,17 @@ async def test_routes(client: Client, stream: str) -> None:
 
     assert len(partitions) == 1
     assert partitions[0] == "test-stream-0"
+
+
+async def exchange_command_versions(client: Client) -> None:
+
+    expected_min_version = 1
+    expected_max_version = 1
+    command_version_input = schema.FrameHandlerInfo(
+        Key.Publish.value, min_version=expected_min_version, max_version=expected_min_version
+    )
+    command_version_server = await client.exchange_command_version(command_version_input)
+
+    assert command_version_server.key_command == Key.Publish.value
+    assert command_version_server.min_version == expected_min_version
+    assert command_version_server.max_version == expected_max_version

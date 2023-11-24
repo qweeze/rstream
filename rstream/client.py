@@ -603,6 +603,29 @@ class Client(BaseClient):
         )
         return resp.streams
 
+    async def exchange_command_version(
+        self, command_info: schema.FrameHandlerInfo
+    ) -> schema.FrameHandlerInfo:
+
+        command_versions_input = []
+        command_versions_input.append(command_info)
+        resp = await self.sync_request(
+            schema.ExchangeCommandVersionRequest(
+                self._corr_id_seq.next(),
+                command_versions=command_versions_input,
+            ),
+            resp_schema=schema.ExchangeCommandVersionResponse,
+            raise_exception=False,
+        )
+
+        command_version = schema.FrameHandlerInfo(
+            resp.command_versions[command_info.key_command - 1].key_command,
+            resp.command_versions[command_info.key_command - 1].min_version,
+            resp.command_versions[command_info.key_command - 1].max_version,
+        )
+
+        return command_version
+
 
 class ClientPool:
     def __init__(
