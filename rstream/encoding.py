@@ -1,5 +1,6 @@
 import io
 import typing
+import logging
 from dataclasses import is_dataclass
 from io import BytesIO
 from typing import (
@@ -22,7 +23,7 @@ from .schema import (
 )
 
 __all__ = ["encode_frame", "decode_frame"]
-
+logger = logging.getLogger(__name__)
 
 class IntSpec(NamedTuple):
     length: int
@@ -111,22 +112,27 @@ def _encode_field(value: VT, tp: TT) -> Union[bytearray, bytes]:
 def _encode_struct(struct: Struct) -> bytearray:
     buffer = bytearray()
     for value, tp in struct.iter_typed_values():
-        buffer += _encode_field(value, tp)
+        if value is not None:
+            buffer += _encode_field(value, tp)
     return buffer
 
 
-def encode_frame(frame: Frame) -> bytes:
+def encode_frame(frame: Frame, version_to_encode: int = 1) -> bytes:
     try:
         payload = _encode_struct(frame)
     except Exception as e:
         raise ValueError(f"Could not encode frame {frame!r}") from e
 
     length = len(payload) + 2 + 2
+    if version_to_encode > 1:
+        version = version_to_encode
+    else:
+        version = frame.version
     return b"".join(
         (
             length.to_bytes(4, "big", signed=False),
             frame.key.value.to_bytes(2, "big", signed=False),
-            frame.version.to_bytes(2, "big", signed=False),
+            version.to_bytes(2, "big", signed=False),
             payload,
         )
     )
@@ -196,17 +202,21 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
         raise NotImplementedError(f"Unexpected type {tp}")
 
 
-def _decode_struct(buf: io.BytesIO, tp: Type[Struct]) -> Struct:
+def _decode_struct(buf: io.BytesIO, tp: Type[Struct], version:int = 1) -> Struct:
     data = {}
     fld_tp: Any
     for fld_name, fld_tp, type_ in tp.flds_meta:
+        #logger.warning("fld name %s fld_tp %s  type_ %s", fld_name, fld_tp, tp.flds_meta)
         if fld_tp is None:
             if typing.get_origin(type_) is list:
                 fld_tp = list(typing.get_args(type_))
             else:
                 fld_tp = type_
 
-        data[fld_name] = _decode_field(buf, fld_tp)
+        if version == 1 and fld_name is not "filter_value":
+            data[fld_name] = _decode_field(buf, fld_tp)
+        else:
+            data[fld_name] = None
 
     return tp(**data)  # type:ignore[call-arg]
 

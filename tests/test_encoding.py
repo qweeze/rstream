@@ -37,7 +37,9 @@ frames = [
     schema.DeclarePublisherResponse(correlation_id=7, response_code=1),
     schema.QueryPublisherSequence(correlation_id=8, publisher_ref="mystream_publisher_1", stream="mystream"),
     schema.QueryPublisherSequenceResponse(correlation_id=8, response_code=1, sequence=293),
-    schema.Publish(publisher_id=1, messages=[schema.Message(publishing_id=294, data=b"hello")]),
+    schema.Publish(
+        publisher_id=1, messages=[schema.Message(publishing_id=294, filter_value=None, data=b"hello")]
+    ),
     schema.PublishConfirm(publisher_id=1, publishing_ids=[294]),
     schema.DeletePublisher(correlation_id=9, publisher_id=1),
     schema.DeletePublisherResponse(correlation_id=9, response_code=1),

@@ -164,7 +164,7 @@ class BaseClient:
             else:
                 logger.exception("TCP connection closed")
 
-    async def send_frame(self, frame: schema.Frame) -> None:
+    async def send_frame(self, frame: schema.Frame, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
         try:

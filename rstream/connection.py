@@ -70,7 +70,7 @@ class Connection:
         length = int.from_bytes(await self._read(4), "big")
         return await self._read(length)
 
-    async def write_frame(self, frame: schema.Frame) -> None:
+    async def write_frame(self, frame: schema.Frame, version: int = 1) -> None:
         await self._write_frame_raw(encode_frame(frame))
 
     async def write_frame_publish(self, frame: schema.Publish) -> None:

@@ -35,7 +35,7 @@ async def test_deliver(client: Client, stream: str) -> None:
     await client.subscribe(stream, subscription_id)
 
     waiter = client.wait_frame(schema.Deliver)
-    msg = schema.Message(publishing_id=1, data=b"test message")
+    msg = schema.Message(publishing_id=1, filter_value=None, data=b"test message")
     await client.publish([msg], publisher_id)
 
     assert await waiter == schema.Deliver(

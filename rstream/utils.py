@@ -1,9 +1,13 @@
+# Copyright 2023 VMware, Inc. All Rights Reserved.
+# SPDX-License-Identifier: MIT
+
+import abc
 import asyncio
 import itertools
 from dataclasses import dataclass
-from typing import Any, Generator, Optional
+from typing import Any, Generator, Optional, Callable, Union, Awaitable
 
-from .amqp import _MessageProtocol
+from .amqp import _MessageProtocol, AMQPMessage
 
 
 @dataclass
@@ -45,3 +49,48 @@ class TimeoutWrapper:
 class DisconnectionErrorInfo:
     reason: str
     streams: list[str]
+
+
+'''
+class FilterConfiguration(abc.ABC):
+
+    @abc.abstractmethod
+    def values(self, filter_values: []) -> None:
+        pass
+
+    @abc.abstractmethod
+    def post_filler(self, predicate: Callable[[AMQPMessage], Union[None, Awaitable[None]]]) -> None:
+        pass
+
+    @abc.abstractmethod
+    def match_unfiltered(self) -> None:
+        pass
+
+    @abc.abstractmethod
+    def match_unfiltered_set(self, match_unfiltered: bool) -> None:
+        pass
+
+'''
+
+
+class FilterConfiguration:
+
+    def __init__(self, values_to_filter: [], predicate: Optional[Callable[[AMQPMessage], Union[None, Awaitable[None]]]], match_unfiltered: bool = False):
+        self._values_to_filter = values_to_filter
+        self._predicate = predicate
+        self._match_unfiltered = match_unfiltered
+
+
+'''
+    def values(self, filter_values: []) -> FilterConfiguration:
+        pass
+
+    def post_filler(self, predicate: Callable[[AMQPMessage], Union[None, Awaitable[None]]]) -> None:
+        pass
+
+    def match_unfiltered(self) -> None:
+        pass
+
+    def match_unfiltered_set(self, match_unfiltered: bool) -> None:
+        pass
+'''

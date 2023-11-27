@@ -30,12 +30,14 @@ from .compression import (
     CompressionType,
     ICompressionCodec,
 )
-from .constants import SlasMechanism
+from .constants import Key, SlasMechanism
 from .utils import DisconnectionErrorInfo, RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
+message_v1_v2 = T = TypeVar("message_v1_v2")
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
+CB_F = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
 
 
 @dataclass
@@ -83,6 +85,7 @@ class Producer:
         connection_name: str = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
+        filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -116,6 +119,7 @@ class Producer:
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         self._close_called = False
         self._connection_name = connection_name
+        self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
 
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
@@ -140,6 +144,15 @@ class Producer:
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
+
+        # Check if the filtering is supported by the server
+        if self._filter_value_extractor is not None:
+            command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
+            server_command_version: schema.FrameHandlerInfo = (
+                await self._default_client.exchange_command_version(command_version_input)
+            )
+            if server_command_version.max_version < 2:
+                raise ValueError("filtering is just supported for RabbitMQ 3.13")
 
     async def close(self) -> None:
 
@@ -292,20 +305,43 @@ class Producer:
             if msg.publishing_id is None:
                 msg.publishing_id = publisher.sequence.next()
 
-            messages.append(
-                schema.Message(
-                    publishing_id=msg.publishing_id,
-                    data=bytes(msg),
+            if self._filter_value_extractor is None:
+                messages.append(
+                    schema.Message(
+                        publishing_id=msg.publishing_id,
+                        filter_value=None,
+                        data=bytes(msg),
+                    )
                 )
-            )
+            else:
+                value_filter: str = await self._filter_value_extractor(msg)
+                messages.append(
+                    schema.Message(
+                        publishing_id=msg.publishing_id,
+                        filter_value=value_filter,
+                        data=bytes(msg),
+                    )
+                )
 
         if len(messages) > 0:
-            await publisher.client.send_frame(
-                schema.Publish(
-                    publisher_id=publisher.id,
-                    messages=messages,
-                ),
-            )
+
+            if self._filter_value_extractor is None:
+                await publisher.client.send_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                )
+
+            else:
+                await publisher.client.send_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                    version=2,
+                )
+
             publishing_ids.update([m.publishing_id for m in messages])
 
         if not sync:
@@ -352,12 +388,23 @@ class Producer:
                 if msg.publishing_id is None:
                     msg.publishing_id = publisher.sequence.next()
 
-                messages.append(
-                    schema.Message(
-                        publishing_id=msg.publishing_id,
-                        data=bytes(msg),
+                if self._filter_value_extractor is None:
+                    messages.append(
+                        schema.Message(
+                            publishing_id=msg.publishing_id,
+                            filter_value=None,
+                            data=bytes(msg),
+                        )
                     )
-                )
+                else:
+                    value_filter: str = await self._filter_value_extractor(msg)
+                    messages.append(
+                        schema.Message(
+                            publishing_id=msg.publishing_id,
+                            filter_value=value_filter,
+                            data=bytes(msg),
+                        )
+                    )
 
                 if item.callback is not None:
                     publishing_ids_callback[item.callback].add(msg.publishing_id)
@@ -365,12 +412,21 @@ class Producer:
             else:
                 compression_codec = item.entry
                 if len(messages) > 0:
-                    await publisher.client.send_publish_frame(
-                        schema.Publish(
-                            publisher_id=publisher.id,
-                            messages=messages,
-                        ),
-                    )
+                    if self._filter_value_extractor is None:
+                        await publisher.client.send_publish_frame(
+                            schema.Publish(
+                                publisher_id=publisher.id,
+                                messages=messages,
+                            ),
+                        )
+                    else:
+                        await publisher.client.send_frame(
+                            schema.Publish(
+                                publisher_id=publisher.id,
+                                messages=messages,
+                            ),
+                            version=2,
+                        )
                     # publishing_ids.update([m.publishing_id for m in messages])
                     messages.clear()
                 for _ in range(item.entry.messages_count()):
