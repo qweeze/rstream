@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 
 import inspect
-import zlib
 import logging
+import zlib
 from dataclasses import dataclass, field, fields
 from typing import (
     Any,
@@ -21,6 +21,7 @@ from .exceptions import ServerError
 
 registry: dict[tuple[bool, Key], Type["Frame"]] = {}
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class Struct:
@@ -227,6 +228,7 @@ class Publish(Frame):
     key = Key.Publish
     publisher_id: int = field(metadata={"type": T.uint8})
     messages: list[Message]
+
 
 @dataclass
 class PublishConfirm(Frame):

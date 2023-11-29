@@ -77,6 +77,13 @@ frames = [
     schema.StoreOffset(reference="mystream_subscriber_1", stream="mystream", offset=240),
 ]
 
+frames_V2 = [
+    schema.Publish(
+        publisher_id=1,
+        messages=[schema.Message(publishing_id=294, filter_value="filter_value", data=b"hello")],
+    ),
+]
+
 is_response = {frame_cls: is_response for (is_response, _), frame_cls in schema.registry.items()}
 
 
@@ -91,3 +98,16 @@ def test_encoding(frame: schema.Frame) -> None:
         raw[:2] = key.to_bytes(2, "big", signed=False)
 
     assert decode_frame(raw) == frame
+
+
+@pytest.mark.parametrize("frame", frames_V2)
+def test_encoding_V2(frame: schema.Frame) -> None:
+    raw = bytearray(encode_frame(frame, version_to_encode=2))
+    del raw[:4]  # get rid of length header
+
+    if is_response[frame.__class__]:
+        # if a frame is a response, first bit of a key must be switched to 1
+        key = int.from_bytes(raw[:2], "big", signed=False) | (1 << 15)
+        raw[:2] = key.to_bytes(2, "big", signed=False)
+
+    assert decode_frame(raw, version_to_decode=2) == frame

@@ -1,6 +1,6 @@
 import io
-import typing
 import logging
+import typing
 from dataclasses import is_dataclass
 from io import BytesIO
 from typing import (
@@ -24,6 +24,7 @@ from .schema import (
 
 __all__ = ["encode_frame", "decode_frame"]
 logger = logging.getLogger(__name__)
+
 
 class IntSpec(NamedTuple):
     length: int
@@ -138,7 +139,7 @@ def encode_frame(frame: Frame, version_to_encode: int = 1) -> bytes:
     )
 
 
-def encode_publish(frame: Publish) -> bytes:
+def encode_publish(frame: Publish, version_to_encode: int = 1) -> bytes:
     with BytesIO() as fp:
         fp_write = fp.write
         fp.seek(8)
@@ -158,12 +159,16 @@ def encode_publish(frame: Publish) -> bytes:
         fp_write(length.to_bytes(4, "big", signed=False))
 
         fp_write(frame.key.value.to_bytes(2, "big", signed=False))
-        fp_write(frame.version.to_bytes(2, "big", signed=False))
+        if version_to_encode > 1:
+            version = version_to_encode
+        else:
+            version = frame.version
+        fp_write(version.to_bytes(2, "big", signed=False))
 
         return fp.getvalue()
 
 
-def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
+def _decode_field(buf: io.BytesIO, tp: Any, version_to_decode: int = 1) -> Any:
     if tp is T.string:
         length = int.from_bytes(buf.read(2), "big", signed=False)
         return buf.read(length).decode("utf-8")
@@ -180,13 +185,13 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
         result = []
         if len(tp) == 1:
             for _ in range(length):
-                value = _decode_field(buf, tp[0])
+                value = _decode_field(buf, tp[0], version_to_decode)
                 result.append(value)
         else:
             for _ in range(length):
                 row = []
                 for subtype in tp:
-                    value = _decode_field(buf, subtype)
+                    value = _decode_field(buf, subtype, version_to_decode)
                     row.append(value)
                 result.append(row)
         return result
@@ -196,32 +201,32 @@ def _decode_field(buf: io.BytesIO, tp: Any) -> Any:
         return int.from_bytes(buf.read(spec.length), spec.byteorder, signed=spec.signed)
 
     elif is_struct(tp):
-        return _decode_struct(buf, tp)
+        return _decode_struct(buf, tp, version_to_decode)
 
     else:
         raise NotImplementedError(f"Unexpected type {tp}")
 
 
-def _decode_struct(buf: io.BytesIO, tp: Type[Struct], version:int = 1) -> Struct:
-    data = {}
+def _decode_struct(buf: io.BytesIO, tp: Type[Struct], version: int = 1) -> Struct:
+    data = {}  # type: ignore
     fld_tp: Any
     for fld_name, fld_tp, type_ in tp.flds_meta:
-        #logger.warning("fld name %s fld_tp %s  type_ %s", fld_name, fld_tp, tp.flds_meta)
         if fld_tp is None:
             if typing.get_origin(type_) is list:
                 fld_tp = list(typing.get_args(type_))
             else:
                 fld_tp = type_
 
-        if version == 1 and fld_name is not "filter_value":
-            data[fld_name] = _decode_field(buf, fld_tp)
-        else:
+        if version == 1 and fld_name == "filter_value":
             data[fld_name] = None
+
+        else:
+            data[fld_name] = _decode_field(buf, fld_tp, version)
 
     return tp(**data)  # type:ignore[call-arg]
 
 
-def decode_frame(data: bytes) -> Frame:
+def decode_frame(data: bytes, version_to_decode: int = 1) -> Frame:
     buf = io.BytesIO(data)
     key = int.from_bytes(buf.read(2), "big", signed=False)
     version = int.from_bytes(buf.read(2), "big", signed=False)
@@ -229,11 +234,11 @@ def decode_frame(data: bytes) -> Frame:
     is_response = key >> 15 & 1 == 1
     key &= ~(1 << 15)
     cls: Type[Frame] = registry[(is_response, Key(key))]
-    if version != cls.version:
+    if version != version_to_decode:
         raise ValueError(f"Version mismatch, got version: {version}")
 
     try:
-        frame = _decode_struct(buf, cls)
+        frame = _decode_struct(buf, cls, version_to_decode)
         assert (extra := buf.read()) == b"", f"Got extra bytes: {extra!r}"
     except Exception as e:
         raise ValueError(f"Could not decode {cls!r}") from e

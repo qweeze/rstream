@@ -4,6 +4,7 @@ import asyncio
 import logging
 import random
 import ssl
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
 from typing import (
@@ -21,12 +22,18 @@ from . import exceptions, schema
 from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
 from .constants import (
+    SUBSCRIPTION_PROPERTY_FILTER_PREFIX,
+    SUBSCRIPTION_PROPERTY_MATCH_UNFILTERED,
     ConsumerOffsetSpecification,
+    Key,
     OffsetType,
     SlasMechanism,
 )
 from .schema import OffsetSpecification
-from .utils import DisconnectionErrorInfo
+from .utils import (
+    DisconnectionErrorInfo,
+    FilterConfiguration,
+)
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
@@ -200,6 +207,7 @@ class Consumer:
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
         consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
+        filter_input: Optional[FilterConfiguration] = None,
     ) -> str:
 
         if offset_specification is None:
@@ -216,12 +224,13 @@ class Consumer:
             )
 
             await subscriber.client.run_queue_listener_task(
-                subscriber_name=subscriber.reference, handler=partial(self._on_deliver, subscriber=subscriber)
+                subscriber_name=subscriber.reference,
+                handler=partial(self._on_deliver, subscriber=subscriber, filter_value=filter_input),
             )
 
         subscriber.client.add_handler(
             schema.Deliver,
-            partial(self._on_deliver, subscriber=subscriber),
+            partial(self._on_deliver, subscriber=subscriber, filter_value=filter_input),
             name=subscriber.reference,
         )
 
@@ -238,6 +247,22 @@ class Consumer:
                     ),
                     name=subscriber.reference,
                 )
+
+        if filter_input is not None:
+            await self.check_if_filtering_is_supported(self._default_client)
+            values_to_filter = filter_input.values()
+            if len(values_to_filter) <= 0:
+                raise ValueError("you need to specify at least one filter value")
+
+            if properties is None:
+                properties = defaultdict(str)
+            for i, filter_value in enumerate(values_to_filter):
+                key = SUBSCRIPTION_PROPERTY_FILTER_PREFIX + str(i)
+                properties[key] = filter_value
+            if filter_input.match_unfiltered():
+                properties[SUBSCRIPTION_PROPERTY_MATCH_UNFILTERED] = "true"
+            else:
+                properties[SUBSCRIPTION_PROPERTY_MATCH_UNFILTERED] = "false"
 
         await subscriber.client.subscribe(
             stream=stream,
@@ -283,8 +308,11 @@ class Consumer:
         )
 
     @staticmethod
-    def _filter_messages(frame: schema.Deliver, subscriber: _Subscriber) -> Iterator[tuple[int, bytes]]:
+    def _filter_messages(
+        frame: schema.Deliver, subscriber: _Subscriber, filter_value: Optional[FilterConfiguration] = None
+    ) -> Iterator[tuple[int, bytes]]:
         min_deliverable_offset = -1
+        is_filtered = True
         if subscriber.offset_type is OffsetType.OFFSET:
             min_deliverable_offset = subscriber.offset
 
@@ -295,18 +323,29 @@ class Consumer:
             if offset < min_deliverable_offset:
                 continue
 
-            yield (offset, message)
+            if filter_value is not None:
+                filter_predicate = filter_value.post_filler()
+                if filter_predicate is not None:
+                    is_filtered = filter_predicate(subscriber.decoder(message))
+
+            if is_filtered:
+                yield (offset, message)
 
         subscriber.offset = frame.chunk_first_offset + frame.num_entries
 
-    async def _on_deliver(self, frame: schema.Deliver, subscriber: _Subscriber) -> None:
+    async def _on_deliver(
+        self, frame: schema.Deliver, subscriber: _Subscriber, filter_value: Optional[FilterConfiguration]
+    ) -> None:
+
+        if filter_value is None:
+            print("filter is None")
 
         if frame.subscription_id != subscriber.subscription_id:
             return
 
         await subscriber.client.credit(subscriber.subscription_id, 1)
 
-        for (offset, message) in self._filter_messages(frame, subscriber):
+        for (offset, message) in self._filter_messages(frame, subscriber, filter_value):
             message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
 
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
@@ -401,3 +440,13 @@ class Consumer:
                     offset_specification=offset_specification,
                 )
             )
+
+    async def check_if_filtering_is_supported(self, client: Optional[Client]) -> None:
+        if client is None:
+            return
+        command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
+        server_command_version: schema.FrameHandlerInfo = await client.exchange_command_version(
+            command_version_input
+        )
+        if server_command_version.max_version < 2:
+            raise ValueError("filtering is just supported for RabbitMQ 3.13")

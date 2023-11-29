@@ -169,7 +169,7 @@ class BaseClient:
         assert self._conn
         try:
             if self.is_connection_alive():
-                await self._conn.write_frame(frame)
+                await self._conn.write_frame(frame, version)
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:

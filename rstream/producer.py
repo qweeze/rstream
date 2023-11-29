@@ -147,12 +147,7 @@ class Producer:
 
         # Check if the filtering is supported by the server
         if self._filter_value_extractor is not None:
-            command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
-            server_command_version: schema.FrameHandlerInfo = (
-                await self._default_client.exchange_command_version(command_version_input)
-            )
-            if server_command_version.max_version < 2:
-                raise ValueError("filtering is just supported for RabbitMQ 3.13")
+            await self.check_if_filtering_is_supported(self._default_client)
 
     async def close(self) -> None:
 
@@ -669,3 +664,13 @@ class Producer:
 
         async with self._lock:
             await self._get_or_create_publisher(stream)
+
+    async def check_if_filtering_is_supported(self, client: Optional[Client]) -> None:
+        if client is None:
+            return
+        command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
+        server_command_version: schema.FrameHandlerInfo = await client.exchange_command_version(
+            command_version_input
+        )
+        if server_command_version.max_version < 2:
+            raise ValueError("filtering is just supported for RabbitMQ 3.13")
