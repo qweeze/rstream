@@ -322,7 +322,6 @@ class Consumer:
             offset += 1
             if offset < min_deliverable_offset:
                 continue
-
             if filter_value is not None:
                 filter_predicate = filter_value.post_filler()
                 if filter_predicate is not None:
@@ -336,9 +335,6 @@ class Consumer:
     async def _on_deliver(
         self, frame: schema.Deliver, subscriber: _Subscriber, filter_value: Optional[FilterConfiguration]
     ) -> None:
-
-        if filter_value is None:
-            print("filter is None")
 
         if frame.subscription_id != subscriber.subscription_id:
             return

@@ -151,12 +151,12 @@ class BaseClient:
     def add_stream(self, stream: str):
         self._streams.append(stream)
 
-    async def send_publish_frame(self, frame: schema.Publish) -> None:
+    async def send_publish_frame(self, frame: schema.Publish, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
         try:
             if self.is_connection_alive():
-                await self._conn.write_frame_publish(frame)
+                await self._conn.write_frame_publish(frame, version)
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:

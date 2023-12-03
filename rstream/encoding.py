@@ -149,6 +149,10 @@ def encode_publish(frame: Publish, version_to_encode: int = 1) -> bytes:
         fp_write(len(messages).to_bytes(4, "big", signed=False))
         for msg in messages:
             fp_write(msg.publishing_id.to_bytes(length=8, byteorder="big", signed=False))
+            if version_to_encode == 2:
+                if msg.filter_value is not None:
+                    fp_write(len(msg.filter_value).to_bytes(length=2, byteorder="big", signed=False))
+                    fp_write(msg.filter_value.encode("utf-8"))
 
             data = msg.data
             fp_write(len(data).to_bytes(4, "big", signed=False))

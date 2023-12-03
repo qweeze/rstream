@@ -415,12 +415,13 @@ class Producer:
                             ),
                         )
                     else:
-                        await publisher.client.send_frame(
-                            schema.Publish(
-                                publisher_id=publisher.id,
-                                messages=messages,
-                            ),
-                            version=2,
+                        value_filter = await self._filter_value_extractor(msg)
+                        messages.append(
+                            schema.Message(
+                                publishing_id=msg.publishing_id,
+                                filter_value=value_filter,
+                                data=bytes(msg),
+                            )
                         )
                     # publishing_ids.update([m.publishing_id for m in messages])
                     messages.clear()
@@ -445,12 +446,21 @@ class Producer:
                     publishing_ids_callback[item.callback].add(publishing_id)
 
         if len(messages) > 0:
-            await publisher.client.send_publish_frame(
-                schema.Publish(
-                    publisher_id=publisher.id,
-                    messages=messages,
-                ),
-            )
+            if self._filter_value_extractor is None:
+                await publisher.client.send_publish_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                )
+            else:
+                await publisher.client.send_publish_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                    version=2,
+                )
             publishing_ids.update([m.publishing_id for m in messages])
 
         for callback in publishing_ids_callback:
