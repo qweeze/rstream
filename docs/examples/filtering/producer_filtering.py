@@ -4,12 +4,11 @@ import time
 from rstream import AMQPMessage, Producer
 
 STREAM = "my-test-stream"
-LOOP = 10000
-BATCH = 100
+MESSAGES = 200
 
 
 async def filter_value_extractor(message: AMQPMessage) -> str:
-    return message.application_properties["id"]
+    return message.application_properties["region"]
 
 
 async def publish():
@@ -22,30 +21,35 @@ async def publish():
 
         start_time = time.perf_counter()
 
-        # sending a million of messages in AMQP format
-        z = 0
-        for j in range(LOOP):
+        # sending 200 messages with filtering New York
+        for i in range(MESSAGES):
+            application_properties = {
+                "region": "New York",
+            }
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+                application_properties=application_properties,
+            )
+            # send is asynchronous
+            await producer.send(stream=STREAM, message=amqp_message)
 
-            messages = []
-            for i in range(BATCH):
-                z = z + 1
-                application_properties = {
-                    "id": str(z),
-                }
-                amqp_message = AMQPMessage(
-                    body="hello: {}".format(i),
-                    application_properties=application_properties,
-                )
-                messages.append(amqp_message)
-            # send_batch is synchronous. will wait till termination
-            await producer.send_batch(stream=STREAM, batch=messages)
+        # wait a bit to ensure all messages will go to a chunk
+        await asyncio.sleep(2)
+
+        # sending 200 messages with filtering California
+        for i in range(MESSAGES):
+            application_properties = {
+                "region": "California",
+            }
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+                application_properties=application_properties,
+            )
+            # send is asynchronous
+            await producer.send(stream=STREAM, message=amqp_message)
 
         end_time = time.perf_counter()
-        message_for_second = LOOP * BATCH / (end_time - start_time)
-        print(
-            f"Sent {LOOP * BATCH} messages in {end_time - start_time:0.4f} seconds. "
-            f"{message_for_second:0.4f} messages per second"
-        )
+        print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")
 
 
 asyncio.run(publish())
