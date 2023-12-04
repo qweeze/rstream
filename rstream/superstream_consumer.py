@@ -25,7 +25,10 @@ from .constants import (
 )
 from .consumer import Consumer, EventContext, MessageContext
 from .superstream import DefaultSuperstreamMetadata
-from .utils import DisconnectionErrorInfo
+from .utils import (
+    DisconnectionErrorInfo,
+    FilterConfiguration,
+)
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
@@ -142,6 +145,7 @@ class SuperStreamConsumer:
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
         consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
+        filter_input: Optional[FilterConfiguration] = None,
     ):
 
         if offset_specification is None:
@@ -173,6 +177,7 @@ class SuperStreamConsumer:
                 properties=properties,
                 subscriber_name=subscriber_name,
                 consumer_update_listener=consumer_update_listener,
+                filter_input=filter_input,
             )
             self._subscribers[partition] = subscriber
 

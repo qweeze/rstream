@@ -538,6 +538,9 @@ class Producer:
         if len(sub_entry_messages) == 0:
             raise ValueError("Empty batch")
 
+        if self._filter_value_extractor is not None:
+            raise ValueError("filtering can't be enabled in sub-batching mode")
+
         # start the background thread to send buffered messages
         if self.task is None:
             self.task = asyncio.create_task(self._timer())

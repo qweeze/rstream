@@ -25,6 +25,7 @@ from .utils import DisconnectionErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
+CB_F = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 
@@ -54,6 +55,7 @@ class SuperStreamProducer:
         default_batch_publishing_delay: float = 0.2,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
         connection_name: str = None,
+        filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -88,6 +90,7 @@ class SuperStreamProducer:
         self._connection_name = connection_name
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
+        self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
 
     async def _get_producer(self) -> Producer:
         if self._producer is None:
@@ -104,6 +107,7 @@ class SuperStreamProducer:
                 default_batch_publishing_delay=self.default_batch_publishing_delay,
                 connection_closed_handler=self._connection_closed_handler,
                 connection_name=self._connection_name,
+                filter_value_extractor=self._filter_value_extractor,
             )
             await producer.start()
             self._producer = producer
