@@ -159,6 +159,17 @@ See examples in:
 
 See the [single active consumer example](https://github.com/qweeze/rstream/blob/master/docs/examples/single_active_consumer/)
 
+### Filtering
+
+Filtering is a new streaming feature enabled from RabbitMQ 3.13 based on Bloom filter.
+RabbitMQ Stream provides a server-side filtering feature that avoids reading all the messages of a stream and filtering 
+only on the client side. This helps to save network bandwidth when a consuming application needs only a subset of 
+messages.
+
+https://rabbitmq.github.io/rabbitmq-stream-java-client/stable/htmlsingle/#filtering 
+
+See the [filtering examples](https://github.com/qweeze/rstream/blob/master/docs/examples/filtering/)
+
 ### Connecting with SSL
 
 You can enable ssl/tls.
