@@ -300,7 +300,7 @@ class Producer:
             )
 
         if len(messages) > 0:
-            await publisher.client.send_frame(
+            await publisher.client.send_publish_frame(
                 schema.Publish(
                     publisher_id=publisher.id,
                     messages=messages,
