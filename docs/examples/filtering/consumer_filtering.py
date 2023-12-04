@@ -14,8 +14,7 @@ cont = 0
 
 
 async def consume():
-    filters = []
-    filters.append("New York")
+    filters = ["New York"]
 
     consumer = Consumer(
         host="localhost",
@@ -35,7 +34,7 @@ async def consume():
         print("Application property: " + str(msg.application_properties[b"region"]))
         global cont
         cont = cont + 1
-        # we shoud read just 200 messages
+        # we should read only 200 messages
         print("cont: " + str(cont))
 
     await consumer.start()
@@ -45,6 +44,7 @@ async def consume():
         decoder=amqp_decoder,
         filter_input=FilterConfiguration(
             values_to_filter=filters,
+            # this post filter can be used to filter messages client side.
             # predicate=lambda message: message.application_properties[b"region"] == filters[0].encode("utf-8"),
             match_unfiltered=False,
         ),

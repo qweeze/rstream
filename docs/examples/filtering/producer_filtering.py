@@ -34,6 +34,8 @@ async def publish():
             await producer.send(stream=STREAM, message=amqp_message)
 
         # wait a bit to ensure all messages will go to a chunk
+        # don't do this in production. This is only for testing purposes
+        # it is to force the bloom filter to be created
         await asyncio.sleep(2)
 
         # sending 200 messages with filtering California
