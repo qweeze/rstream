@@ -445,4 +445,8 @@ class Consumer:
             command_version_input
         )
         if server_command_version.max_version < 2:
-            raise ValueError("filtering is just supported for RabbitMQ 3.13")
+            filter_not_supported = (
+                "Filtering is not supported by the broker "
+                + "(requires RabbitMQ 3.13+ and stream_filtering feature flag activated)"
+            )
+            raise ValueError(filter_not_supported)
