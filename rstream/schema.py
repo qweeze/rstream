@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import inspect
+import logging
 import zlib
 from dataclasses import dataclass, field, fields
 from typing import (
@@ -19,6 +20,7 @@ from .constants import Key, OffsetType, T
 from .exceptions import ServerError
 
 registry: dict[tuple[bool, Key], Type["Frame"]] = {}
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -204,6 +206,7 @@ class QueryPublisherSequenceResponse(Frame, is_response=True):
 @dataclass
 class Message(Struct):
     publishing_id: int = field(metadata={"type": T.uint64})
+    filter_value: Optional[str] = field(metadata={"type": T.string})
     data: bytes = field(metadata={"type": T.bytes})
 
 

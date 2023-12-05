@@ -19,6 +19,7 @@ from .http_requests import (
     delete_exchange,
 )
 from .util import (
+    filter_value_extractor,
     routing_extractor,
     routing_extractor_for_sac,
     routing_extractor_key,
@@ -126,6 +127,25 @@ async def producer(pytestconfig, ssl_context):
         password=pytestconfig.getoption("rmq_password"),
         frame_max=1024 * 1024,
         heartbeat=60,
+    )
+    await producer.start()
+    try:
+        yield producer
+    finally:
+        await producer.close()
+
+
+@pytest.fixture()
+async def producer_with_filtering(pytestconfig, ssl_context):
+    producer = Producer(
+        host=pytestconfig.getoption("rmq_host"),
+        port=pytestconfig.getoption("rmq_port"),
+        ssl_context=ssl_context,
+        username=pytestconfig.getoption("rmq_username"),
+        password=pytestconfig.getoption("rmq_password"),
+        frame_max=1024 * 1024,
+        heartbeat=60,
+        filter_value_extractor=filter_value_extractor,
     )
     await producer.start()
     try:

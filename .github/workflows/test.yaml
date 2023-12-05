@@ -19,7 +19,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     services:
       rabbitmq-streaming:
-        image: pivotalrabbitmq/rabbitmq-stream
+        image: rabbitmq:3.13-rc-management
         env:
           RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbitmq_stream advertised_host localhost"
         ports:
@@ -36,6 +36,8 @@ jobs:
           version: 1.4.2
           virtualenvs-create: true
           virtualenvs-in-project: false
+      - name: Enable RabbitMQ Plugins
+        run: docker exec ${{ job.services.rabbitmq-streaming.id }} rabbitmq-plugins enable rabbitmq_stream rabbitmq_stream_management rabbitmq_amqp1_0
       - name: poetry install
         run: poetry install --no-root
       - name: isort check-only

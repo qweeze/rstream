@@ -3,7 +3,10 @@
 
 from importlib import metadata
 
-from .utils import DisconnectionErrorInfo
+from .utils import (
+    DisconnectionErrorInfo,
+    FilterConfiguration,
+)
 
 try:
     __version__ = metadata.version(__package__)
@@ -64,4 +67,5 @@ __all__ = [
     "EventContext",
     "DisconnectionErrorInfo",
     "SlasMechanism",
+    "FilterConfiguration",
 ]

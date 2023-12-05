@@ -13,6 +13,7 @@ from rstream import (
     Consumer,
     ConsumerOffsetSpecification,
     DisconnectionErrorInfo,
+    FilterConfiguration,
     MessageContext,
     OffsetType,
     Producer,
@@ -693,3 +694,83 @@ async def test_super_stream_consumer_connection_broke_with_reconnect(super_strea
     assert "test-super-stream-0" in streams_disconnected
     assert "test-super-stream-1" in streams_disconnected
     assert "test-super-stream-2" in streams_disconnected
+
+
+async def test_consume_filtering(stream: str, consumer: Consumer, producer_with_filtering: Producer) -> None:
+
+    filters = ["1"]
+
+    captured: list[bytes] = []
+
+    async def on_message(msg: AMQPMessage, message_context: MessageContext):
+        captured.append(bytes(msg))
+
+    await consumer.subscribe(
+        stream,
+        callback=on_message,
+        decoder=amqp_decoder,
+        filter_input=FilterConfiguration(
+            values_to_filter=filters,
+            predicate=lambda message: message.application_properties[b"id"] == filters[0].encode("utf-8"),
+            match_unfiltered=False,
+        ),
+    )
+
+    for j in range(10):
+
+        messages = []
+        for i in range(50):
+            application_properties = {
+                "id": str(i),
+            }
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+                application_properties=application_properties,
+            )
+            messages.append(amqp_message)
+        # send_batch is synchronous. will wait till termination
+        await producer_with_filtering.send_batch(stream=stream, batch=messages)  # type: ignore
+
+    # Consumed just the filetered items
+    await wait_for(lambda: len(captured) == 10)
+
+
+async def test_consume_filtering_match_unfiltered(
+    stream: str, consumer: Consumer, producer: Producer
+) -> None:
+
+    filters = ["1"]
+
+    captured: list[bytes] = []
+
+    async def on_message(msg: AMQPMessage, message_context: MessageContext):
+        captured.append(bytes(msg))
+
+    await consumer.subscribe(
+        stream,
+        callback=on_message,
+        decoder=amqp_decoder,
+        filter_input=FilterConfiguration(
+            values_to_filter=filters,
+            predicate=lambda message: message.application_properties[b"id"] == filters[0].encode("utf-8"),
+            match_unfiltered=False,
+        ),
+    )
+
+    for j in range(10):
+
+        messages = []
+        for i in range(50):
+            application_properties = {
+                "id": str(i),
+            }
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+                application_properties=application_properties,
+            )
+            messages.append(amqp_message)
+        # send_batch is synchronous. will wait till termination
+        await producer.send_batch(stream=stream, batch=messages)  # type: ignore
+
+    # No filter on produce side no filetering
+    await wait_for(lambda: len(captured) == 0)

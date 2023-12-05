@@ -65,3 +65,7 @@ class SlasMechanism(str, enum.Enum):
 class ConsumerOffsetSpecification:
     offset_type: OffsetType = OffsetType.FIRST
     offset: Optional[int] = None
+
+
+SUBSCRIPTION_PROPERTY_FILTER_PREFIX = "filter."
+SUBSCRIPTION_PROPERTY_MATCH_UNFILTERED = "match-unfiltered"

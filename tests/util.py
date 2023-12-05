@@ -137,3 +137,7 @@ async def task_to_delete_connection(connection_name: str) -> None:
         if connection["client_properties"]["connection_name"] == connection_name:
             delete_connection(connection["name"])
             await wait_for(lambda: get_connection(connection["name"]) is False)
+
+
+async def filter_value_extractor(message: AMQPMessage) -> str:
+    return message.application_properties["id"]

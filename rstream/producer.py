@@ -30,12 +30,14 @@ from .compression import (
     CompressionType,
     ICompressionCodec,
 )
-from .constants import SlasMechanism
+from .constants import Key, SlasMechanism
 from .utils import DisconnectionErrorInfo, RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
+message_v1_v2 = T = TypeVar("message_v1_v2")
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
+CB_F = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
 
 
 @dataclass
@@ -83,6 +85,7 @@ class Producer:
         connection_name: str = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
+        filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -116,6 +119,7 @@ class Producer:
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         self._close_called = False
         self._connection_name = connection_name
+        self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
 
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
@@ -140,6 +144,10 @@ class Producer:
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
+
+        # Check if the filtering is supported by the server
+        if self._filter_value_extractor is not None:
+            await self.check_if_filtering_is_supported(self._default_client)
 
     async def close(self) -> None:
 
@@ -292,20 +300,43 @@ class Producer:
             if msg.publishing_id is None:
                 msg.publishing_id = publisher.sequence.next()
 
-            messages.append(
-                schema.Message(
-                    publishing_id=msg.publishing_id,
-                    data=bytes(msg),
+            if self._filter_value_extractor is None:
+                messages.append(
+                    schema.Message(
+                        publishing_id=msg.publishing_id,
+                        filter_value=None,
+                        data=bytes(msg),
+                    )
                 )
-            )
+            else:
+                value_filter: str = await self._filter_value_extractor(msg)
+                messages.append(
+                    schema.Message(
+                        publishing_id=msg.publishing_id,
+                        filter_value=value_filter,
+                        data=bytes(msg),
+                    )
+                )
 
         if len(messages) > 0:
-            await publisher.client.send_publish_frame(
-                schema.Publish(
-                    publisher_id=publisher.id,
-                    messages=messages,
-                ),
-            )
+
+            if self._filter_value_extractor is None:
+                await publisher.client.send_publish_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                )
+
+            else:
+                await publisher.client.send_publish_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                    version=2,
+                )
+
             publishing_ids.update([m.publishing_id for m in messages])
 
         if not sync:
@@ -352,12 +383,23 @@ class Producer:
                 if msg.publishing_id is None:
                     msg.publishing_id = publisher.sequence.next()
 
-                messages.append(
-                    schema.Message(
-                        publishing_id=msg.publishing_id,
-                        data=bytes(msg),
+                if self._filter_value_extractor is None:
+                    messages.append(
+                        schema.Message(
+                            publishing_id=msg.publishing_id,
+                            filter_value=None,
+                            data=bytes(msg),
+                        )
                     )
-                )
+                else:
+                    value_filter: str = await self._filter_value_extractor(msg)
+                    messages.append(
+                        schema.Message(
+                            publishing_id=msg.publishing_id,
+                            filter_value=value_filter,
+                            data=bytes(msg),
+                        )
+                    )
 
                 if item.callback is not None:
                     publishing_ids_callback[item.callback].add(msg.publishing_id)
@@ -365,12 +407,22 @@ class Producer:
             else:
                 compression_codec = item.entry
                 if len(messages) > 0:
-                    await publisher.client.send_publish_frame(
-                        schema.Publish(
-                            publisher_id=publisher.id,
-                            messages=messages,
-                        ),
-                    )
+                    if self._filter_value_extractor is None:
+                        await publisher.client.send_publish_frame(
+                            schema.Publish(
+                                publisher_id=publisher.id,
+                                messages=messages,
+                            ),
+                        )
+                    else:
+                        value_filter = await self._filter_value_extractor(msg)
+                        messages.append(
+                            schema.Message(
+                                publishing_id=msg.publishing_id,
+                                filter_value=value_filter,
+                                data=bytes(msg),
+                            )
+                        )
                     # publishing_ids.update([m.publishing_id for m in messages])
                     messages.clear()
                 for _ in range(item.entry.messages_count()):
@@ -394,12 +446,21 @@ class Producer:
                     publishing_ids_callback[item.callback].add(publishing_id)
 
         if len(messages) > 0:
-            await publisher.client.send_publish_frame(
-                schema.Publish(
-                    publisher_id=publisher.id,
-                    messages=messages,
-                ),
-            )
+            if self._filter_value_extractor is None:
+                await publisher.client.send_publish_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                )
+            else:
+                await publisher.client.send_publish_frame(
+                    schema.Publish(
+                        publisher_id=publisher.id,
+                        messages=messages,
+                    ),
+                    version=2,
+                )
             publishing_ids.update([m.publishing_id for m in messages])
 
         for callback in publishing_ids_callback:
@@ -476,6 +537,9 @@ class Producer:
 
         if len(sub_entry_messages) == 0:
             raise ValueError("Empty batch")
+
+        if self._filter_value_extractor is not None:
+            raise ValueError("filtering can't be enabled in sub-batching mode")
 
         # start the background thread to send buffered messages
         if self.task is None:
@@ -613,3 +677,17 @@ class Producer:
 
         async with self._lock:
             await self._get_or_create_publisher(stream)
+
+    async def check_if_filtering_is_supported(self, client: Optional[Client]) -> None:
+        if client is None:
+            return
+        command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
+        server_command_version: schema.FrameHandlerInfo = await client.exchange_command_version(
+            command_version_input
+        )
+        if server_command_version.max_version < 2:
+            filter_not_supported = (
+                "Filtering is not supported by the broker "
+                + "(requires RabbitMQ 3.13+ and stream_filtering feature flag activated)"
+            )
+            raise ValueError(filter_not_supported)
