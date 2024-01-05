@@ -3,6 +3,7 @@
 
 import asyncio
 import logging
+import time
 from functools import partial
 
 import pytest
@@ -175,20 +176,24 @@ async def test_consumer_callback(stream: str, consumer: Consumer, producer: Prod
         assert offset >= 0 and offset < 100
 
 
-# this test seems failing (to check)
-# async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: Producer) -> None:
-#    messages = [str(i).encode() for i in range(1, 5_000)]
-#    await producer.send_batch(stream, messages)
+async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: Producer) -> None:
+    messages = [str(i).encode() for i in range(1, 5_000)]
+    await producer.send_batch(stream, messages)
 
-# mark time in between message batches
-#    now = int(time.time() * 1000)
+    # mark time in between message batches
+    now = int(time.time() * 1500)
 
-#    messages = [str(i).encode() for i in range(5_000, 5_100)]
-#    await producer.send_batch(stream, messages)
+    messages = [str(i).encode() for i in range(5_000, 5_100)]
+    await producer.send_batch(stream, messages)
 
-#    captured: list[bytes] = []
-#    await consumer.subscribe(stream, callback=captured.append, offset_type=OffsetType.TIMESTAMP, offset=now)
-#    await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000")
+    captured: list[bytes] = []
+
+    await consumer.subscribe(
+        stream,
+        callback=lambda message, message_context: captured.append(bytes(message)),
+        offset_specification=ConsumerOffsetSpecification(offset_type=OffsetType.TIMESTAMP, offset=now),
+    )
+    await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000")
 
 
 async def test_offset_type_next(stream: str, consumer: Consumer, producer: Producer) -> None:
