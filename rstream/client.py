@@ -245,7 +245,8 @@ class BaseClient:
                 _key = frame.key, frame.corr_id
                 fut = self._waiters.get(_key)
                 if fut is not None:
-                    fut.set_result(frame)
+                    if not fut.done():
+                        fut.set_result(frame)
                     del self._waiters[_key]
 
                 for subscriber_name, handler in list(self._handlers.get(frame.__class__, {}).items()):
