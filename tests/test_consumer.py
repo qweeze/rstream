@@ -181,7 +181,8 @@ async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: 
     await producer.send_batch(stream, messages)
 
     # mark time in between message batches
-    now = int(time.time() * 1500)
+    await asyncio.sleep(1)
+    now = int(time.time() * 1000)
 
     messages = [str(i).encode() for i in range(5_000, 5_100)]
     await producer.send_batch(stream, messages)

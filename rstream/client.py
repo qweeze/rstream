@@ -151,6 +151,9 @@ class BaseClient:
     def add_stream(self, stream: str):
         self._streams.append(stream)
 
+    async def get_stream_count(self):
+        return len(self._streams)
+
     async def send_publish_frame(self, frame: schema.Publish, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
