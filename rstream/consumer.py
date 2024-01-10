@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import random
 import ssl
@@ -33,6 +34,7 @@ from .schema import OffsetSpecification
 from .utils import (
     DisconnectionErrorInfo,
     FilterConfiguration,
+    MetadataUpdateInfo,
 )
 
 MT = TypeVar("MT")
@@ -83,6 +85,7 @@ class Consumer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         connection_closed_handler: Optional[CB_CONN[DisconnectionErrorInfo]] = None,
+        metadata_update_handler: Optional[CB_CONN[MetadataUpdateInfo]] = None,
         connection_name: str = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
@@ -106,6 +109,7 @@ class Consumer:
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
         self._connection_closed_handler = connection_closed_handler
+        self._metadata_update_handler = metadata_update_handler
         self._connection_name = connection_name
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         if self._connection_name is None:
@@ -236,6 +240,12 @@ class Consumer:
             name=subscriber.reference,
         )
 
+        subscriber.client.add_handler(
+            schema.MetadataUpdate,
+            partial(self._on_metadata_update),
+            name=subscriber.reference,
+        )
+
         # to handle single-active-consumer
         if properties is not None:
             if "single-active-consumer" in properties:
@@ -355,6 +365,14 @@ class Consumer:
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
             if maybe_coro is not None:
                 await maybe_coro
+
+    async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
+
+        if self._metadata_update_handler is not None:
+            metadata_update_info = MetadataUpdateInfo(frame.metadata_info.code, frame.metadata_info.stream)
+            result = self._metadata_update_handler(metadata_update_info)
+            if result is not None and inspect.isawaitable(result):
+                await result
 
     async def _on_consumer_update_query_response(
         self,

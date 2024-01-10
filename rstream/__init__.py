@@ -6,6 +6,7 @@ from importlib import metadata
 from .utils import (
     DisconnectionErrorInfo,
     FilterConfiguration,
+    MetadataUpdateInfo,
 )
 
 try:
@@ -68,4 +69,5 @@ __all__ = [
     "DisconnectionErrorInfo",
     "SlasMechanism",
     "FilterConfiguration",
+    "MetadataUpdateInfo",
 ]

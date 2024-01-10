@@ -31,7 +31,11 @@ from .compression import (
     ICompressionCodec,
 )
 from .constants import Key, SlasMechanism
-from .utils import DisconnectionErrorInfo, RawMessage
+from .utils import (
+    DisconnectionErrorInfo,
+    MetadataUpdateInfo,
+    RawMessage,
+)
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 message_v1_v2 = T = TypeVar("message_v1_v2")
@@ -84,6 +88,7 @@ class Producer:
         default_context_switch_value: int = 1000,
         connection_name: str = None,
         connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        metadata_update_handler: Optional[CB[MetadataUpdateInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
         filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
@@ -116,6 +121,7 @@ class Producer:
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
         self._connection_closed_handler = connection_closed_handler
+        self._metadata_update_handler = metadata_update_handler
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         self._close_called = False
         self._connection_name = connection_name
@@ -253,6 +259,11 @@ class Producer:
         client.add_handler(
             schema.PublishError,
             partial(self._on_publish_error, publisher=publisher),
+            name=publisher.reference,
+        )
+        client.add_handler(
+            schema.MetadataUpdate,
+            partial(self._on_metadata_update),
             name=publisher.reference,
         )
 
@@ -626,6 +637,14 @@ class Producer:
                     del waiting[confirmation]
                     if isinstance(confirmation, asyncio.Future):
                         confirmation.set_exception(exc)
+
+    async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
+
+        if self._metadata_update_handler is not None:
+            metadata_update_info = MetadataUpdateInfo(frame.metadata_info.code, frame.metadata_info.stream)
+            result = self._metadata_update_handler(metadata_update_info)
+            if result is not None and inspect.isawaitable(result):
+                await result
 
     async def create_stream(
         self,
