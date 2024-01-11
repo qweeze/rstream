@@ -24,9 +24,7 @@ async def consume():
                 + metadata_update_info.reason
             )
 
-            global consumer_closed
-            consumer_closed = True
-            await consumer.close()
+            await consumer.reconnect_stream(metadata_update_info.streams[0])
 
         consumer = Consumer(
             host="34.89.82.143",
@@ -50,18 +48,12 @@ async def consume():
         COUNT = COUNT + 1
         if COUNT % 100000 == 0:
             print("Got message: {} from stream {}, offset {}".format(msg, stream, offset))
-            print("consumed 100K messages")
+            print("consumed 1 million messages")
 
-    while True:
-        consumer = await connect()
-        await consumer.start()
-        await consumer.subscribe(stream=STREAM, callback=on_message, decoder=amqp_decoder)
-        await consumer.run()
-        global consumer_closed
-        if consumer_closed is True:
-            continue
-        else:
-            break
+    consumer = await connect()
+    await consumer.start()
+    await consumer.subscribe(stream=STREAM, callback=on_message, decoder=amqp_decoder)
+    await consumer.run()
 
 
 asyncio.run(consume())
