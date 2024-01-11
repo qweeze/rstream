@@ -45,16 +45,9 @@ class TimeoutWrapper:
 
 
 @dataclass
-class DisconnectionErrorInfo:
+class OnClosedErrorInfo:
     reason: str
     streams: list[str]
-
-
-@dataclass
-class MetadataUpdateInfo:
-    code: int
-    stream: str
-
 
 class FilterConfiguration:
     def __init__(

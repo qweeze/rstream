@@ -4,9 +4,8 @@
 from importlib import metadata
 
 from .utils import (
-    DisconnectionErrorInfo,
+    OnClosedErrorInfo,
     FilterConfiguration,
-    MetadataUpdateInfo,
 )
 
 try:
@@ -66,8 +65,7 @@ __all__ = [
     "StreamDoesNotExist",
     "OffsetSpecification",
     "EventContext",
-    "DisconnectionErrorInfo",
+    "OnClosedErrorInfo",
     "SlasMechanism",
     "FilterConfiguration",
-    "MetadataUpdateInfo",
 ]

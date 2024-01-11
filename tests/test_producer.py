@@ -11,7 +11,7 @@ from rstream import (
     AMQPMessage,
     CompressionType,
     Consumer,
-    DisconnectionErrorInfo,
+    OnClosedErrorInfo,
     Producer,
     RawMessage,
     RouteType,
@@ -478,7 +478,7 @@ async def test_producer_connection_broke(stream: str) -> None:
     stream_disconnected = None
     producer_broke: Producer
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         nonlocal connection_broke
         connection_broke = True
         nonlocal producer_broke
@@ -492,7 +492,7 @@ async def test_producer_connection_broke(stream: str) -> None:
         "localhost",
         username="guest",
         password="guest",
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
     )
 
@@ -518,7 +518,7 @@ async def test_producer_connection_broke_with_send_batch(stream: str) -> None:
     stream_disconnected = None
     producer_broke: Producer
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
 
         nonlocal connection_broke
         connection_broke = True
@@ -531,7 +531,7 @@ async def test_producer_connection_broke_with_send_batch(stream: str) -> None:
         "localhost",
         username="guest",
         password="guest",
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
     )
 
@@ -566,7 +566,7 @@ async def test_super_stream_producer_connection_broke(super_stream: str) -> None
     streams_disconnected: set[str] = set()
     producer_broke: Producer
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         nonlocal connection_broke
         connection_broke = True
         nonlocal producer_broke
@@ -581,7 +581,7 @@ async def test_super_stream_producer_connection_broke(super_stream: str) -> None
         password="guest",
         routing_extractor=routing_extractor_generic,
         routing=RouteType.Hash,
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
         super_stream=super_stream,
     )
@@ -621,7 +621,7 @@ async def test_producer_connection_broke_with_reconnect(stream: str) -> None:
     stream_disconnected = None
     producer_broke: Producer
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         nonlocal connection_broke
         connection_broke = True
         nonlocal producer_broke
@@ -637,7 +637,7 @@ async def test_producer_connection_broke_with_reconnect(stream: str) -> None:
         "localhost",
         username="guest",
         password="guest",
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
     )
 
@@ -671,7 +671,7 @@ async def test_super_stream_producer_connection_broke_with_reconnect(super_strea
     streams_disconnected: set[str] = set()
     producer_broke: Producer
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         nonlocal connection_broke
         connection_broke = True
         nonlocal producer_broke
@@ -687,7 +687,7 @@ async def test_super_stream_producer_connection_broke_with_reconnect(super_strea
         password="guest",
         routing_extractor=routing_extractor_generic,
         routing=RouteType.Hash,
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
         super_stream=super_stream,
     )

@@ -26,7 +26,7 @@ from .constants import (
 from .consumer import Consumer, EventContext, MessageContext
 from .superstream import DefaultSuperstreamMetadata
 from .utils import (
-    DisconnectionErrorInfo,
+    OnClosedErrorInfo,
     FilterConfiguration,
 )
 
@@ -50,7 +50,7 @@ class SuperStreamConsumer:
         max_retries: int = 20,
         super_stream: str,
         connection_name: str = None,
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -81,7 +81,7 @@ class SuperStreamConsumer:
         self._consumers: dict[str, Consumer] = {}
         self._stop_event = asyncio.Event()
         self._subscribers: dict[str, str] = defaultdict(str)
-        self._connection_closed_handler = connection_closed_handler
+        self._on_close_handler = on_close_handler
         self._connection_name = connection_name
         if self._connection_name is None:
             self._connection_name = "rstream-consumer"
@@ -124,7 +124,7 @@ class SuperStreamConsumer:
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
                 addr=Addr(broker.host, broker.port),
-                connection_closed_handler=self._connection_closed_handler,
+                connection_closed_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 stream=stream,
             )
@@ -153,7 +153,7 @@ class SuperStreamConsumer:
 
         if self._default_client is None or self._default_client.is_connection_alive() is False:
             self._default_client = await self._pool.get(
-                connection_closed_handler=self._connection_closed_handler, connection_name="rstream-locator"
+                connection_closed_handler=self._on_close_handler, connection_name="rstream-locator"
             )
 
         self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self.default_client)
@@ -193,7 +193,7 @@ class SuperStreamConsumer:
             heartbeat=self.heartbeat,
             load_balancer_mode=self.load_balancer_mode,
             max_retries=self.max_retries,
-            connection_closed_handler=self._connection_closed_handler,
+            on_close_handler=self._on_close_handler,
             connection_name=self._connection_name,
         )
 

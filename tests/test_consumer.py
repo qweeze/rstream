@@ -13,7 +13,7 @@ from rstream import (
     AMQPMessage,
     Consumer,
     ConsumerOffsetSpecification,
-    DisconnectionErrorInfo,
+    OnClosedErrorInfo,
     FilterConfiguration,
     MessageContext,
     OffsetType,
@@ -538,7 +538,7 @@ async def test_consumer_connection_broke(stream: str) -> None:
     stream_disconnected = None
     consumer_broke: Consumer
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         nonlocal connection_broke
         connection_broke = True
         nonlocal consumer_broke
@@ -553,7 +553,7 @@ async def test_consumer_connection_broke(stream: str) -> None:
         vhost="/",
         username="guest",
         password="guest",
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
     )
 
@@ -578,7 +578,7 @@ async def test_super_stream_consumer_connection_broke(super_stream: str) -> None
     streams_disconnected: set[str] = set()
     consumer_broke: Consumer
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         nonlocal connection_broke
         nonlocal streams_disconnected
         # avoiding multiple connection closed to hit
@@ -600,7 +600,7 @@ async def test_super_stream_consumer_connection_broke(super_stream: str) -> None
         vhost="/",
         username="guest",
         password="guest",
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
         super_stream=super_stream,
     )
@@ -629,7 +629,7 @@ async def test_super_stream_consumer_connection_broke_with_reconnect(super_strea
     consumer_broke: Consumer
     offset_restart = 0
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         logger.warning("connection closed")
         nonlocal connection_broke
         nonlocal streams_disconnected
@@ -654,7 +654,7 @@ async def test_super_stream_consumer_connection_broke_with_reconnect(super_strea
         password="guest",
         routing_extractor=routing_extractor_generic,
         routing=RouteType.Hash,
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
         super_stream=super_stream,
     )
@@ -677,7 +677,7 @@ async def test_super_stream_consumer_connection_broke_with_reconnect(super_strea
         vhost="/",
         username="guest",
         password="guest",
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         connection_name="test-connection",
         super_stream=super_stream,
     )

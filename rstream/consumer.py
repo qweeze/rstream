@@ -32,9 +32,8 @@ from .constants import (
 )
 from .schema import OffsetSpecification
 from .utils import (
-    DisconnectionErrorInfo,
+    OnClosedErrorInfo,
     FilterConfiguration,
-    MetadataUpdateInfo,
 )
 
 MT = TypeVar("MT")
@@ -84,8 +83,7 @@ class Consumer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
-        connection_closed_handler: Optional[CB_CONN[DisconnectionErrorInfo]] = None,
-        metadata_update_handler: Optional[CB_CONN[MetadataUpdateInfo]] = None,
+        on_close_handler: Optional[CB_CONN[OnClosedErrorInfo]] = None,
         connection_name: str = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
@@ -108,8 +106,7 @@ class Consumer:
         self._subscribers: dict[str, _Subscriber] = {}
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
-        self._connection_closed_handler = connection_closed_handler
-        self._metadata_update_handler = metadata_update_handler
+        self._on_close_handler = on_close_handler
         self._connection_name = connection_name
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         if self._connection_name is None:
@@ -130,7 +127,7 @@ class Consumer:
 
     async def start(self) -> None:
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler,
+            connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
@@ -158,14 +155,14 @@ class Consumer:
         if stream not in self._clients:
             if self._default_client is None:
                 self._default_client = await self._pool.get(
-                    connection_closed_handler=self._connection_closed_handler,
+                    connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
                 )
             leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
                 addr=Addr(broker.host, broker.port),
-                connection_closed_handler=self._connection_closed_handler,
+                connection_closed_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 stream=stream,
             )
@@ -368,9 +365,9 @@ class Consumer:
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
-        if self._metadata_update_handler is not None:
-            metadata_update_info = MetadataUpdateInfo(frame.metadata_info.code, frame.metadata_info.stream)
-            result = self._metadata_update_handler(metadata_update_info)
+        if self._on_close_handler is not None:
+            metadata_update_info = OnClosedErrorInfo(str(frame.metadata_info.code), [frame.metadata_info.stream])
+            result = self._on_close_handler(metadata_update_info)
             if result is not None and inspect.isawaitable(result):
                 await result
 

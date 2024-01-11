@@ -32,8 +32,7 @@ from .compression import (
 )
 from .constants import Key, SlasMechanism
 from .utils import (
-    DisconnectionErrorInfo,
-    MetadataUpdateInfo,
+    OnClosedErrorInfo,
     RawMessage,
 )
 
@@ -87,8 +86,7 @@ class Producer:
         default_batch_publishing_delay: float = 0.2,
         default_context_switch_value: int = 1000,
         connection_name: str = None,
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
-        metadata_update_handler: Optional[CB[MetadataUpdateInfo]] = None,
+        on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
         filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
@@ -120,8 +118,7 @@ class Producer:
         self._default_batch_publishing_delay = default_batch_publishing_delay
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
-        self._connection_closed_handler = connection_closed_handler
-        self._metadata_update_handler = metadata_update_handler
+        self._on_close_handler = on_close_handler
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         self._close_called = False
         self._connection_name = connection_name
@@ -146,7 +143,7 @@ class Producer:
     async def start(self) -> None:
         self._close_called = False
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler,
+            connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
@@ -201,14 +198,14 @@ class Producer:
         if stream not in self._clients:
             if self._default_client is None:
                 self._default_client = await self._pool.get(
-                    connection_closed_handler=self._connection_closed_handler,
+                    connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
                 )
             leader, _ = await (await self.default_client).query_leader_and_replicas(stream)
             self._clients[stream] = await self._pool.get(
                 connection_name=self._connection_name,
                 addr=Addr(leader.host, leader.port),
-                connection_closed_handler=self._connection_closed_handler,
+                connection_closed_handler=self._on_close_handler,
                 stream=stream,
                 sasl_configuration_mechanism=self._sasl_configuration_mechanism,
             )
@@ -640,9 +637,9 @@ class Producer:
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
-        if self._metadata_update_handler is not None:
-            metadata_update_info = MetadataUpdateInfo(frame.metadata_info.code, frame.metadata_info.stream)
-            result = self._metadata_update_handler(metadata_update_info)
+        if self._on_close_handler is not None:
+            metadata_update_info = OnClosedErrorInfo(str(frame.metadata_info.code), [frame.metadata_info.stream])
+            result = self._on_close_handler(metadata_update_info)
             if result is not None and inspect.isawaitable(result):
                 await result
 
