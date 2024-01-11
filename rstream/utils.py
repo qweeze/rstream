@@ -49,6 +49,7 @@ class OnClosedErrorInfo:
     reason: str
     streams: list[str]
 
+
 class FilterConfiguration:
     def __init__(
         self,

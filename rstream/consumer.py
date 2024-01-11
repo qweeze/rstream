@@ -31,10 +31,7 @@ from .constants import (
     SlasMechanism,
 )
 from .schema import OffsetSpecification
-from .utils import (
-    OnClosedErrorInfo,
-    FilterConfiguration,
-)
+from .utils import FilterConfiguration, OnClosedErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
@@ -366,7 +363,9 @@ class Consumer:
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
         if self._on_close_handler is not None:
-            metadata_update_info = OnClosedErrorInfo(str(frame.metadata_info.code), [frame.metadata_info.stream])
+            metadata_update_info = OnClosedErrorInfo(
+                str(frame.metadata_info.code), [frame.metadata_info.stream]
+            )
             result = self._on_close_handler(metadata_update_info)
             if result is not None and inspect.isawaitable(result):
                 await result

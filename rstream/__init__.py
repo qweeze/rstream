@@ -3,10 +3,7 @@
 
 from importlib import metadata
 
-from .utils import (
-    OnClosedErrorInfo,
-    FilterConfiguration,
-)
+from .utils import FilterConfiguration, OnClosedErrorInfo
 
 try:
     __version__ = metadata.version(__package__)

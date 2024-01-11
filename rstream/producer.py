@@ -31,10 +31,7 @@ from .compression import (
     ICompressionCodec,
 )
 from .constants import Key, SlasMechanism
-from .utils import (
-    OnClosedErrorInfo,
-    RawMessage,
-)
+from .utils import OnClosedErrorInfo, RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 message_v1_v2 = T = TypeVar("message_v1_v2")
@@ -638,7 +635,7 @@ class Producer:
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
         if self._on_close_handler is not None:
-            metadata_update_info = OnClosedErrorInfo(str(frame.metadata_info.code), [frame.metadata_info.stream])
+            metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
             result = self._on_close_handler(metadata_update_info)
             if result is not None and inspect.isawaitable(result):
                 await result

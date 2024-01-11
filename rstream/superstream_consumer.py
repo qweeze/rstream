@@ -25,10 +25,7 @@ from .constants import (
 )
 from .consumer import Consumer, EventContext, MessageContext
 from .superstream import DefaultSuperstreamMetadata
-from .utils import (
-    OnClosedErrorInfo,
-    FilterConfiguration,
-)
+from .utils import FilterConfiguration, OnClosedErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
