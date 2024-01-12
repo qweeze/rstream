@@ -30,8 +30,8 @@ async def consume():
             host="34.89.82.143",
             port=5552,
             vhost="/",
-            username="default_user_dihAqY5mlRseK375uAK",
-            password="SvPRDs1ba-YXBS6by1Y3YCUcoCXf_jAE",
+            username="XXXXXXXXXXXXX",
+            password="XXXXXXXXXXXXX",
             load_balancer_mode=True,
             on_close_handler=on_metadata_update,
         )

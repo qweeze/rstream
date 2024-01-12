@@ -15,6 +15,7 @@ from rstream import (
     OffsetType,
     SuperStreamConsumer,
     amqp_decoder,
+    Producer,
 )
 
 from .http_requests import (
@@ -137,6 +138,14 @@ async def task_to_delete_connection(connection_name: str) -> None:
         if connection["client_properties"]["connection_name"] == connection_name:
             delete_connection(connection["name"])
             await wait_for(lambda: get_connection(connection["name"]) is False)
+
+
+async def task_to_delete_stream(producer: Producer, stream: str) -> None:
+
+    # delay a few seconds before deleting the connection
+    await asyncio.sleep(5)
+
+    await producer.delete_stream(stream)
 
 
 async def filter_value_extractor(message: AMQPMessage) -> str:

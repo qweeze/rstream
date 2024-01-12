@@ -1,14 +1,39 @@
 import asyncio
 import time
 
-from rstream import AMQPMessage, OnClosedErrorInfo, Producer
+from rstream import (
+    AMQPMessage,
+    OnClosedErrorInfo,
+    Producer,
+    ConfirmationStatus,
+)
 
 STREAM = "my-test-stream"
 MESSAGES = 10000000
 producer_closed = False
+COUNT = 0
+CONFIRMED = 0
+
+async def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
+    global CONFIRMED
+    if confirmation.is_confirmed:
+        CONFIRMED = CONFIRMED + 1
+
+
+async def print_count_values():
+
+    global COUNT
+    global CONFIRMED
+
+    while True:
+        await asyncio.sleep(5)
+
+        print("NUMBER OF PRODUCED MESSAGES:         " + str(COUNT))
+        print("NUMBER OF CONFIRMED MESSAGES:        " + str(CONFIRMED))
 
 
 async def publish():
+    asyncio.create_task(print_count_values())
     async def on_metadata_update(on_closed_info: OnClosedErrorInfo) -> None:
 
         if on_closed_info.reason == "MetaData Update":
@@ -35,11 +60,7 @@ async def publish():
     # producer will be closed at the end by the async context manager
     # both if connection is still alive or not
     async with Producer(
-        "34.89.82.143",
-        username="XXXXXXXX",
-        password="XXXXXXXX",
-        load_balancer_mode=True,
-        on_close_handler=on_metadata_update,
+        "localhost", username="guest", password="guest",  load_balancer_mode=False,  on_close_handler=on_metadata_update
     ) as producer:
 
         # create a stream if it doesn't already exist
@@ -49,6 +70,7 @@ async def publish():
         start_time = time.perf_counter()
 
         print("Sending MESSAGES")
+        global COUNT
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(
                 body="hello: {}".format(i),
@@ -57,17 +79,15 @@ async def publish():
             global producer_closed
             if producer_closed is False:
                 try:
-                    await producer.send(stream=STREAM, message=amqp_message)
+                    await producer.send(stream=STREAM, message=amqp_message, on_publish_confirm=_on_publish_confirm_client)
                 except Exception as e:
-                    # gives time to reconnect_stream to reconnect
                     await asyncio.sleep(3)
                     continue
             else:
                 producer_closed = False
                 continue
 
-            if i % 100000 == 0:
-                print("sent 10000 messages")
+            COUNT = COUNT + 1
 
     end_time = time.perf_counter()
     print(f"Sent {MESSAGES} messages in {end_time - start_time:0.4f} seconds")

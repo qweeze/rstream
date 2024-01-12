@@ -364,7 +364,7 @@ class Consumer:
 
         if self._on_close_handler is not None:
             metadata_update_info = OnClosedErrorInfo(
-                str(frame.metadata_info.code), [frame.metadata_info.stream]
+                "MetaData Update", [frame.metadata_info.stream]
             )
             result = self._on_close_handler(metadata_update_info)
             if result is not None and inspect.isawaitable(result):

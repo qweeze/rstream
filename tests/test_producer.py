@@ -26,6 +26,7 @@ from .util import (
     on_publish_confirm_client_callback2,
     routing_extractor_generic,
     task_to_delete_connection,
+    task_to_delete_stream,
     wait_for,
 )
 
@@ -722,3 +723,46 @@ async def test_super_stream_producer_connection_broke_with_reconnect(super_strea
     assert "test-super-stream-0" in streams_disconnected
     assert "test-super-stream-1" in streams_disconnected
     assert "test-super-stream-2" in streams_disconnected
+
+'''
+async def test_producer_metadata_update() -> None:
+
+    connection_broke = False
+    stream_updated = None
+    producer_broke: Producer
+    stream_metadata_updated = "test-metadata-update-stream"
+
+    async def on_metadata_update(disconnection_info: OnClosedErrorInfo) -> None:
+        nonlocal connection_broke
+        connection_broke = True
+        nonlocal producer
+
+        nonlocal stream_updated
+        stream_updated = disconnection_info.streams.pop()
+        await producer.close()
+
+    producer = Producer(
+        "localhost",
+        username="guest",
+        password="guest",
+        on_close_handler=on_metadata_update,
+        connection_name="test-connection",
+    )
+
+    await producer.start()
+    await producer.create_stream(stream_metadata_updated)
+    # delete the stream after a while
+    asyncio.create_task(task_to_delete_stream(producer, stream_metadata_updated))
+
+    while connection_broke is False:
+        try:
+            await producer.send(stream_metadata_updated, b"one")
+        # Connection broke
+        except BaseException:
+            break
+
+
+
+    assert connection_broke is True
+    assert stream_updated == stream_metadata_updated
+'''

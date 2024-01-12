@@ -44,8 +44,8 @@ async def publish():
     # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
         "34.89.82.143",
-        username="default_user_dihAqY5mlRseK375uAK",
-        password="SvPRDs1ba-YXBS6by1Y3YCUcoCXf_jAE",
+        username="XXXXXXXXXXX",
+        password="XXXXXXXXXXX",
         routing_extractor=routing_extractor,
         routing=RouteType.Hash,
         super_stream=SUPER_STREAM,
