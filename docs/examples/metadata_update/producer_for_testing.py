@@ -3,9 +3,9 @@ import time
 
 from rstream import (
     AMQPMessage,
+    ConfirmationStatus,
     OnClosedErrorInfo,
     Producer,
-    ConfirmationStatus,
 )
 
 STREAM = "my-test-stream"
@@ -13,6 +13,7 @@ MESSAGES = 10000000
 producer_closed = False
 COUNT = 0
 CONFIRMED = 0
+
 
 async def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
     global CONFIRMED
@@ -34,6 +35,7 @@ async def print_count_values():
 
 async def publish():
     asyncio.create_task(print_count_values())
+
     async def on_metadata_update(on_closed_info: OnClosedErrorInfo) -> None:
 
         if on_closed_info.reason == "MetaData Update":
@@ -60,7 +62,11 @@ async def publish():
     # producer will be closed at the end by the async context manager
     # both if connection is still alive or not
     async with Producer(
-        "localhost", username="guest", password="guest",  load_balancer_mode=False,  on_close_handler=on_metadata_update
+        "localhost",
+        username="guest",
+        password="guest",
+        load_balancer_mode=False,
+        on_close_handler=on_metadata_update,
     ) as producer:
 
         # create a stream if it doesn't already exist
@@ -79,7 +85,9 @@ async def publish():
             global producer_closed
             if producer_closed is False:
                 try:
-                    await producer.send(stream=STREAM, message=amqp_message, on_publish_confirm=_on_publish_confirm_client)
+                    await producer.send(
+                        stream=STREAM, message=amqp_message, on_publish_confirm=_on_publish_confirm_client
+                    )
                 except Exception as e:
                     await asyncio.sleep(3)
                     continue

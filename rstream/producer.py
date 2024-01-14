@@ -183,6 +183,7 @@ class Producer:
                     logger.debug("exception in delete_publisher in Producer.close:", exc)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
+            publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
 
         self._publishers.clear()
 
@@ -662,6 +663,7 @@ class Producer:
             await publisher.client.delete_publisher(publisher.id)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
+            publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
             del self._publishers[stream]
 
         async with self._lock:

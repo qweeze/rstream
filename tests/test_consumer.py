@@ -33,6 +33,7 @@ from .util import (
     routing_extractor_generic,
     run_consumer,
     task_to_delete_connection,
+    task_to_delete_stream_consumer,
     wait_for,
 )
 
@@ -780,3 +781,46 @@ async def test_consume_filtering_match_unfiltered(
 
     # No filter on produce side no filetering
     await wait_for(lambda: len(captured) == 0)
+
+
+async def test_consumer_metadata_update(consumer: Consumer) -> None:
+
+    consumer_closed = False
+    stream_disconnected = None
+    stream = "test-stream-metadata-update"
+    consumer_metadata_update: Consumer
+
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
+        nonlocal consumer_closed
+
+        nonlocal consumer_metadata_update
+        nonlocal stream_disconnected
+        stream_disconnected = disconnection_info.streams.pop()
+
+        if consumer_closed is False:
+            consumer_closed = True
+            await consumer_metadata_update.close()
+
+    consumer_metadata_update = Consumer(
+        host="localhost",
+        port=5552,
+        vhost="/",
+        username="guest",
+        password="guest",
+        on_close_handler=on_connection_closed,
+        connection_name="test-connection",
+    )
+
+    async def on_message(msg: AMQPMessage, message_context: MessageContext):
+        message_context.consumer.get_stream(message_context.subscriber_name)
+
+    await consumer_metadata_update.start()
+    await consumer_metadata_update.create_stream(stream)
+    asyncio.create_task(task_to_delete_stream_consumer(consumer, stream))
+    await consumer_metadata_update.subscribe(stream=stream, callback=on_message, decoder=amqp_decoder)
+    await consumer_metadata_update.run()
+
+    assert consumer_closed is True
+    assert stream_disconnected == stream
+
+    await asyncio.sleep(1)

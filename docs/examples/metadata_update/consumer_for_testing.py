@@ -13,6 +13,7 @@ STREAM = "my-test-stream"
 COUNT = 0
 consumer_closed = False
 
+
 async def print_count_values():
 
     global COUNT
@@ -21,6 +22,7 @@ async def print_count_values():
         await asyncio.sleep(5)
 
         print("NUMBER OF CONSUMED MESSAGES:         " + str(COUNT))
+
 
 async def consume():
     asyncio.create_task(print_count_values())
@@ -74,4 +76,3 @@ async def consume():
 
 
 asyncio.run(consume())
-

@@ -288,6 +288,10 @@ class Consumer:
             schema.Deliver,
             name=subscriber.reference,
         )
+        subscriber.client.remove_handler(
+            schema.MetadataUpdate,
+            name=subscriber.reference,
+        )
         try:
             await asyncio.wait_for(subscriber.client.unsubscribe(subscriber.subscription_id), 5)
         except asyncio.TimeoutError:
@@ -363,9 +367,7 @@ class Consumer:
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
         if self._on_close_handler is not None:
-            metadata_update_info = OnClosedErrorInfo(
-                "MetaData Update", [frame.metadata_info.stream]
-            )
+            metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
             result = self._on_close_handler(metadata_update_info)
             if result is not None and inspect.isawaitable(result):
                 await result

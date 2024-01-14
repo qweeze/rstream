@@ -9,13 +9,14 @@ from typing import Any, Awaitable, Callable, Optional
 from rstream import (
     AMQPMessage,
     ConfirmationStatus,
+    Consumer,
     EventContext,
     MessageContext,
     OffsetSpecification,
     OffsetType,
+    Producer,
     SuperStreamConsumer,
     amqp_decoder,
-    Producer,
 )
 
 from .http_requests import (
@@ -140,12 +141,20 @@ async def task_to_delete_connection(connection_name: str) -> None:
             await wait_for(lambda: get_connection(connection["name"]) is False)
 
 
-async def task_to_delete_stream(producer: Producer, stream: str) -> None:
+async def task_to_delete_stream_producer(producer: Producer, stream: str) -> None:
 
     # delay a few seconds before deleting the connection
-    await asyncio.sleep(5)
+    await asyncio.sleep(4)
 
     await producer.delete_stream(stream)
+
+
+async def task_to_delete_stream_consumer(consumer: Consumer, stream: str) -> None:
+
+    # delay a few seconds before deleting the connection
+    await asyncio.sleep(4)
+
+    await consumer.delete_stream(stream)
 
 
 async def filter_value_extractor(message: AMQPMessage) -> str:
