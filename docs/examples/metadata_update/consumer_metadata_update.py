@@ -32,12 +32,11 @@ async def consume():
                 await consumer.close()
 
         consumer = Consumer(
-            host="34.89.82.143",
+            host="localhost",
             port=5552,
             vhost="/",
-            username="XXXXXXXXXXXXX",
-            password="XXXXXXXXXXXXX",
-            load_balancer_mode=True,
+            username="guest",
+            password="guest",
             on_close_handler=on_metadata_update,
         )
 

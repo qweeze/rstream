@@ -40,10 +40,9 @@ async def publish():
     # producer will be closed at the end by the async context manager
     # both if connection is still alive or not
     async with Producer(
-        "34.89.82.143",
-        username="XXXXXXXX",
-        password="XXXXXXXX",
-        load_balancer_mode=True,
+        "localhost",
+        username="guest",
+        password="guest",
         on_close_handler=on_metadata_update,
     ) as producer:
 

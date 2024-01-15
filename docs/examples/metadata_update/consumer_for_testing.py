@@ -61,7 +61,6 @@ async def consume():
             vhost="/",
             username="guest",
             password="guest",
-            load_balancer_mode=False,
             on_close_handler=on_metadata_update,
         )
 

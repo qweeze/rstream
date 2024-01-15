@@ -49,14 +49,13 @@ async def publish():
 
     # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
-        "34.89.82.143",
-        username="XXXXXXXXXXX",
-        password="XXXXXXXXXXX",
+        "localhost",
+        username="guest",
+        password="guest",
         routing_extractor=routing_extractor,
         routing=RouteType.Hash,
         super_stream=SUPER_STREAM,
         on_close_handler=on_metadata_update,
-        load_balancer_mode=True,
     ) as super_stream_producer:
         # Sending a million messages
 

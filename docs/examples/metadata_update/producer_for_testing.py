@@ -74,7 +74,6 @@ async def publish():
         "localhost",
         username="guest",
         password="guest",
-        load_balancer_mode=False,
         on_close_handler=on_metadata_update,
     ) as producer:
 
