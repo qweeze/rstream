@@ -675,8 +675,11 @@ class Producer:
             finally:
                 await self._close_locator_connection()
 
-    async def stream_exists(self, stream: str) -> bool:
+    async def stream_exists(self, stream: str, on_close_event: False) -> bool:
+
         async with self._lock:
+            if on_close_event:
+                self._default_client = None
             stream_exist = await (await self.default_client).stream_exists(stream)
             await self._close_locator_connection()
         return stream_exist
@@ -723,7 +726,7 @@ class Producer:
 
     async def _create_locator_connection(self) -> Client:
         return await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler,
+            connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )

@@ -36,6 +36,12 @@ async def consume():
                     + " with code: "
                     + on_closed_info.reason
                 )
+                await asyncio.sleep(2)
+                # reconnect just if the stream exists
+                if await consumer.stream_exists(on_closed_info.streams[0]):
+                    await consumer.reconnect_stream(on_closed_info.streams[0])
+                else:
+                    await consumer.close()
 
             else:
                 print(
@@ -44,13 +50,10 @@ async def consume():
                     + " for reason: "
                     + str(on_closed_info.reason)
                 )
+                await asyncio.sleep(2)
+                # reconnect just if the stream exists
 
-            await asyncio.sleep(2)
-            # reconnect just if the stream exists
-            if await consumer.stream_exists(on_closed_info.streams[0]):
                 await consumer.reconnect_stream(on_closed_info.streams[0])
-            else:
-                await consumer.close()
 
         consumer = Consumer(
             host="localhost",
