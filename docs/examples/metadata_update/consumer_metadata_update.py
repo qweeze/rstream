@@ -24,7 +24,12 @@ async def consume():
                 + metadata_update_info.reason
             )
 
-            await consumer.reconnect_stream(metadata_update_info.streams[0])
+            await asyncio.sleep(2)
+            # reconnect just if the stream exists
+            if await consumer.stream_exists(metadata_update_info.streams[0]):
+                await consumer.reconnect_stream(metadata_update_info.streams[0])
+            else:
+                await consumer.close()
 
         consumer = Consumer(
             host="34.89.82.143",

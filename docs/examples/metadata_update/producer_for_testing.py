@@ -56,7 +56,12 @@ async def publish():
 
         global producer_closed
         producer_closed = True
-        await producer.reconnect_stream(on_closed_info.streams[0])
+        # reconnect just if the stream exists
+        await asyncio.sleep(2)
+        if await producer.stream_exists(on_closed_info.streams[0]):
+            await producer.reconnect_stream(on_closed_info.streams[0])
+        else:
+            await producer.close()
 
     print("creating Producer")
     # producer will be closed at the end by the async context manager
