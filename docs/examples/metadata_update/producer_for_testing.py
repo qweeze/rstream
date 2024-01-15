@@ -38,6 +38,9 @@ async def publish():
 
     async def on_metadata_update(on_closed_info: OnClosedErrorInfo) -> None:
 
+        global producer_closed
+        producer_closed = True
+
         if on_closed_info.reason == "MetaData Update":
             print(
                 "metadata changed for stream : "
@@ -52,7 +55,6 @@ async def publish():
             else:
                 await producer.close()
 
-
         else:
             print(
                 "connection has been closed from stream: "
@@ -64,11 +66,6 @@ async def publish():
             for stream in on_closed_info.streams:
                 await asyncio.sleep(2)
                 await producer.reconnect_stream(stream)
-            else:
-                await producer.close()
-
-        global producer_closed
-        producer_closed = True
 
     print("creating Producer")
     # producer will be closed at the end by the async context manager

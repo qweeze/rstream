@@ -675,7 +675,7 @@ class Producer:
             finally:
                 await self._close_locator_connection()
 
-    async def stream_exists(self, stream: str, on_close_event: False) -> bool:
+    async def stream_exists(self, stream: str, on_close_event: bool = False) -> bool:
 
         async with self._lock:
             if on_close_event:

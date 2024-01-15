@@ -52,8 +52,8 @@ async def consume():
                 )
                 await asyncio.sleep(2)
                 # reconnect just if the stream exists
-
-                await consumer.reconnect_stream(on_closed_info.streams[0])
+                for stream in on_closed_info.streams:
+                    await consumer.reconnect_stream(stream)
 
         consumer = Consumer(
             host="localhost",

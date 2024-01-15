@@ -26,17 +26,30 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 
 async def consume():
     async def on_metadata_update(on_closed_info: OnClosedErrorInfo) -> None:
-        print(
-            "metadata changed for stream : "
-            + str(on_closed_info.streams[0])
-            + " with code: "
-            + on_closed_info.reason
-        )
 
-        for stream in on_closed_info.streams:
+        if on_closed_info.reason == "MetaData Update":
+            print(
+                "metadata changed for stream : "
+                + str(on_closed_info.streams[0])
+                + " with code: "
+                + on_closed_info.reason
+            )
 
-            await asyncio.sleep(2)
-            if await consumer.stream_exists(on_closed_info.streams[0]):
+            for stream in on_closed_info.streams:
+                await asyncio.sleep(2)
+                if await consumer.stream_exists(on_closed_info.streams[0]):
+                    await consumer.reconnect_stream(stream)
+
+        else:
+            print(
+                "connection has been closed from stream: "
+                + str(on_closed_info.streams)
+                + " for reason: "
+                + str(on_closed_info.reason)
+            )
+
+            for stream in on_closed_info.streams:
+                await asyncio.sleep(2)
                 await consumer.reconnect_stream(stream)
 
     consumer = SuperStreamConsumer(

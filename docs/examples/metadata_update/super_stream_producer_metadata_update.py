@@ -20,7 +20,9 @@ async def routing_extractor(message: AMQPMessage) -> str:
 async def publish():
     async def on_metadata_update(on_closed_info: OnClosedErrorInfo) -> None:
 
-        print("im here")
+        global producer_closed
+        producer_closed = True
+
         if on_closed_info.reason == "MetaData Update":
             print(
                 "metadata changed for stream : "
@@ -28,6 +30,10 @@ async def publish():
                 + " with code: "
                 + on_closed_info.reason
             )
+            await asyncio.sleep(2)
+            # reconnect just if the partition exists
+            if await super_stream_producer.stream_exists((on_closed_info.streams[0])):
+                await super_stream_producer.reconnect_stream(on_closed_info.streams[0])
 
         else:
             print(
@@ -36,13 +42,10 @@ async def publish():
                 + " for reason: "
                 + str(on_closed_info.reason)
             )
-
-        global producer_closed
-        producer_closed = True
-        await asyncio.sleep(2)
-        # reconnect just if the partition exists
-        if await super_stream_producer.stream_exists((on_closed_info.streams[0])):
-            await super_stream_producer.reconnect_stream(on_closed_info.streams[0])
+            await asyncio.sleep(2)
+            # reconnect just if the partition exists
+            for stream in on_closed_info.streams:
+                await super_stream_producer.reconnect_stream(stream)
 
     # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
