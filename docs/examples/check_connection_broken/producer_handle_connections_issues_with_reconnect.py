@@ -1,11 +1,7 @@
 import asyncio
 import time
 
-from rstream import (
-    AMQPMessage,
-    DisconnectionErrorInfo,
-    Producer,
-)
+from rstream import AMQPMessage, OnClosedErrorInfo, Producer
 
 STREAM = "my-test-stream"
 MESSAGES = 10000000
@@ -13,7 +9,7 @@ connection_is_closed = False
 
 
 async def publish():
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         print(
             "connection has been closed from stream: "
             + str(disconnection_info.streams)
@@ -29,7 +25,7 @@ async def publish():
     # producer will be closed at the end by the async context manager
     # both if connection is still alive or not
     async with Producer(
-        "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
+        "localhost", username="guest", password="guest", on_close_handler=on_connection_closed
     ) as producer:
 
         # create a stream if it doesn't already exist

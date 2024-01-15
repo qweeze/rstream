@@ -21,7 +21,7 @@ from .superstream import (
     RoutingKeyRoutingStrategy,
     RoutingStrategy,
 )
-from .utils import DisconnectionErrorInfo
+from .utils import OnClosedErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
@@ -53,7 +53,7 @@ class SuperStreamProducer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         default_batch_publishing_delay: float = 0.2,
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
         connection_name: str = None,
         filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
@@ -86,7 +86,7 @@ class SuperStreamProducer:
         self._default_client: Optional[Client] = None
         self._producer: Producer | None = None
         self._routing_strategy: RoutingStrategy
-        self._connection_closed_handler = connection_closed_handler
+        self._on_close_handler = on_close_handler
         self._connection_name = connection_name
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
@@ -105,7 +105,7 @@ class SuperStreamProducer:
                 heartbeat=self.heartbeat,
                 load_balancer_mode=self.load_balancer_mode,
                 default_batch_publishing_delay=self.default_batch_publishing_delay,
-                connection_closed_handler=self._connection_closed_handler,
+                on_close_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 filter_value_extractor=self._filter_value_extractor,
             )
@@ -140,7 +140,7 @@ class SuperStreamProducer:
 
     async def start(self) -> None:
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler, connection_name="rstream-locator"
+            connection_closed_handler=self._on_close_handler, connection_name="rstream-locator"
         )
         self.super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self._default_client)
         if self.routing == RouteType.Hash:
@@ -161,3 +161,7 @@ class SuperStreamProducer:
         # close previous clients and re-create a publisher (with a new client)
         if self._producer is not None:
             await self._producer.reconnect_stream(stream)
+
+    async def stream_exists(self, stream: str) -> bool:
+        producer = await self._get_producer()
+        return await producer.stream_exists(stream)

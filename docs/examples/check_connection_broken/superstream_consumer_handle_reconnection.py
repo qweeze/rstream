@@ -4,9 +4,9 @@ import signal
 from rstream import (
     AMQPMessage,
     ConsumerOffsetSpecification,
-    DisconnectionErrorInfo,
     MessageContext,
     OffsetType,
+    OnClosedErrorInfo,
     SuperStreamConsumer,
     amqp_decoder,
 )
@@ -25,7 +25,7 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 
 
 async def consume():
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         print(
             "connection has been closed from stream: "
             + str(disconnection_info.streams)
@@ -45,7 +45,7 @@ async def consume():
         username="guest",
         password="guest",
         super_stream="invoices",
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
     )
 
     loop = asyncio.get_event_loop()

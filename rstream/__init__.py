@@ -3,10 +3,7 @@
 
 from importlib import metadata
 
-from .utils import (
-    DisconnectionErrorInfo,
-    FilterConfiguration,
-)
+from .utils import FilterConfiguration, OnClosedErrorInfo
 
 try:
     __version__ = metadata.version(__package__)
@@ -65,7 +62,7 @@ __all__ = [
     "StreamDoesNotExist",
     "OffsetSpecification",
     "EventContext",
-    "DisconnectionErrorInfo",
+    "OnClosedErrorInfo",
     "SlasMechanism",
     "FilterConfiguration",
 ]

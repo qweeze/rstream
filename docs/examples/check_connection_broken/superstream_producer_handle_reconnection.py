@@ -3,7 +3,7 @@ import time
 
 from rstream import (
     AMQPMessage,
-    DisconnectionErrorInfo,
+    OnClosedErrorInfo,
     RouteType,
     SuperStreamProducer,
 )
@@ -19,7 +19,7 @@ async def publish():
     async def routing_extractor(message: AMQPMessage) -> str:
         return message.application_properties["id"]
 
-    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
 
         print(
             "connection has been closed from stream: "
@@ -41,7 +41,7 @@ async def publish():
         password="guest",
         routing_extractor=routing_extractor,
         routing=RouteType.Hash,
-        connection_closed_handler=on_connection_closed,
+        on_close_handler=on_connection_closed,
         super_stream=SUPER_STREAM,
     ) as super_stream_producer:
 

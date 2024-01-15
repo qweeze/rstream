@@ -34,7 +34,7 @@ from . import (
 from .connection import Connection, ConnectionClosed
 from .constants import SlasMechanism
 from .schema import OffsetSpecification
-from .utils import DisconnectionErrorInfo
+from .utils import OnClosedErrorInfo
 
 FT = TypeVar("FT", bound=schema.Frame)
 HT = Annotated[
@@ -69,7 +69,7 @@ class BaseClient:
         frame_max: int,
         heartbeat: int,
         connection_name: Optional[str] = "",
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
         self.host = host
@@ -268,7 +268,7 @@ class BaseClient:
             if self._connection_closed_handler is not None:
                 # don't raise for locator connections without streams
                 if len(self._streams) > 0:
-                    connection_error_info = DisconnectionErrorInfo("Connection Closed", self._streams)
+                    connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
                     result = self._connection_closed_handler(connection_error_info)
                     if result is not None and inspect.isawaitable(result):
                         await result
@@ -663,7 +663,7 @@ class ClientPool:
         self,
         connection_name: Optional[str],
         addr: Optional[Addr] = None,
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         stream: Optional[str] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ) -> Client:
@@ -702,7 +702,7 @@ class ClientPool:
         self,
         connection_name: Optional[str],
         addr: Addr,
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ) -> Client:
         desired_host, desired_port = addr.host, str(addr.port)
@@ -738,7 +738,7 @@ class ClientPool:
         self,
         connection_name: Optional[str],
         addr: Addr,
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ) -> Client:
         host, port = addr

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import random
 import ssl
@@ -30,10 +31,7 @@ from .constants import (
     SlasMechanism,
 )
 from .schema import OffsetSpecification
-from .utils import (
-    DisconnectionErrorInfo,
-    FilterConfiguration,
-)
+from .utils import FilterConfiguration, OnClosedErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT, Any], Union[None, Awaitable[None]]], "Message callback type"]
@@ -82,7 +80,7 @@ class Consumer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
-        connection_closed_handler: Optional[CB_CONN[DisconnectionErrorInfo]] = None,
+        on_close_handler: Optional[CB_CONN[OnClosedErrorInfo]] = None,
         connection_name: str = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
@@ -105,7 +103,7 @@ class Consumer:
         self._subscribers: dict[str, _Subscriber] = {}
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
-        self._connection_closed_handler = connection_closed_handler
+        self._on_close_handler = on_close_handler
         self._connection_name = connection_name
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         if self._connection_name is None:
@@ -126,7 +124,7 @@ class Consumer:
 
     async def start(self) -> None:
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler,
+            connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
@@ -154,14 +152,14 @@ class Consumer:
         if stream not in self._clients:
             if self._default_client is None:
                 self._default_client = await self._pool.get(
-                    connection_closed_handler=self._connection_closed_handler,
+                    connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
                 )
             leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
                 addr=Addr(broker.host, broker.port),
-                connection_closed_handler=self._connection_closed_handler,
+                connection_closed_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 stream=stream,
             )
@@ -236,6 +234,12 @@ class Consumer:
             name=subscriber.reference,
         )
 
+        subscriber.client.add_handler(
+            schema.MetadataUpdate,
+            partial(self._on_metadata_update),
+            name=subscriber.reference,
+        )
+
         # to handle single-active-consumer
         if properties is not None:
             if "single-active-consumer" in properties:
@@ -282,6 +286,10 @@ class Consumer:
         subscriber = self._subscribers[subscriber_name]
         subscriber.client.remove_handler(
             schema.Deliver,
+            name=subscriber.reference,
+        )
+        subscriber.client.remove_handler(
+            schema.MetadataUpdate,
             name=subscriber.reference,
         )
         try:
@@ -356,6 +364,14 @@ class Consumer:
             if maybe_coro is not None:
                 await maybe_coro
 
+    async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
+
+        if self._on_close_handler is not None:
+            metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
+            result = self._on_close_handler(metadata_update_info)
+            if result is not None and inspect.isawaitable(result):
+                await result
+
     async def _on_consumer_update_query_response(
         self,
         frame: schema.ConsumerUpdateResponse,
@@ -407,8 +423,10 @@ class Consumer:
             finally:
                 await self._close_locator_connection()
 
-    async def stream_exists(self, stream: str) -> bool:
+    async def stream_exists(self, stream: str, on_close_event: bool = False) -> bool:
         async with self._lock:
+            if on_close_event:
+                self._default_client = None
             stream_exists = await (await self.default_client).stream_exists(stream)
             await self._close_locator_connection()
 
@@ -473,7 +491,7 @@ class Consumer:
 
     async def _create_locator_connection(self) -> Client:
         return await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler,
+            connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )

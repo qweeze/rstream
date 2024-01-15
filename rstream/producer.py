@@ -31,7 +31,7 @@ from .compression import (
     ICompressionCodec,
 )
 from .constants import Key, SlasMechanism
-from .utils import DisconnectionErrorInfo, RawMessage
+from .utils import OnClosedErrorInfo, RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
 message_v1_v2 = T = TypeVar("message_v1_v2")
@@ -83,7 +83,7 @@ class Producer:
         default_batch_publishing_delay: float = 0.2,
         default_context_switch_value: int = 1000,
         connection_name: str = None,
-        connection_closed_handler: Optional[CB[DisconnectionErrorInfo]] = None,
+        on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
         filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
@@ -115,7 +115,7 @@ class Producer:
         self._default_batch_publishing_delay = default_batch_publishing_delay
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
-        self._connection_closed_handler = connection_closed_handler
+        self._on_close_handler = on_close_handler
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         self._close_called = False
         self._connection_name = connection_name
@@ -140,7 +140,7 @@ class Producer:
     async def start(self) -> None:
         self._close_called = False
         self._default_client = await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler,
+            connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
@@ -183,6 +183,7 @@ class Producer:
                     logger.debug("exception in delete_publisher in Producer.close:", exc)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
+            publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
 
         self._publishers.clear()
 
@@ -195,14 +196,14 @@ class Producer:
         if stream not in self._clients:
             if self._default_client is None:
                 self._default_client = await self._pool.get(
-                    connection_closed_handler=self._connection_closed_handler,
+                    connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
                 )
             leader, _ = await (await self.default_client).query_leader_and_replicas(stream)
             self._clients[stream] = await self._pool.get(
                 connection_name=self._connection_name,
                 addr=Addr(leader.host, leader.port),
-                connection_closed_handler=self._connection_closed_handler,
+                connection_closed_handler=self._on_close_handler,
                 stream=stream,
                 sasl_configuration_mechanism=self._sasl_configuration_mechanism,
             )
@@ -253,6 +254,11 @@ class Producer:
         client.add_handler(
             schema.PublishError,
             partial(self._on_publish_error, publisher=publisher),
+            name=publisher.reference,
+        )
+        client.add_handler(
+            schema.MetadataUpdate,
+            partial(self._on_metadata_update),
             name=publisher.reference,
         )
 
@@ -627,6 +633,14 @@ class Producer:
                     if isinstance(confirmation, asyncio.Future):
                         confirmation.set_exception(exc)
 
+    async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
+
+        if self._on_close_handler is not None:
+            metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
+            result = self._on_close_handler(metadata_update_info)
+            if result is not None and inspect.isawaitable(result):
+                await result
+
     async def create_stream(
         self,
         stream: str,
@@ -649,6 +663,7 @@ class Producer:
             await publisher.client.delete_publisher(publisher.id)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
+            publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
             del self._publishers[stream]
 
         async with self._lock:
@@ -660,8 +675,11 @@ class Producer:
             finally:
                 await self._close_locator_connection()
 
-    async def stream_exists(self, stream: str) -> bool:
+    async def stream_exists(self, stream: str, on_close_event: bool = False) -> bool:
+
         async with self._lock:
+            if on_close_event:
+                self._default_client = None
             stream_exist = await (await self.default_client).stream_exists(stream)
             await self._close_locator_connection()
         return stream_exist
@@ -708,7 +726,7 @@ class Producer:
 
     async def _create_locator_connection(self) -> Client:
         return await self._pool.get(
-            connection_closed_handler=self._connection_closed_handler,
+            connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
         )
