@@ -69,7 +69,7 @@ async def publish():
                     continue
             else:
                 producer_closed = False
-                continue
+                break
 
             if i % 100000 == 0:
                 print("sent 10000 messages")

@@ -34,9 +34,10 @@ async def consume():
         )
 
         for stream in on_closed_info.streams:
-            # restart from last offset in subscriber
-            # alternatively you can specify an offset to reconnect
-            await consumer.reconnect_stream(stream)
+
+            await asyncio.sleep(2)
+            if await consumer.stream_exists(on_closed_info.streams[0]):
+                await consumer.reconnect_stream(stream)
 
     consumer = SuperStreamConsumer(
         host="34.89.82.143",

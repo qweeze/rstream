@@ -210,3 +210,6 @@ class SuperStreamConsumer:
 
     async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
         await self._consumers[stream].reconnect_stream(stream, offset)
+
+    async def stream_exists(self, stream: str) -> None:
+        await self._consumers[stream].stream_exists(stream)

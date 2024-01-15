@@ -161,3 +161,7 @@ class SuperStreamProducer:
         # close previous clients and re-create a publisher (with a new client)
         if self._producer is not None:
             await self._producer.reconnect_stream(stream)
+
+    async def stream_exists(self, stream: str) -> bool:
+        producer = await self._get_producer()
+        return await producer.stream_exists(stream)

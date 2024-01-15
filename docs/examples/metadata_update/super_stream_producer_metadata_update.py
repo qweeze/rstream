@@ -39,7 +39,10 @@ async def publish():
 
         global producer_closed
         producer_closed = True
-        await super_stream_producer.reconnect_stream(on_closed_info.streams[0])
+        await asyncio.sleep(2)
+        # reconnect just if the partition exists
+        if await super_stream_producer.stream_exists((on_closed_info.streams[0])):
+            await super_stream_producer.reconnect_stream(on_closed_info.streams[0])
 
     # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
