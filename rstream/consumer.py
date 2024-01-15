@@ -112,9 +112,9 @@ class Consumer:
             self._connection_name = "rstream-consumer"
 
     @property
-    def default_client(self) -> Client:
+    async def default_client(self) -> Client:
         if self._default_client is None:
-            raise ValueError("Consumer is not started")
+            self._default_client = await self._create_locator_connection()
         return self._default_client
 
     async def __aenter__(self) -> Consumer:
@@ -157,7 +157,7 @@ class Consumer:
                     connection_closed_handler=self._connection_closed_handler,
                     connection_name=self._connection_name,
                 )
-            leader, replicas = await self.default_client.query_leader_and_replicas(stream)
+            leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
                 addr=Addr(broker.host, broker.port),
@@ -165,6 +165,8 @@ class Consumer:
                 connection_name=self._connection_name,
                 stream=stream,
             )
+
+            await self._close_locator_connection()
 
         return self._clients[stream]
 
@@ -249,7 +251,7 @@ class Consumer:
                 )
 
         if filter_input is not None:
-            await self.check_if_filtering_is_supported(self._default_client)
+            await self._check_if_filtering_is_supported()
             values_to_filter = filter_input.values()
             if len(values_to_filter) <= 0:
                 raise ValueError("you need to specify at least one filter value")
@@ -295,17 +297,23 @@ class Consumer:
         if subscriber_name == "":
             raise ValueError("subscriber_name must not be an empty string")
 
-        return await self.default_client.query_offset(
-            stream,
-            subscriber_name,
-        )
+        async with self._lock:
+            offset = await (await self.default_client).query_offset(
+                stream,
+                subscriber_name,
+            )
+            await self._close_locator_connection()
+
+        return offset
 
     async def store_offset(self, stream: str, subscriber_name: str, offset: int) -> None:
-        await self.default_client.store_offset(
-            stream=stream,
-            reference=subscriber_name,
-            offset=offset,
-        )
+        async with self._lock:
+            await (await self.default_client).store_offset(
+                stream=stream,
+                reference=subscriber_name,
+                offset=offset,
+            )
+            await self._close_locator_connection()
 
     @staticmethod
     def _filter_messages(
@@ -374,25 +382,37 @@ class Consumer:
         arguments: Optional[dict[str, Any]] = None,
         exists_ok: bool = False,
     ) -> None:
-        try:
-            await self.default_client.create_stream(stream, arguments)
-        except exceptions.StreamAlreadyExists:
-            if not exists_ok:
-                raise
+        async with self._lock:
+            try:
+                await (await self.default_client).create_stream(stream, arguments)
+
+            except exceptions.StreamAlreadyExists:
+                if not exists_ok:
+                    raise
+            finally:
+                await self._close_locator_connection()
 
     async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
         for subscriber in list(self._subscribers.values()):
             if subscriber.stream == stream:
                 del self._subscribers[subscriber.reference]
 
-        try:
-            await self.default_client.delete_stream(stream)
-        except exceptions.StreamDoesNotExist:
-            if not missing_ok:
-                raise
+        async with self._lock:
+            try:
+                await (await self.default_client).delete_stream(stream)
+
+            except exceptions.StreamDoesNotExist:
+                if not missing_ok:
+                    raise
+            finally:
+                await self._close_locator_connection()
 
     async def stream_exists(self, stream: str) -> bool:
-        return await self.default_client.stream_exists(stream)
+        async with self._lock:
+            stream_exists = await (await self.default_client).stream_exists(stream)
+            await self._close_locator_connection()
+
+        return stream_exists
 
     async def stream(self, subscriber_name) -> str:
         if subscriber_name not in self._subscribers:
@@ -437,16 +457,29 @@ class Consumer:
                 )
             )
 
-    async def check_if_filtering_is_supported(self, client: Optional[Client]) -> None:
-        if client is None:
-            return
+    async def _check_if_filtering_is_supported(self) -> None:
+
         command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
-        server_command_version: schema.FrameHandlerInfo = await client.exchange_command_version(
-            command_version_input
-        )
+        server_command_version: schema.FrameHandlerInfo = await (
+            await self.default_client
+        ).exchange_command_version(command_version_input)
+        await self._close_locator_connection()
         if server_command_version.max_version < 2:
             filter_not_supported = (
                 "Filtering is not supported by the broker "
                 + "(requires RabbitMQ 3.13+ and stream_filtering feature flag activated)"
             )
             raise ValueError(filter_not_supported)
+
+    async def _create_locator_connection(self) -> Client:
+        return await self._pool.get(
+            connection_closed_handler=self._connection_closed_handler,
+            connection_name=self._connection_name,
+            sasl_configuration_mechanism=self._sasl_configuration_mechanism,
+        )
+
+    async def _close_locator_connection(self):
+
+        if await (await self.default_client).get_stream_count() == 0:
+            await (await self.default_client).close()
+            self._default_client = None
