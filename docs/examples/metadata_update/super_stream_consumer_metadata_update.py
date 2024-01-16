@@ -53,13 +53,12 @@ async def consume():
                 await consumer.reconnect_stream(stream)
 
     consumer = SuperStreamConsumer(
-        host="34.89.82.143",
+        host="localhost",
         port=5552,
         vhost="/",
-        username="XXXXXXXXXXXX",
-        password="XXXXXXXXXXXX",
+        username="guest",
+        password="guest",
         super_stream="invoices",
-        load_balancer_mode=True,
         on_close_handler=on_metadata_update,
     )
 
