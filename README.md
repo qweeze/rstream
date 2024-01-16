@@ -219,7 +219,6 @@ ssl_options.verify               = verify_peer
 ssl_options.fail_if_no_peer_cert = true
 ```
 
-
 ### Managing disconnections
 
 The client does not support auto-reconnect at the moment.
@@ -237,7 +236,7 @@ async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> No
 
 consumer = Consumer(
 ..        
-connection_closed_handler=on_connection_closed,
+on_close_handler=on_connection_closed,
 )
 ```
 
@@ -246,7 +245,7 @@ When the `connection_closed_handler` event is raised, you can close the Consumer
 
 Example:
 ```python
- async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+ async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
         print(
             "connection has been closed from stream: "
             + str(disconnection_info.streams)
@@ -259,8 +258,15 @@ Example:
             await producer.reconnect_stream(stream)
 ```
 
-
 Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/)
+
+### Metadata Update
+
+If the streams topology changes (ex:Stream deleted or add/remove follower), the client receives an MetadataUpdate event.
+The client is notified by a callback (similar to what happens for connection_broken scenarios)
+After this the client can try to reconnect.
+
+Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/metadata_update/)
 
 ## Load Balancer
 

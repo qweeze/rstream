@@ -71,7 +71,7 @@ async def publish():
                     await super_stream_producer.send(amqp_message)
                 except Exception as e:
                     # give some time to the reconnect_stream to reconnect
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(5)
                     continue
             else:
                 producer_closed = False

@@ -24,7 +24,7 @@ async def publish():
     # producer will be closed at the end by the async context manager
     # both if connection is still alive or not
     async with Producer(
-        "localhost", username="guest", password="guest", connection_closed_handler=on_connection_closed
+        "localhost", username="guest", password="guest", on_close_handler=on_connection_closed
     ) as producer:
 
         # create a stream if it doesn't already exist
