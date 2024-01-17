@@ -34,7 +34,9 @@ jobs:
     name: upload release to PyPI
     runs-on: ubuntu-latest
     # Specifying a GitHub environment is optional, but strongly encouraged
-    environment: release
+    environment:
+      name: pypi
+      url: https://pypi.org/p/rstream
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
