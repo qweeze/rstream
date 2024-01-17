@@ -37,6 +37,7 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/p/rstream
+
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
