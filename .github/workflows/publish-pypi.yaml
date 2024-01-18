@@ -43,6 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: build with poetry
+        env:
+          REPO: ${{ inputs.pypi_repository_url }}
         run: |    
           curl -sSL https://install.python-poetry.org | python3 -
           export PATH="/home/runner/.local/bin:$PATH"
