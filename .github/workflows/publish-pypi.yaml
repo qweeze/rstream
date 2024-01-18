@@ -44,6 +44,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: build with poetry
         run: |    
+          curl -sSL https://install.python-poetry.org | python3 -
+          export PATH="/home/runner/.local/bin:$PATH"
+          poetry config repositories.test-pypi $REPO
           poetry build
       # retrieve your distributions here
       - name: Publish package distributions to PyPI
