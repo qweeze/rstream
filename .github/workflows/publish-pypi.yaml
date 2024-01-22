@@ -12,23 +12,6 @@ on:
       pypi_api_password:
         required: true
 
-#jobs:
-#  build:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - name: Publish python poetry package
-#        env:
-#          USER: ${{ secrets.pypi_api_login }}
-#          PASS: ${{ secrets.pypi_api_password }}
-#          REPO: ${{ inputs.pypi_repository_url }}
-#        run: |
-#          curl -sSL https://install.python-poetry.org | python3 -
-#          export PATH="/home/runner/.local/bin:$PATH"
-#          poetry config repositories.test-pypi $REPO
-#          poetry build
-#          poetry publish --username=$USER --password=$PASS
-
 jobs:
   pypi-publish:
     name: upload release to PyPI
