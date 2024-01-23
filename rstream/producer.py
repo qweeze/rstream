@@ -272,7 +272,7 @@ class Producer:
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
-        await self._check_connection()
+        await self._check_connection(stream)
 
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -371,7 +371,7 @@ class Producer:
         if len(batch) == 0:
             raise ValueError("Empty batch")
 
-        await self._check_connection()
+        await self._check_connection(stream)
         if self._close_called:
             return []
 
@@ -488,7 +488,7 @@ class Producer:
         timeout: Optional[int] = 5,
     ) -> int:
 
-        await self._check_connection()
+        await self._check_connection(stream)
 
         publishing_ids = await self._send_batch(
             stream,
@@ -515,7 +515,7 @@ class Producer:
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
-        await self._check_connection()
+        await self._check_connection(stream)
 
         # start the background thread to send buffered messages
         if self.task is None:
@@ -684,11 +684,11 @@ class Producer:
             await self._close_locator_connection()
         return stream_exist
 
-    async def _check_connection(self):
+    async def _check_connection(self, stream: str):
 
-        for publisher in self._publishers.values():
-            if publisher.client.is_connection_alive() is False:
-                raise Exception("connection Closed")
+        if stream in self._publishers:
+            if self._publishers[stream].client.is_connection_alive() is False:
+                raise Exception("connection Closed for stream: " + stream)
 
     async def reconnect_stream(self, stream: str) -> None:
 
@@ -696,7 +696,8 @@ class Producer:
             del self._clients[stream]
         if stream in self._publishers:
             async with self._lock:
-                await self._publishers[stream].client.close()
+                if await self._publishers[stream].client.get_stream_count() == 1:
+                    await self._publishers[stream].client.close()
                 del self._publishers[stream]
 
         if self._default_client is not None:

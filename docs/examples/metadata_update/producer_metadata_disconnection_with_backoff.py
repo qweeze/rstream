@@ -5,6 +5,7 @@ from rstream import (
     AMQPMessage,
     OnClosedErrorInfo,
     RouteType,
+    StreamDoesNotExist,
     SuperStreamProducer,
 )
 
@@ -21,58 +22,50 @@ async def routing_extractor(message: AMQPMessage) -> str:
 async def publish():
     async def on_metadata_update(on_closed_info: OnClosedErrorInfo) -> None:
 
-        if on_closed_info.reason == "MetaData Update":
-            print(
-                "metadata changed for stream : "
-                + str(on_closed_info.streams[0])
-                + " with code: "
-                + on_closed_info.reason
-            )
-            await asyncio.sleep(2)
-            # reconnect just if the partition exists
-            if await super_stream_producer.stream_exists((on_closed_info.streams[0])):
-                await super_stream_producer.reconnect_stream(on_closed_info.streams[0])
+        global producer_closed
 
-        else:
-            print(
-                "connection has been closed from stream: "
-                + str(on_closed_info.streams)
-                + " for reason: "
-                + str(on_closed_info.reason)
-            )
+        print(
+            "connection has been closed from stream: "
+            + str(on_closed_info.streams)
+            + " for reason: "
+            + str(on_closed_info.reason)
+        )
 
-            await asyncio.sleep(2)
-            # reconnect just if the partition exists
-            for stream in on_closed_info.streams:
-                backoff = 1
-                while True:
-                    try:
-                        print("reconnecting stream: {}".format(stream))
-                        await super_stream_producer.reconnect_stream(stream)
+        await asyncio.sleep(2)
+        # reconnect just if the partition exists
+        for stream in on_closed_info.streams:
+            backoff = 1
+            while True:
+                try:
+                    print("reconnecting stream: {}".format(stream))
+                    await super_stream_producer.reconnect_stream(stream)
+                    break
+                except StreamDoesNotExist:
+                    print("stream does not exist anymore")
+                    continue
+                except Exception as ex:
+                    if backoff > 32:
+                        # failed to found the leader
+                        print("reconnection failed")
                         break
-                    except Exception as ex:
-                        if backoff > 16:
-                            # failed to found the leader
-                            print("reconnection failed")
-                            break
-                        backoff = backoff * 2
-                        await asyncio.sleep(backoff)
-                        print("reconnection backoff: {}, error {}".format(backoff, ex))
-                        continue
+                    backoff = backoff * 2
+                    await asyncio.sleep(backoff)
+                    print("reconnection backoff: {}, error {}".format(backoff, ex))
+                    continue
 
-            global producer_closed
-            producer_closed = True
+        global producer_closed
+        producer_closed = True
 
     # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
-        "localhost",
-        username="guest",
-        password="guest",
+        "34.105.232.133",
+        username="default_user_ZRgpS3c7FCiD7m226nf",
+        password="9K6OnYVQDedbXYnxBJMgTWxrBoSC6pvr",
         routing_extractor=routing_extractor,
         routing=RouteType.Hash,
         super_stream=SUPER_STREAM,
-        load_balancer_mode=True,
         on_close_handler=on_metadata_update,
+        load_balancer_mode=True,
     ) as super_stream_producer:
         # Sending a million messages
 
@@ -90,8 +83,10 @@ async def publish():
                     # give some time to the reconnect_stream to reconnect
                     print("error sending message: {}".format(e))
                     await asyncio.sleep(5)
+                    producer_closed = False
                     continue
             else:
+                await asyncio.sleep(5)
                 producer_closed = False
                 continue
             if i % 10000 == 0:

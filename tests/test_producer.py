@@ -666,63 +666,68 @@ async def test_producer_connection_broke_with_reconnect(stream: str) -> None:
 
 
 async def test_super_stream_producer_connection_broke_with_reconnect(super_stream: str) -> None:
+    with pytest.raises(Exception):
 
-    connection_broke = False
-    disconnected_once = False
-    streams_disconnected: set[str] = set()
-    producer_broke: Producer
+        connection_broke = False
+        disconnected_once = False
+        streams_disconnected: set[str] = set()
+        producer_broke: Producer
 
-    async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
-        nonlocal connection_broke
-        connection_broke = True
-        nonlocal producer_broke
+        async def on_connection_closed(disconnection_info: OnClosedErrorInfo) -> None:
+            logger.warning("on_connection_closed")
+            nonlocal connection_broke
+            connection_broke = True
+            nonlocal producer_broke
 
-        nonlocal streams_disconnected
-        for stream in disconnection_info.streams:
-            streams_disconnected.add(stream)
-            await super_stream_producer_broke.reconnect_stream(stream)
+            nonlocal streams_disconnected
+            for stream in disconnection_info.streams:
+                streams_disconnected.add(stream)
+                await super_stream_producer_broke.reconnect_stream(stream)
 
-    super_stream_producer_broke = SuperStreamProducer(
-        "localhost",
-        username="guest",
-        password="guest",
-        routing_extractor=routing_extractor_generic,
-        routing=RouteType.Hash,
-        on_close_handler=on_connection_closed,
-        connection_name="test-connection",
-        super_stream=super_stream,
-    )
-
-    await super_stream_producer_broke.start()
-
-    asyncio.create_task(task_to_delete_connection("test-connection"))
-    i = 0
-    while True:
-        amqp_message = AMQPMessage(
-            body="hello: {}".format(i),
-            application_properties={"id": "{}".format(i)},
+        super_stream_producer_broke = SuperStreamProducer(
+            "localhost",
+            username="guest",
+            password="guest",
+            routing_extractor=routing_extractor_generic,
+            routing=RouteType.Hash,
+            on_close_handler=on_connection_closed,
+            connection_name="test-connection",
+            super_stream=super_stream,
         )
-        i = i + 1
-        # send is asynchronous
-        try:
-            await super_stream_producer_broke.send(message=amqp_message)
-            if disconnected_once is True and connection_broke is True:
-                connection_broke = False
-                break
+
+        await super_stream_producer_broke.start()
+
+        asyncio.create_task(task_to_delete_connection("test-connection"))
+        i = 0
+        while True:
+            amqp_message = AMQPMessage(
+                body="hello: {}".format(i),
+                application_properties={"id": "{}".format(i)},
+            )
+            i = i + 1
+            # send is asynchronous
+            try:
+
+                if disconnected_once is True and connection_broke is True:
+                    connection_broke = False
+                    break
+
+                await super_stream_producer_broke.send(message=amqp_message)
+
             # Connection broke wait for reconnection
-        except BaseException:
-            disconnected_once = True
-            # wait for reconnection
-            await asyncio.sleep(2)
-            continue
+            except BaseException:
+                disconnected_once = True
+                # wait for reconnection
+                await asyncio.sleep(2)
+                pass
 
-    await super_stream_producer_broke.close()
+        await super_stream_producer_broke.close()
 
-    assert disconnected_once is True
-    assert connection_broke is False
-    assert "test-super-stream-0" in streams_disconnected
-    assert "test-super-stream-1" in streams_disconnected
-    assert "test-super-stream-2" in streams_disconnected
+        assert disconnected_once is True
+        assert connection_broke is False
+        assert "test-super-stream-0" in streams_disconnected
+        assert "test-super-stream-1" in streams_disconnected
+        assert "test-super-stream-2" in streams_disconnected
 
 
 async def test_producer_metadata_update(producer: Producer) -> None:
