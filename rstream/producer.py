@@ -200,6 +200,7 @@ class Producer:
                     connection_name=self._connection_name,
                 )
             leader, _ = await (await self.default_client).query_leader_and_replicas(stream)
+            print("before connecting")
             self._clients[stream] = await self._pool.get(
                 connection_name=self._connection_name,
                 addr=Addr(leader.host, leader.port),
@@ -207,7 +208,7 @@ class Producer:
                 stream=stream,
                 sasl_configuration_mechanism=self._sasl_configuration_mechanism,
             )
-
+            print("after connecting")
             await self._close_locator_connection()
 
         return self._clients[stream]
@@ -235,16 +236,24 @@ class Producer:
             sequence=utils.MonotonicSeq(),
             client=client,
         )
-        await client.declare_publisher(
-            stream=stream,
-            reference=publisher.reference,
-            publisher_id=publisher.id,
-        )
-        sequence = await client.query_publisher_sequence(
-            stream=stream,
-            reference=reference,
-        )
-        publisher.sequence.set(sequence + 1)
+        print("before declaring publisher")
+        try:
+            await client.declare_publisher(
+                stream=stream,
+                reference=publisher.reference,
+                publisher_id=publisher.id,
+            )
+            print("after declaring publisher")
+            sequence = await client.query_publisher_sequence(
+                stream=stream,
+                reference=reference,
+            )
+            publisher.sequence.set(sequence + 1)
+            print("after query_publisher_sequence")
+
+        except Exception as e:
+            raise e
+
 
         client.add_handler(
             schema.PublishConfirm,
@@ -382,7 +391,12 @@ class Producer:
         for item in batch:
 
             async with self._lock:
-                publisher = await self._get_or_create_publisher(stream, publisher_name=item.publisher_name)
+                try:
+                    publisher = await self._get_or_create_publisher(stream, publisher_name=item.publisher_name)
+                except Exception as ex:
+                    print("exception happened in back thread")
+                    await self._maybe_clean_up_during_metadata_update(stream)
+                    return []
 
             if not isinstance(item.entry, ICompressionCodec):
 
@@ -390,7 +404,6 @@ class Producer:
 
                 if msg.publishing_id is None:
                     msg.publishing_id = publisher.sequence.next()
-
                 if self._filter_value_extractor is None:
                     messages.append(
                         schema.Message(
@@ -633,13 +646,16 @@ class Producer:
                     if isinstance(confirmation, asyncio.Future):
                         confirmation.set_exception(exc)
 
+
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
-        if self._on_close_handler is not None:
+        #if self._on_close_handler is not None:
+        async with self._lock:
+            await self._maybe_clean_up_during_metadata_update(frame.metadata_info.stream)
             metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
-            result = self._on_close_handler(metadata_update_info)
-            if result is not None and inspect.isawaitable(result):
-                await result
+            #result = self._on_close_handler(metadata_update_info)
+            #if result is not None and inspect.isawaitable(result):
+            #    await result
 
     async def create_stream(
         self,
@@ -692,20 +708,14 @@ class Producer:
 
     async def reconnect_stream(self, stream: str) -> None:
 
-        if stream in self._clients:
-            del self._clients[stream]
-        if stream in self._publishers:
-            async with self._lock:
-                if await self._publishers[stream].client.get_stream_count() == 1:
-                    await self._publishers[stream].client.close()
-                del self._publishers[stream]
-
-        if self._default_client is not None:
-            if self._default_client.is_connection_alive() is False:
-                await self._default_client.close()
-                self._default_client = None
-
         async with self._lock:
+            await self._maybe_clean_up_during_metadata_update(stream)
+
+            if self._default_client is not None:
+                if self._default_client.is_connection_alive() is False:
+                    await self._default_client.close()
+                    self._default_client = None
+
             await self._get_or_create_publisher(stream)
 
     async def _check_if_filtering_is_supported(self) -> None:
@@ -737,3 +747,21 @@ class Producer:
         if await (await self.default_client).get_stream_count() == 0:
             await (await self.default_client).close()
             self._default_client = None
+
+    async def _maybe_clean_up_during_metadata_update(self, stream: str):
+
+        if stream in self._publishers:
+
+            if self._publishers[stream].client.is_connection_alive():
+                await self._publishers[stream].client.remove_stream(stream)
+                if await self._publishers[stream].client.get_stream_count() == 0:
+                    await self._publishers[stream].client.close()
+            else:
+                await self._publishers[stream].client.close()
+            del self._publishers[stream]
+
+            if stream in self._clients:
+                await self._clients[stream].delete_publisher(self._publishers[stream].id)
+                del self._clients[stream]
+
+

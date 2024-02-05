@@ -154,6 +154,9 @@ class BaseClient:
     async def get_stream_count(self):
         return len(self._streams)
 
+    async def remove_stream(self, stream: str):
+        self._streams.remove(stream)
+
     async def send_publish_frame(self, frame: schema.Publish, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
         assert self._conn
@@ -540,7 +543,7 @@ class Client(BaseClient):
                 reference=reference,
             ),
             resp_schema=schema.DeclarePublisherResponse,
-            raise_exception=False,
+            raise_exception=True,
         )
 
     async def delete_publisher(self, publisher_id: int) -> None:
@@ -562,7 +565,7 @@ class Client(BaseClient):
                 stream=stream,
             ),
             resp_schema=schema.QueryPublisherSequenceResponse,
-            raise_exception=False,
+            raise_exception=True,
         )
         return resp.sequence
 
