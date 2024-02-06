@@ -7,6 +7,7 @@ import asyncio
 import inspect
 import logging
 import ssl
+import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
@@ -68,24 +69,24 @@ logger = logging.getLogger(__name__)
 
 class Producer:
     def __init__(
-        self,
-        host: str,
-        port: int = 5552,
-        *,
-        ssl_context: Optional[ssl.SSLContext] = None,
-        vhost: str = "/",
-        username: str,
-        password: str,
-        frame_max: int = 1 * 1024 * 1024,
-        heartbeat: int = 60,
-        load_balancer_mode: bool = False,
-        max_retries: int = 20,
-        default_batch_publishing_delay: float = 0.2,
-        default_context_switch_value: int = 1000,
-        connection_name: str = None,
-        on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
-        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
-        filter_value_extractor: Optional[CB_F[Any]] = None,
+            self,
+            host: str,
+            port: int = 5552,
+            *,
+            ssl_context: Optional[ssl.SSLContext] = None,
+            vhost: str = "/",
+            username: str,
+            password: str,
+            frame_max: int = 1 * 1024 * 1024,
+            heartbeat: int = 60,
+            load_balancer_mode: bool = False,
+            max_retries: int = 20,
+            default_batch_publishing_delay: float = 3,
+            default_context_switch_value: int = 1000,
+            connection_name: str = None,
+            on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
+            sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
+            filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -214,9 +215,9 @@ class Producer:
         return self._clients[stream]
 
     async def _get_or_create_publisher(
-        self,
-        stream: str,
-        publisher_name: Optional[str] = None,
+            self,
+            stream: str,
+            publisher_name: Optional[str] = None,
     ) -> _Publisher:
         if stream in self._publishers:
             publisher = self._publishers[stream]
@@ -252,8 +253,10 @@ class Producer:
             print("after query_publisher_sequence")
 
         except Exception as e:
+            traceback.print_exc()
+            print("error declaring publisher: " + str(e))
+            await self._maybe_clean_up_during_metadata_update(stream)
             raise e
-
 
         client.add_handler(
             schema.PublishConfirm,
@@ -274,11 +277,11 @@ class Producer:
         return publisher
 
     async def send_batch(
-        self,
-        stream: str,
-        batch: list[MessageT],
-        publisher_name: Optional[str] = None,
-        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+            self,
+            stream: str,
+            batch: list[MessageT],
+            publisher_name: Optional[str] = None,
+            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
         await self._check_connection(stream)
@@ -295,13 +298,13 @@ class Producer:
 
     # used by send_batch and send_wait
     async def _send_batch(
-        self,
-        stream: str,
-        batch: list[MessageT],
-        publisher_name: Optional[str] = None,
-        callback: Optional[CB[ConfirmationStatus]] = None,
-        sync: bool = True,
-        timeout: Optional[int] = None,
+            self,
+            stream: str,
+            batch: list[MessageT],
+            publisher_name: Optional[str] = None,
+            callback: Optional[CB[ConfirmationStatus]] = None,
+            sync: bool = True,
+            timeout: Optional[int] = None,
     ) -> list[int]:
 
         messages = []
@@ -373,14 +376,14 @@ class Producer:
 
     # used by send, send_sub_batch (with compression)
     async def _send_batch_async(
-        self,
-        stream: str,
-        batch: list[_MessageNotification],
+            self,
+            stream: str,
+            batch: list[_MessageNotification],
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
 
-        await self._check_connection(stream)
+        # await self._check_connection(stream)
         if self._close_called:
             return []
 
@@ -391,12 +394,7 @@ class Producer:
         for item in batch:
 
             async with self._lock:
-                try:
-                    publisher = await self._get_or_create_publisher(stream, publisher_name=item.publisher_name)
-                except Exception as ex:
-                    print("exception happened in back thread")
-                    await self._maybe_clean_up_during_metadata_update(stream)
-                    return []
+                publisher = await self._get_or_create_publisher(stream, publisher_name=item.publisher_name)
 
             if not isinstance(item.entry, ICompressionCodec):
 
@@ -494,11 +492,11 @@ class Producer:
         return list(publishing_ids)
 
     async def send_wait(
-        self,
-        stream: str,
-        message: MessageT,
-        publisher_name: Optional[str] = None,
-        timeout: Optional[int] = 5,
+            self,
+            stream: str,
+            message: MessageT,
+            publisher_name: Optional[str] = None,
+            timeout: Optional[int] = 5,
     ) -> int:
 
         await self._check_connection(stream)
@@ -521,14 +519,14 @@ class Producer:
         return 0
 
     async def send(
-        self,
-        stream: str,
-        message: MessageT,
-        publisher_name: Optional[str] = None,
-        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+            self,
+            stream: str,
+            message: MessageT,
+            publisher_name: Optional[str] = None,
+            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
-        await self._check_connection(stream)
+        # await self._check_connection(stream)
 
         # start the background thread to send buffered messages
         if self.task is None:
@@ -548,12 +546,12 @@ class Producer:
             self._default_context_switch_counter = 0
 
     async def send_sub_entry(
-        self,
-        stream: str,
-        sub_entry_messages: list[MessageT],
-        compression_type: CompressionType = CompressionType.No,
-        publisher_name: Optional[str] = None,
-        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+            self,
+            stream: str,
+            sub_entry_messages: list[MessageT],
+            compression_type: CompressionType = CompressionType.No,
+            publisher_name: Optional[str] = None,
+            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
         if len(sub_entry_messages) == 0:
@@ -579,20 +577,24 @@ class Producer:
 
     # After the timeout send the messages in _buffered_messages in batches
     async def _timer(self):
+        try:
+            while not self._close_called:
+                await asyncio.sleep(0.5)
+                for stream in self._buffered_messages:
+                    try:
+                        await self._publish_buffered_messages(stream)
+                    except BaseException as exc:
+                        logger.debug("producer _timer exception: ", {exc})
+        except Exception as ex:
+            print("exception in _timer: " + str(ex))
 
-        while not self._close_called:
-            await asyncio.sleep(self._default_batch_publishing_delay)
-            for stream in self._buffered_messages:
-                try:
-                    await self._publish_buffered_messages(stream)
-                except BaseException as exc:
-                    logger.debug("producer _timer exception: ", {exc})
+        print("exiting _timer")
 
     async def _publish_buffered_messages(self, stream: str) -> None:
 
-        if stream in self._clients:
-            if self._clients[stream].is_connection_alive() is False:
-                return
+        # if stream in self._clients:
+        #     if self._clients[stream].is_connection_alive() is False:
+        #         return
 
         async with self._buffered_messages_lock:
             if len(self._buffered_messages[stream]):
@@ -646,22 +648,21 @@ class Producer:
                     if isinstance(confirmation, asyncio.Future):
                         confirmation.set_exception(exc)
 
-
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
-        #if self._on_close_handler is not None:
+        # if self._on_close_handler is not None:
         async with self._lock:
             await self._maybe_clean_up_during_metadata_update(frame.metadata_info.stream)
             metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
-            #result = self._on_close_handler(metadata_update_info)
-            #if result is not None and inspect.isawaitable(result):
+            # result = self._on_close_handler(metadata_update_info)
+            # if result is not None and inspect.isawaitable(result):
             #    await result
 
     async def create_stream(
-        self,
-        stream: str,
-        arguments: Optional[dict[str, Any]] = None,
-        exists_ok: bool = False,
+            self,
+            stream: str,
+            arguments: Optional[dict[str, Any]] = None,
+            exists_ok: bool = False,
     ) -> None:
 
         async with self._lock:
@@ -702,9 +703,13 @@ class Producer:
 
     async def _check_connection(self, stream: str):
 
-        if stream in self._publishers:
-            if self._publishers[stream].client.is_connection_alive() is False:
+        if stream in self._clients:
+            if self._clients[stream].is_connection_alive() is False:
                 raise Exception("connection Closed for stream: " + stream)
+
+        # if stream in self._publishers:
+        #     if self._publishers[stream].client.is_connection_alive() is False:
+        #         raise Exception("connection Closed for stream: " + stream)
 
     async def reconnect_stream(self, stream: str) -> None:
 
@@ -730,8 +735,8 @@ class Producer:
 
         if server_command_version.max_version < 2:
             filter_not_supported = (
-                "Filtering is not supported by the broker "
-                + "(requires RabbitMQ 3.13+ and stream_filtering feature flag activated)"
+                    "Filtering is not supported by the broker "
+                    + "(requires RabbitMQ 3.13+ and stream_filtering feature flag activated)"
             )
             raise ValueError(filter_not_supported)
 
@@ -761,7 +766,5 @@ class Producer:
             del self._publishers[stream]
 
             if stream in self._clients:
-                await self._clients[stream].delete_publisher(self._publishers[stream].id)
+                # await self._clients[stream].delete_publisher(self._publishers[stream].id)
                 del self._clients[stream]
-
-
