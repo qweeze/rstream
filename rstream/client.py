@@ -165,10 +165,14 @@ class BaseClient:
                 await self._conn.write_frame_publish(frame, version)
         except socket.error:
             self._is_not_closed = False
-            if self._connection_closed_handler is not None:
-                logger.debug("TCP connection closed")
-            else:
-                logger.exception("TCP connection closed")
+            #if self._connection_closed_handler is not None:
+            #    logger.debug("TCP connection closed")
+            #else:
+            #    logger.exception("TCP connection closed")
+            connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
+            result = self._connection_closed_handler(connection_error_info)
+            if result is not None and inspect.isawaitable(result):
+                await result
 
     async def send_frame(self, frame: schema.Frame, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -178,10 +182,14 @@ class BaseClient:
                 await self._conn.write_frame(frame, version)
         except socket.error:
             self._is_not_closed = False
-            if self._connection_closed_handler is not None:
-                logger.debug("TCP connection closed")
-            else:
-                logger.exception("TCP connection closed")
+            #if self._connection_closed_handler is not None:
+            #    logger.debug("TCP connection closed")
+            #else:
+            #    logger.exception("TCP connection closed")
+            connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
+            result = self._connection_closed_handler(connection_error_info)
+            if result is not None and inspect.isawaitable(result):
+                await result
 
     def wait_frame(
         self,
@@ -565,7 +573,7 @@ class Client(BaseClient):
                 stream=stream,
             ),
             resp_schema=schema.QueryPublisherSequenceResponse,
-            raise_exception=True,
+            raise_exception=False,
         )
         return resp.sequence
 
