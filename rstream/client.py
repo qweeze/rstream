@@ -105,6 +105,8 @@ class BaseClient:
         self._is_not_closed: bool = True
 
         self._streams: list[str] = []
+        self._available_ids: list[bool] = [True for i in range(250)]
+        self._current_id = 1
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -156,6 +158,19 @@ class BaseClient:
 
     async def remove_stream(self, stream: str):
         self._streams.remove(stream)
+
+    async def get_available_id(self) -> int:
+        if self._current_id >= 250:
+            self._current_id = 1
+        for id in range(self._current_id, 250):
+            if self._available_ids[id] is True:
+                self._current_id = id
+                self._available_ids[id] = False
+                return id
+
+    async def free_available_id(self, publishing_id):
+        self._available_ids[publishing_id] = True
+
 
     async def send_publish_frame(self, frame: schema.Publish, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)

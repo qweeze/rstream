@@ -121,6 +121,7 @@ class Producer:
         self._close_called = False
         self._connection_name = connection_name
         self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
+        self.publisher_id = 0
 
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
@@ -228,7 +229,9 @@ class Producer:
         client = await self._get_or_create_client(stream)
 
         # We can have multiple publishers sharing same connection, so their ids must be distinct
-        publisher_id = len([p for p in self._publishers.values() if p.client is client]) + 1
+        #publisher_id = len([p for p in self._publishers.values() if p.client is client]) + 2
+        publisher_id = await client.get_available_id()
+
         reference = publisher_name or f"{stream}_publisher_{publisher_id}"
         publisher = self._publishers[stream] = _Publisher(
             id=publisher_id,
@@ -650,6 +653,7 @@ class Producer:
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
+        #await asyncio.sleep(3)
         # if self._on_close_handler is not None:
         async with self._lock:
             await self.maybe_clean_up_during_metadata_update(frame.metadata_info.stream)
@@ -759,14 +763,16 @@ class Producer:
 
             if self._publishers[stream].client.is_connection_alive():
                 await self._publishers[stream].client.remove_stream(stream)
+                await self._publishers[stream].client.free_available_id(self._publishers[stream].id)
                 if await self._publishers[stream].client.get_stream_count() == 0:
                     await self._publishers[stream].client.close()
             else:
                 await self._publishers[stream].client.close()
+            self._publishers.pop(stream)
             del self._publishers[stream]
 
             if stream in self._clients:
-                # await self._clients[stream].delete_publisher(self._publishers[stream].id)
+                await self._clients[stream].delete_publisher(self._publishers[stream].id)
                 del self._clients[stream]
 
 
