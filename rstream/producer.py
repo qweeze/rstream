@@ -84,7 +84,7 @@ class Producer:
             default_batch_publishing_delay: float = 3,
             default_context_switch_value: int = 1000,
             connection_name: str = None,
-            #on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
+            # on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
             sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
             filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
@@ -116,7 +116,7 @@ class Producer:
         self._default_batch_publishing_delay = default_batch_publishing_delay
         self._default_context_switch_counter = 0
         self._default_context_switch_value = default_context_switch_value
-        #self._on_close_handler = on_close_handler
+        # self._on_close_handler = on_close_handler
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         self._close_called = False
         self._connection_name = connection_name
@@ -196,7 +196,7 @@ class Producer:
 
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
-            if self._default_client is None:
+            if self._default_client is None or self._default_client.is_connection_alive() is False:
                 self._default_client = await self._pool.get(
                     connection_closed_handler=self._on_connection_closed,
                     connection_name=self._connection_name,
@@ -225,23 +225,24 @@ class Producer:
             if publisher_name is not None:
                 assert publisher.reference == publisher_name
             return publisher
-
-        client = await self._get_or_create_client(stream)
-
-        # We can have multiple publishers sharing same connection, so their ids must be distinct
-        #publisher_id = len([p for p in self._publishers.values() if p.client is client]) + 2
-        publisher_id = await client.get_available_id()
-
-        reference = publisher_name or f"{stream}_publisher_{publisher_id}"
-        publisher = self._publishers[stream] = _Publisher(
-            id=publisher_id,
-            stream=stream,
-            reference=reference,
-            sequence=utils.MonotonicSeq(),
-            client=client,
-        )
         print("before declaring publisher")
         try:
+
+            client = await self._get_or_create_client(stream)
+
+            # We can have multiple publishers sharing same connection, so their ids must be distinct
+            # publisher_id = len([p for p in self._publishers.values() if p.client is client]) + 2
+            publisher_id = await client.get_available_id()
+
+            reference = publisher_name or f"{stream}_publisher_{publisher_id}"
+            publisher = self._publishers[stream] = _Publisher(
+                id=publisher_id,
+                stream=stream,
+                reference=reference,
+                sequence=utils.MonotonicSeq(),
+                client=client,
+            )
+
             await client.declare_publisher(
                 stream=stream,
                 reference=publisher.reference,
@@ -256,7 +257,7 @@ class Producer:
             print("after query_publisher_sequence")
 
         except Exception as e:
-            traceback.print_exc()
+            # traceback.print_exc()
             print("error declaring publisher: " + str(e))
             await self.maybe_clean_up_during_metadata_update(stream)
             raise e
@@ -653,7 +654,7 @@ class Producer:
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
-        #await asyncio.sleep(3)
+        # await asyncio.sleep(3)
         # if self._on_close_handler is not None:
         async with self._lock:
             await self.maybe_clean_up_during_metadata_update(frame.metadata_info.stream)
@@ -768,13 +769,10 @@ class Producer:
                     await self._publishers[stream].client.close()
             else:
                 await self._publishers[stream].client.close()
-            self._publishers.pop(stream)
             del self._publishers[stream]
 
-            if stream in self._clients:
-                await self._clients[stream].delete_publisher(self._publishers[stream].id)
-                del self._clients[stream]
-
+        if stream in self._clients:
+            del self._clients[stream]
 
     async def _on_connection_closed(self, disconnection_info: OnClosedErrorInfo) -> None:
         for stream in disconnection_info.streams:

@@ -58,14 +58,15 @@ async def publish():
 
     # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
-            "34.105.232.133",
-            username="test",
-            password="test",
+            "node0",
+            username="guest",
+            password="guest",
+            port=5562,
             routing_extractor=routing_extractor,
             routing=RouteType.Hash,
             super_stream=SUPER_STREAM,
             # on_close_handler=on_metadata_update,
-            load_balancer_mode=True,
+            load_balancer_mode=False,
     ) as super_stream_producer:
         # Sending a million messages
 
@@ -81,7 +82,7 @@ async def publish():
                 try:
 
                     await super_stream_producer.send(amqp_message)
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(2.5)
                     print("sent message: {}".format(i))
                     # time.sleep(5)
                 except Exception as e:
