@@ -11,6 +11,7 @@ import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
+from random import randrange
 from typing import (
     Annotated,
     Any,
@@ -32,6 +33,7 @@ from .compression import (
     ICompressionCodec,
 )
 from .constants import Key, SlasMechanism
+from .exceptions import StreamDoesNotExist
 from .utils import OnClosedErrorInfo, RawMessage
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
@@ -69,24 +71,24 @@ logger = logging.getLogger(__name__)
 
 class Producer:
     def __init__(
-            self,
-            host: str,
-            port: int = 5552,
-            *,
-            ssl_context: Optional[ssl.SSLContext] = None,
-            vhost: str = "/",
-            username: str,
-            password: str,
-            frame_max: int = 1 * 1024 * 1024,
-            heartbeat: int = 60,
-            load_balancer_mode: bool = False,
-            max_retries: int = 20,
-            default_batch_publishing_delay: float = 3,
-            default_context_switch_value: int = 1000,
-            connection_name: str = None,
-            # on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
-            sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
-            filter_value_extractor: Optional[CB_F[Any]] = None,
+        self,
+        host: str,
+        port: int = 5552,
+        *,
+        ssl_context: Optional[ssl.SSLContext] = None,
+        vhost: str = "/",
+        username: str,
+        password: str,
+        frame_max: int = 1 * 1024 * 1024,
+        heartbeat: int = 60,
+        load_balancer_mode: bool = False,
+        max_retries: int = 20,
+        default_batch_publishing_delay: float = 3,
+        default_context_switch_value: int = 1000,
+        connection_name: str = None,
+        # on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
+        sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
+        filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
         self._pool = ClientPool(
             host,
@@ -163,11 +165,6 @@ class Producer:
                 await asyncio.sleep(0.2)
                 break
 
-        # flush messages still in buffer
-        # if self._default_client is None:
-        #    return
-
-        # if self.default_client.is_connection_alive():
         if self.task is not None:
             for stream in self._buffered_messages:
                 await self._publish_buffered_messages(stream)
@@ -202,7 +199,7 @@ class Producer:
                     connection_name=self._connection_name,
                 )
             leader, _ = await (await self.default_client).query_leader_and_replicas(stream)
-            print("before connecting")
+
             self._clients[stream] = await self._pool.get(
                 connection_name=self._connection_name,
                 addr=Addr(leader.host, leader.port),
@@ -210,28 +207,26 @@ class Producer:
                 stream=stream,
                 sasl_configuration_mechanism=self._sasl_configuration_mechanism,
             )
-            print("after connecting")
+
             await self._close_locator_connection()
 
         return self._clients[stream]
 
     async def _get_or_create_publisher(
-            self,
-            stream: str,
-            publisher_name: Optional[str] = None,
+        self,
+        stream: str,
+        publisher_name: Optional[str] = None,
     ) -> _Publisher:
         if stream in self._publishers:
             publisher = self._publishers[stream]
             if publisher_name is not None:
                 assert publisher.reference == publisher_name
             return publisher
-        print("before declaring publisher")
         try:
 
             client = await self._get_or_create_client(stream)
 
             # We can have multiple publishers sharing same connection, so their ids must be distinct
-            # publisher_id = len([p for p in self._publishers.values() if p.client is client]) + 2
             publisher_id = await client.get_available_id()
 
             reference = publisher_name or f"{stream}_publisher_{publisher_id}"
@@ -248,19 +243,22 @@ class Producer:
                 reference=publisher.reference,
                 publisher_id=publisher.id,
             )
-            print("after declaring publisher")
+
             sequence = await client.query_publisher_sequence(
                 stream=stream,
                 reference=reference,
             )
             publisher.sequence.set(sequence + 1)
-            print("after query_publisher_sequence")
 
-        except Exception as e:
-            # traceback.print_exc()
-            print("error declaring publisher: " + str(e))
-            await self.maybe_clean_up_during_metadata_update(stream)
+        except StreamDoesNotExist as e:
+            logger.warning("Error in _get_or_create_publisher: stream does not exists anymore")
+            await self.maybe_clean_up_during_lost_connection(stream)
             raise e
+        except Exception as ex:
+            # traceback.print_exc()
+            logger.warning("error declaring publisher: " + str(ex))
+            await self.maybe_clean_up_during_lost_connection(stream)
+            raise ex
 
         client.add_handler(
             schema.PublishConfirm,
@@ -281,11 +279,11 @@ class Producer:
         return publisher
 
     async def send_batch(
-            self,
-            stream: str,
-            batch: list[MessageT],
-            publisher_name: Optional[str] = None,
-            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+        self,
+        stream: str,
+        batch: list[MessageT],
+        publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
         await self._check_connection(stream)
@@ -302,13 +300,13 @@ class Producer:
 
     # used by send_batch and send_wait
     async def _send_batch(
-            self,
-            stream: str,
-            batch: list[MessageT],
-            publisher_name: Optional[str] = None,
-            callback: Optional[CB[ConfirmationStatus]] = None,
-            sync: bool = True,
-            timeout: Optional[int] = None,
+        self,
+        stream: str,
+        batch: list[MessageT],
+        publisher_name: Optional[str] = None,
+        callback: Optional[CB[ConfirmationStatus]] = None,
+        sync: bool = True,
+        timeout: Optional[int] = None,
     ) -> list[int]:
 
         messages = []
@@ -380,9 +378,9 @@ class Producer:
 
     # used by send, send_sub_batch (with compression)
     async def _send_batch_async(
-            self,
-            stream: str,
-            batch: list[_MessageNotification],
+        self,
+        stream: str,
+        batch: list[_MessageNotification],
     ) -> list[int]:
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -398,7 +396,12 @@ class Producer:
         for item in batch:
 
             async with self._lock:
-                publisher = await self._get_or_create_publisher(stream, publisher_name=item.publisher_name)
+                try:
+                    publisher = await self._get_or_create_publisher(
+                        stream, publisher_name=item.publisher_name
+                    )
+                except Exception as ex:
+                    raise ex
 
             if not isinstance(item.entry, ICompressionCodec):
 
@@ -496,11 +499,11 @@ class Producer:
         return list(publishing_ids)
 
     async def send_wait(
-            self,
-            stream: str,
-            message: MessageT,
-            publisher_name: Optional[str] = None,
-            timeout: Optional[int] = 5,
+        self,
+        stream: str,
+        message: MessageT,
+        publisher_name: Optional[str] = None,
+        timeout: Optional[int] = 5,
     ) -> int:
 
         await self._check_connection(stream)
@@ -523,11 +526,11 @@ class Producer:
         return 0
 
     async def send(
-            self,
-            stream: str,
-            message: MessageT,
-            publisher_name: Optional[str] = None,
-            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+        self,
+        stream: str,
+        message: MessageT,
+        publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
         # await self._check_connection(stream)
@@ -550,12 +553,12 @@ class Producer:
             self._default_context_switch_counter = 0
 
     async def send_sub_entry(
-            self,
-            stream: str,
-            sub_entry_messages: list[MessageT],
-            compression_type: CompressionType = CompressionType.No,
-            publisher_name: Optional[str] = None,
-            on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
+        self,
+        stream: str,
+        sub_entry_messages: list[MessageT],
+        compression_type: CompressionType = CompressionType.No,
+        publisher_name: Optional[str] = None,
+        on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
 
         if len(sub_entry_messages) == 0:
@@ -590,9 +593,7 @@ class Producer:
                     except BaseException as exc:
                         logger.debug("producer _timer exception: ", {exc})
         except Exception as ex:
-            print("exception in _timer: " + str(ex))
-
-        print("exiting _timer")
+            logger.warning("exception in _timer: " + str(ex))
 
     async def _publish_buffered_messages(self, stream: str) -> None:
 
@@ -654,20 +655,14 @@ class Producer:
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
-        # await asyncio.sleep(3)
-        # if self._on_close_handler is not None:
         async with self._lock:
-            await self.maybe_clean_up_during_metadata_update(frame.metadata_info.stream)
-            metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
-            # result = self._on_close_handler(metadata_update_info)
-            # if result is not None and inspect.isawaitable(result):
-            #    await result
+            await self.maybe_clean_up_during_lost_connection(frame.metadata_info.stream)
 
     async def create_stream(
-            self,
-            stream: str,
-            arguments: Optional[dict[str, Any]] = None,
-            exists_ok: bool = False,
+        self,
+        stream: str,
+        arguments: Optional[dict[str, Any]] = None,
+        exists_ok: bool = False,
     ) -> None:
 
         async with self._lock:
@@ -712,22 +707,6 @@ class Producer:
             if self._clients[stream].is_connection_alive() is False:
                 raise Exception("connection Closed for stream: " + stream)
 
-        # if stream in self._publishers:
-        #     if self._publishers[stream].client.is_connection_alive() is False:
-        #         raise Exception("connection Closed for stream: " + stream)
-
-    async def reconnect_stream(self, stream: str) -> None:
-
-        async with self._lock:
-            await self.maybe_clean_up_during_metadata_update(stream)
-
-            if self._default_client is not None:
-                if self._default_client.is_connection_alive() is False:
-                    await self._default_client.close()
-                    self._default_client = None
-
-            await self._get_or_create_publisher(stream)
-
     async def _check_if_filtering_is_supported(self) -> None:
 
         command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
@@ -740,8 +719,8 @@ class Producer:
 
         if server_command_version.max_version < 2:
             filter_not_supported = (
-                    "Filtering is not supported by the broker "
-                    + "(requires RabbitMQ 3.13+ and stream_filtering feature flag activated)"
+                "Filtering is not supported by the broker "
+                + "(requires RabbitMQ 3.13+ and stream_filtering feature flag activated)"
             )
             raise ValueError(filter_not_supported)
 
@@ -758,10 +737,19 @@ class Producer:
             await (await self.default_client).close()
             self._default_client = None
 
-    async def maybe_clean_up_during_metadata_update(self, stream: str):
+    async def maybe_clean_up_during_lost_connection(self, stream: str):
+
+        await asyncio.sleep(randrange(3))
 
         if stream in self._publishers:
 
+            # try to delete the publisher if deadling
+            try:
+                await asyncio.wait_for(
+                    self._publishers[stream].client.delete_publisher(self._publishers[stream].id), 3
+                )
+            except asyncio.TimeoutError:
+                logger.debug("Timeout deleting publisher in maybe_clean_up_during_lost_connection")
             if self._publishers[stream].client.is_connection_alive():
                 await self._publishers[stream].client.remove_stream(stream)
                 await self._publishers[stream].client.free_available_id(self._publishers[stream].id)
@@ -774,7 +762,8 @@ class Producer:
         if stream in self._clients:
             del self._clients[stream]
 
+    # this is notified by the client when a disconnection happens in order to cleanup handlers
     async def _on_connection_closed(self, disconnection_info: OnClosedErrorInfo) -> None:
-        for stream in disconnection_info.streams:
-            async with self._lock:
-                await self.maybe_clean_up_during_metadata_update(stream)
+        async with self._lock:
+            for stream in disconnection_info.streams:
+                await self.maybe_clean_up_during_lost_connection(stream)

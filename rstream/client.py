@@ -105,7 +105,7 @@ class BaseClient:
         self._is_not_closed: bool = True
 
         self._streams: list[str] = []
-        self._available_ids: list[bool] = [True for i in range(250)]
+        self._available_ids: list[bool] = [True for i in range(257)]
         self._current_id = 1
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
@@ -160,17 +160,22 @@ class BaseClient:
         self._streams.remove(stream)
 
     async def get_available_id(self) -> int:
-        if self._current_id >= 250:
+        if self._current_id <= 256:
+            publishing_id = self._current_id
+            self._available_ids[publishing_id] = False
+            self._current_id = self._current_id + 1
+            return publishing_id
+        else:
             self._current_id = 1
-        for id in range(self._current_id, 250):
-            if self._available_ids[id] is True:
-                self._current_id = id
-                self._available_ids[id] = False
-                return id
+            for publishing_id in range(self._current_id, 257):
+                if self._available_ids[publishing_id] is True:
+                    self._available_ids[publishing_id] = False
+                    self._current_id = publishing_id
+                    return publishing_id
+            return self._current_id
 
     async def free_available_id(self, publishing_id):
         self._available_ids[publishing_id] = True
-
 
     async def send_publish_frame(self, frame: schema.Publish, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -180,14 +185,11 @@ class BaseClient:
                 await self._conn.write_frame_publish(frame, version)
         except socket.error:
             self._is_not_closed = False
-            #if self._connection_closed_handler is not None:
-            #    logger.debug("TCP connection closed")
-            #else:
-            #    logger.exception("TCP connection closed")
-            connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
-            result = self._connection_closed_handler(connection_error_info)
-            if result is not None and inspect.isawaitable(result):
-                await result
+            if self._connection_closed_handler is not None:
+                connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
+                result = self._connection_closed_handler(connection_error_info)
+                if result is not None and inspect.isawaitable(result):
+                    await result
 
     async def send_frame(self, frame: schema.Frame, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -197,14 +199,11 @@ class BaseClient:
                 await self._conn.write_frame(frame, version)
         except socket.error:
             self._is_not_closed = False
-            #if self._connection_closed_handler is not None:
-            #    logger.debug("TCP connection closed")
-            #else:
-            #    logger.exception("TCP connection closed")
-            connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
-            result = self._connection_closed_handler(connection_error_info)
-            if result is not None and inspect.isawaitable(result):
-                await result
+            if self._connection_closed_handler is not None:
+                connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
+                result = self._connection_closed_handler(connection_error_info)
+                if result is not None and inspect.isawaitable(result):
+                    await result
 
     def wait_frame(
         self,
