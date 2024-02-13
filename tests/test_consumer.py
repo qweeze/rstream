@@ -655,7 +655,6 @@ async def test_super_stream_consumer_connection_broke_with_reconnect(super_strea
         password="guest",
         routing_extractor=routing_extractor_generic,
         routing=RouteType.Hash,
-        on_close_handler=on_connection_closed,
         connection_name="test-connection",
         super_stream=super_stream,
     )

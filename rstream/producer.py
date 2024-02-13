@@ -7,7 +7,6 @@ import asyncio
 import inspect
 import logging
 import ssl
-import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
