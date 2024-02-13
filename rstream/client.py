@@ -186,10 +186,9 @@ class BaseClient:
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
-                connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
-                result = self._connection_closed_handler(connection_error_info)
-                if result is not None and inspect.isawaitable(result):
-                    await result
+                logger.debug("TCP connection closed")
+            else:
+                logger.exception("TCP connection closed")
 
     async def send_frame(self, frame: schema.Frame, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -200,10 +199,9 @@ class BaseClient:
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
-                connection_error_info = OnClosedErrorInfo("Connection Closed", self._streams)
-                result = self._connection_closed_handler(connection_error_info)
-                if result is not None and inspect.isawaitable(result):
-                    await result
+                logger.debug("TCP connection closed")
+            else:
+                logger.exception("TCP connection closed")
 
     def wait_frame(
         self,
