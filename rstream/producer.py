@@ -285,7 +285,7 @@ class Producer:
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
 
-        await self._check_connection(stream)
+        # await self._check_connection(stream)
 
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -505,7 +505,7 @@ class Producer:
         timeout: Optional[int] = 5,
     ) -> int:
 
-        await self._check_connection(stream)
+        # await self._check_connection(stream)
 
         publishing_ids = await self._send_batch(
             stream,
