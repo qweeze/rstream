@@ -221,9 +221,10 @@ ssl_options.fail_if_no_peer_cert = true
 
 ### Managing disconnections
 
-The client does not support auto-reconnect at the moment.
+The client supports auto-reconnect just for Producer and SuperstreamProducer at the moment.
 
-When the TCP connection is disconnected unexpectedly, the client raises an event:
+When the TCP connection is disconnected unexpectedly, the Producer and the SuperstreamProducer will try to automatically
+reconnect while in case of the Consumer/SuperstreamConsumer the client raises an event that needs to be managed:
 
 ```python
 async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
@@ -241,7 +242,7 @@ on_close_handler=on_connection_closed,
 ```
 
 ### Reconnect
-When the `connection_closed_handler` event is raised, you can close the Consumers/Producers by doing a correct clean-up or try reconnecting using the reconnect stream.
+When the `on_close_handler` event is raised, you can close the Consumers by doing a correct clean-up or try reconnecting using the reconnect stream.
 
 Example:
 ```python
@@ -262,9 +263,10 @@ Please take a look at the complete examples [here](https://github.com/qweeze/rst
 
 ### Metadata Update
 
-If the streams topology changes (ex:Stream deleted or add/remove follower), the client receives an MetadataUpdate event.
-The client is notified by a callback (similar to what happens for connection_broken scenarios)
-After this the client can try to reconnect.
+If the streams topology changes (ex:Stream deleted or add/remove follower), The server removes the producers and consumers 
+linked to the stream and then it sends the Metadata update event.
+the behaviour is similar to what we have for disconnections. In case of the Producer/Superstream Producer 
+the Client will try to automatically reconnect while the Consumer needs to manage the on_close_handler event.
 
 Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/metadata_update/)
 
