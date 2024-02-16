@@ -105,6 +105,8 @@ class BaseClient:
         self._is_not_closed: bool = True
 
         self._streams: list[str] = []
+        self._available_ids: list[bool] = [True for i in range(257)]
+        self._current_id = 1
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -153,6 +155,27 @@ class BaseClient:
 
     async def get_stream_count(self):
         return len(self._streams)
+
+    async def remove_stream(self, stream: str):
+        self._streams.remove(stream)
+
+    async def get_available_id(self) -> int:
+        if self._current_id <= 256:
+            publishing_id = self._current_id
+            self._available_ids[publishing_id] = False
+            self._current_id = self._current_id + 1
+            return publishing_id
+        else:
+            self._current_id = 1
+            for publishing_id in range(self._current_id, 257):
+                if self._available_ids[publishing_id] is True:
+                    self._available_ids[publishing_id] = False
+                    self._current_id = publishing_id
+                    return publishing_id
+            return self._current_id
+
+    async def free_available_id(self, publishing_id):
+        self._available_ids[publishing_id] = True
 
     async def send_publish_frame(self, frame: schema.Publish, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -540,7 +563,7 @@ class Client(BaseClient):
                 reference=reference,
             ),
             resp_schema=schema.DeclarePublisherResponse,
-            raise_exception=False,
+            raise_exception=True,
         )
 
     async def delete_publisher(self, publisher_id: int) -> None:
