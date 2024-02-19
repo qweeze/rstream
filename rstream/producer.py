@@ -251,12 +251,12 @@ class Producer:
 
         except StreamDoesNotExist as e:
             logger.warning("Error in _get_or_create_publisher: stream does not exists anymore")
-            await self.maybe_clean_up_during_lost_connection(stream)
+            await self._maybe_clean_up_during_lost_connection(stream)
             raise e
         except Exception as ex:
             # traceback.print_exc()
             logger.warning("error declaring publisher: " + str(ex))
-            await self.maybe_clean_up_during_lost_connection(stream)
+            await self._maybe_clean_up_during_lost_connection(stream)
             raise ex
 
         client.add_handler(
@@ -284,8 +284,6 @@ class Producer:
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
-
-        # await self._check_connection(stream)
 
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -384,7 +382,6 @@ class Producer:
         if len(batch) == 0:
             raise ValueError("Empty batch")
 
-        # await self._check_connection(stream)
         if self._close_called:
             return []
 
@@ -505,8 +502,6 @@ class Producer:
         timeout: Optional[int] = 5,
     ) -> int:
 
-        # await self._check_connection(stream)
-
         publishing_ids = await self._send_batch(
             stream,
             [message],
@@ -531,8 +526,6 @@ class Producer:
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
-
-        # await self._check_connection(stream)
 
         # start the background thread to send buffered messages
         if self.task is None:
@@ -596,10 +589,6 @@ class Producer:
 
     async def _publish_buffered_messages(self, stream: str) -> None:
 
-        # if stream in self._clients:
-        #     if self._clients[stream].is_connection_alive() is False:
-        #         return
-
         async with self._buffered_messages_lock:
             if len(self._buffered_messages[stream]):
                 await self._send_batch_async(stream, self._buffered_messages[stream])
@@ -655,7 +644,7 @@ class Producer:
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
         async with self._lock:
-            await self.maybe_clean_up_during_lost_connection(frame.metadata_info.stream)
+            await self._maybe_clean_up_during_lost_connection(frame.metadata_info.stream)
 
     async def create_stream(
         self,
@@ -700,12 +689,6 @@ class Producer:
             await self._close_locator_connection()
         return stream_exist
 
-    async def _check_connection(self, stream: str):
-
-        if stream in self._clients:
-            if self._clients[stream].is_connection_alive() is False:
-                raise Exception("connection Closed for stream: " + stream)
-
     async def _check_if_filtering_is_supported(self) -> None:
 
         command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
@@ -736,7 +719,7 @@ class Producer:
             await (await self.default_client).close()
             self._default_client = None
 
-    async def maybe_clean_up_during_lost_connection(self, stream: str):
+    async def _maybe_clean_up_during_lost_connection(self, stream: str):
 
         await asyncio.sleep(randrange(3))
 
@@ -765,4 +748,4 @@ class Producer:
     async def _on_connection_closed(self, disconnection_info: OnClosedErrorInfo) -> None:
         async with self._lock:
             for stream in disconnection_info.streams:
-                await self.maybe_clean_up_during_lost_connection(stream)
+                await self._maybe_clean_up_during_lost_connection(stream)
