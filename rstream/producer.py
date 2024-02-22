@@ -541,10 +541,7 @@ class Producer:
         self._default_context_switch_counter += 1
 
         if self._default_context_switch_counter > self._default_context_switch_value:
-            try:
-                await asyncio.sleep(0)
-            except asyncio.exceptions.CancelledError:
-                logger.warning("Exception during sleep 0 in Send")
+            await asyncio.sleep(0)
             self._default_context_switch_counter = 0
 
     async def send_sub_entry(

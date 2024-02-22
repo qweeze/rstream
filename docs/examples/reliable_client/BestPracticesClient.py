@@ -3,6 +3,7 @@ import json
 import signal
 import time
 
+# Set of import from rsteram needed for the various functionalities
 from rstream import (
     AMQPMessage,
     ConfirmationStatus,
@@ -10,6 +11,7 @@ from rstream import (
     ConsumerOffsetSpecification,
     MessageContext,
     OffsetType,
+    OnClosedErrorInfo,
     Producer,
     RouteType,
     SuperStreamConsumer,
@@ -17,15 +19,16 @@ from rstream import (
     amqp_decoder,
 )
 
+# global variables needed by the test
 confirmed_count = 0
 messages_consumed = 0
-producer: Producer
-consumer: Consumer
-tasks: tuple[None, None]
+messages_per_producer = 0
+producer: Producer | SuperStreamProducer
+consumer: Consumer | SuperStreamConsumer
 
 # Load configuration file (appsettings.json)
 async def load_json_file(configuration_file: str) -> dict:
-    data = open(configuration_file)
+    data = open("./python_rstream/appsettings.json")
     return json.load(data)
 
 
@@ -34,9 +37,8 @@ async def routing_extractor(message: AMQPMessage) -> str:
     return message.application_properties["id"]
 
 
-# Make producers
-async def make_producer(data: dict) -> Producer | SuperStreamProducer:
-    rabbitmq_data = data["RabbitMQ"]
+# Make producers (producer or superstream producer)
+async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
     host = rabbitmq_data["Host"]
     username = rabbitmq_data["Username"]
     password = rabbitmq_data["Password"]
@@ -44,6 +46,8 @@ async def make_producer(data: dict) -> Producer | SuperStreamProducer:
     vhost = rabbitmq_data["Virtualhost"]
     load_balancer = bool(rabbitmq_data["LoadBalancer"])
     stream_name = rabbitmq_data["StreamName"]
+
+    producer: Producer | SuperStreamProducer
 
     if bool(rabbitmq_data["SuperStream"]) is False:
 
@@ -73,6 +77,36 @@ async def make_producer(data: dict) -> Producer | SuperStreamProducer:
     return producer
 
 
+# metadata and disconnection events for consumers
+async def on_close_connection(on_closed_info: OnClosedErrorInfo) -> None:
+
+    print(
+        "connection has been closed from stream: "
+        + str(on_closed_info.streams)
+        + " for reason: "
+        + str(on_closed_info.reason)
+    )
+
+    await asyncio.sleep(2)
+    # reconnect just if the partition exists
+    for stream in on_closed_info.streams:
+        backoff = 1
+        while True:
+            try:
+                print("reconnecting stream: {}".format(stream))
+                await consumer.reconnect_stream(stream)
+                break
+            except Exception as ex:
+                if backoff > 32:
+                    # failed to found the leader
+                    print("reconnection failed")
+                    break
+                backoff = backoff * 2
+                print("exception reconnecting waiting 120s: " + str(ex))
+                await asyncio.sleep(30)
+                continue
+
+
 # Make consumers
 async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
 
@@ -84,6 +118,8 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
     load_balancer = bool(rabbitmq_data["LoadBalancer"])
     stream_name = rabbitmq_data["StreamName"]
 
+    consumer: Consumer | SuperStreamConsumer
+
     if bool(rabbitmq_data["SuperStream"]) is False:
 
         consumer = Consumer(
@@ -93,6 +129,7 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
             port=port,
             vhost=vhost,
             load_balancer_mode=load_balancer,
+            on_close_handler=on_close_connection,
         )
 
     else:
@@ -105,18 +142,10 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
             vhost=vhost,
             load_balancer_mode=load_balancer,
             super_stream=stream_name,
+            on_close_handler=on_close_connection,
         )
 
     return consumer
-
-
-# for testing purpose
-async def wait_for(condition, timeout=1):
-    async def _wait():
-        while not condition():
-            await asyncio.sleep(0.01)
-
-    await asyncio.wait_for(_wait(), timeout)
 
 
 # Where the confirmation happens
@@ -134,20 +163,21 @@ async def _on_publish_confirm_client(confirmation: ConfirmationStatus) -> None:
 
 async def on_message(msg: AMQPMessage, message_context: MessageContext):
     global messages_consumed
-    messages_consumed += 1
+    messages_consumed = messages_consumed + 1
+    # some printf after some messages consumed in order to check that we are working...
     if (messages_consumed % 100000) == 0:
         stream = await message_context.consumer.stream(message_context.subscriber_name)
         offset = message_context.offset
         print("Received message: {} from stream: {} - message offset: {}".format(msg, stream, offset))
 
+    if messages_consumed == (messages_per_producer * 3):
+        print("CONSUMED ALL MESSAGES PUBLISHED...")
+
 
 async def publish(rabbitmq_configuration: dict):
 
     global producer
-
-    configuration = await load_json_file(
-        "/Users/dpalaia/projects/rabbitmq-stream-mixing/python/python_rstream/appsettings.json"
-    )
+    global messages_per_producer
 
     stream_name = rabbitmq_configuration["StreamName"]
     is_super_stream_scenario = bool(rabbitmq_configuration["SuperStream"])
@@ -155,13 +185,13 @@ async def publish(rabbitmq_configuration: dict):
     producers = int(rabbitmq_configuration["Producers"])
     delay_sending_msg = int(rabbitmq_configuration["DelayDuringSendMs"])
 
-    producer = await make_producer(configuration)
+    producer = await make_producer(rabbitmq_configuration)
     await producer.start()
 
     # create a stream if it doesn't already exist
     if not is_super_stream_scenario:
         for p in range(producers):
-            await producer.create_stream(stream_name + "-" + str(p), exists_ok=True)
+            await producer.create_stream(stream_name + "-" + str(p), exists_ok=True)  # type: ignore
 
     start_time = time.perf_counter()
 
@@ -179,14 +209,20 @@ async def publish(rabbitmq_configuration: dict):
         # send is asynchronous
         if not is_super_stream_scenario:
             for p in range(producers):
-                await producer.send(
-                    stream=stream_name + "-" + str(p),
-                    message=amqp_message,
-                    on_publish_confirm=_on_publish_confirm_client,
-                )
+                try:
+                    await producer.send(
+                        stream=stream_name + "-" + str(p),
+                        message=amqp_message,
+                        on_publish_confirm=_on_publish_confirm_client,
+                    )  # type: ignore
+                except Exception as ex:
+                    print("Exception in send: " + str(ex))
 
         else:
-            await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)
+            try:
+                await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)  # type: ignore
+            except Exception as ex:
+                print("Exception in send: " + str(ex))
 
     await producer.close()
 
@@ -214,9 +250,9 @@ async def consume(rabbitmq_configuration: dict):
     # create a stream if it doesn't already exist
     if not is_super_stream_scenario:
         for p in range(consumers):
-            await consumer.create_stream(stream_name + "-" + str(p), exists_ok=True)
+            await consumer.create_stream(stream_name + "-" + str(p), exists_ok=True)  # type: ignore
 
-    offset_spec = ConsumerOffsetSpecification(OffsetType.FIRST, None)
+    offset_spec = ConsumerOffsetSpecification(OffsetType.LAST, None)
     await consumer.start()
     if not is_super_stream_scenario:
         for c in range(consumers):
@@ -225,9 +261,9 @@ async def consume(rabbitmq_configuration: dict):
                 callback=on_message,
                 decoder=amqp_decoder,
                 offset_specification=offset_spec,
-            )
+            )  # type: ignore
     else:
-        await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_spec)
+        await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_spec)  # type: ignore
 
     await consumer.run()
 
@@ -249,9 +285,7 @@ async def main():
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(close(producer_task, consumer_task)))
 
-    configuration = await load_json_file(
-        "/Users/dpalaia/projects/rabbitmq-stream-mixing/python/python_rstream/appsettings.json"
-    )
+    configuration = await load_json_file("appsettings.json")
     rabbitmq_configuration = configuration["RabbitMQ"]
 
     producer_task = asyncio.create_task(publish(rabbitmq_configuration))
