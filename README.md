@@ -259,7 +259,7 @@ Example:
             await producer.reconnect_stream(stream)
 ```
 
-Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/check_connection_broken/)
+Please take a look at the complete reliable client example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/reliable_client/)
 
 ### Metadata Update
 
@@ -268,7 +268,7 @@ linked to the stream and then it sends the Metadata update event.
 the behaviour is similar to what we have for disconnections. In case of the Producer/Superstream Producer 
 the Client will try to automatically reconnect while the Consumer needs to manage the on_close_handler event.
 
-Please take a look at the complete examples [here](https://github.com/qweeze/rstream/blob/master/docs/examples/metadata_update/)
+Please take a look at the complete reliable client example [here](https://github.com/qweeze/rstream/blob/master/docs/examples/reliable_client/)
 
 ## Load Balancer
 
