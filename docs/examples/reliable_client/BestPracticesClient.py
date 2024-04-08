@@ -23,8 +23,9 @@ from rstream import (
 confirmed_count = 0
 messages_consumed = 0
 messages_per_producer = 0
-producer: Producer | SuperStreamProducer
-consumer: Consumer | SuperStreamConsumer
+producer: Producer
+consumer: Consumer
+
 
 # Load configuration file (appsettings.json)
 async def load_json_file(configuration_file: str) -> dict:
@@ -46,8 +47,6 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
     vhost = rabbitmq_data["Virtualhost"]
     load_balancer = bool(rabbitmq_data["LoadBalancer"])
     stream_name = rabbitmq_data["StreamName"]
-
-    producer: Producer | SuperStreamProducer
 
     if bool(rabbitmq_data["SuperStream"]) is False:
 
@@ -117,8 +116,6 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
     vhost = rabbitmq_data["Virtualhost"]
     load_balancer = bool(rabbitmq_data["LoadBalancer"])
     stream_name = rabbitmq_data["StreamName"]
-
-    consumer: Consumer | SuperStreamConsumer
 
     if bool(rabbitmq_data["SuperStream"]) is False:
 
@@ -191,7 +188,7 @@ async def publish(rabbitmq_configuration: dict):
     # create a stream if it doesn't already exist
     if not is_super_stream_scenario:
         for p in range(producers):
-            await producer.create_stream(stream_name + "-" + str(p), exists_ok=True)  # type: ignore
+            await producer.create_stream(stream_name + "-" + str(p), exists_ok=True)
 
     start_time = time.perf_counter()
 
@@ -214,15 +211,15 @@ async def publish(rabbitmq_configuration: dict):
                         stream=stream_name + "-" + str(p),
                         message=amqp_message,
                         on_publish_confirm=_on_publish_confirm_client,
-                    )  # type: ignore
+                    )
                 except Exception as ex:
-                    print("Exception in send: " + str(ex))
+                    print("exception while sending " + str(ex))
 
         else:
             try:
-                await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)  # type: ignore
+                await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)
             except Exception as ex:
-                print("Exception in send: " + str(ex))
+                print("exception while sending " + str(ex))
 
     await producer.close()
 
@@ -250,9 +247,9 @@ async def consume(rabbitmq_configuration: dict):
     # create a stream if it doesn't already exist
     if not is_super_stream_scenario:
         for p in range(consumers):
-            await consumer.create_stream(stream_name + "-" + str(p), exists_ok=True)  # type: ignore
+            await consumer.create_stream(stream_name + "-" + str(p), exists_ok=True)
 
-    offset_spec = ConsumerOffsetSpecification(OffsetType.LAST, None)
+    offset_spec = ConsumerOffsetSpecification(OffsetType.FIRST, None)
     await consumer.start()
     if not is_super_stream_scenario:
         for c in range(consumers):
@@ -261,9 +258,9 @@ async def consume(rabbitmq_configuration: dict):
                 callback=on_message,
                 decoder=amqp_decoder,
                 offset_specification=offset_spec,
-            )  # type: ignore
+            )
     else:
-        await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_spec)  # type: ignore
+        await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_spec)
 
     await consumer.run()
 

@@ -157,7 +157,8 @@ class BaseClient:
         return len(self._streams)
 
     async def remove_stream(self, stream: str):
-        self._streams.remove(stream)
+        if stream in self._streams:
+            self._streams.remove(stream)
 
     async def get_available_id(self) -> int:
         if self._current_id <= 256:
