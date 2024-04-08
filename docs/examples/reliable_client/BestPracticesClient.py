@@ -61,7 +61,7 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
 
     else:
 
-        producer = SuperStreamProducer(
+        producer = SuperStreamProducer(  # type: ignore
             host=host,
             username=username,
             password=password,
@@ -131,7 +131,7 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
 
     else:
 
-        consumer = SuperStreamConsumer(
+        consumer = SuperStreamConsumer(  # type: ignore
             host=host,
             username=username,
             password=password,
@@ -182,7 +182,7 @@ async def publish(rabbitmq_configuration: dict):
     producers = int(rabbitmq_configuration["Producers"])
     delay_sending_msg = int(rabbitmq_configuration["DelayDuringSendMs"])
 
-    producer = await make_producer(rabbitmq_configuration)
+    producer = await make_producer(rabbitmq_configuration)  # type: ignore
     await producer.start()
 
     # create a stream if it doesn't already exist
@@ -217,7 +217,7 @@ async def publish(rabbitmq_configuration: dict):
 
         else:
             try:
-                await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)
+                await producer.send(message=amqp_message, on_publish_confirm=_on_publish_confirm_client)  # type: ignore
             except Exception as ex:
                 print("exception while sending " + str(ex))
 
@@ -242,7 +242,7 @@ async def consume(rabbitmq_configuration: dict):
     consumers = int(rabbitmq_configuration["Consumers"])
     stream_name = rabbitmq_configuration["StreamName"]
 
-    consumer = await make_consumer(rabbitmq_configuration)
+    consumer = await make_consumer(rabbitmq_configuration)  # type: ignore
 
     # create a stream if it doesn't already exist
     if not is_super_stream_scenario:
@@ -260,7 +260,7 @@ async def consume(rabbitmq_configuration: dict):
                 offset_specification=offset_spec,
             )
     else:
-        await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_spec)
+        await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_spec)  # type: ignore
 
     await consumer.run()
 

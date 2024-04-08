@@ -3,10 +3,21 @@
 
 from importlib import metadata
 
+from .utils import FilterConfiguration, OnClosedErrorInfo
+
+try:
+    __version__ = metadata.version(__package__)
+    __license__ = metadata.metadata(__package__)["license"]
+except metadata.PackageNotFoundError:
+    __version__ = "dev"
+    __license__ = None
+
+del metadata
+
 from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
 from .compression import CompressionType  # noqa: E402
 from .constants import OffsetType  # noqa: E402; noqa: E402
-from .constants import (
+from .constants import (  # noqa: E402
     ConsumerOffsetSpecification,
     SlasMechanism,
 )
@@ -31,17 +42,6 @@ from .superstream_producer import (  # noqa: E402
     RouteType,
     SuperStreamProducer,
 )
-from .utils import FilterConfiguration, OnClosedErrorInfo
-
-try:
-    __version__ = metadata.version(__package__)
-    __license__ = metadata.metadata(__package__)["license"]
-except metadata.PackageNotFoundError:
-    __version__ = "dev"
-    __license__ = None
-
-del metadata
-
 
 __all__ = [
     "AMQPMessage",

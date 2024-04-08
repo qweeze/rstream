@@ -454,10 +454,12 @@ class Consumer:
             if stream == self._subscribers[subscriber_id].stream:
                 curr_subscriber = self._subscribers[subscriber_id]
                 curr_subscriber_id = subscriber_id
-        del self._subscribers[curr_subscriber_id]
+        if curr_subscriber_id is not None:
+            del self._subscribers[curr_subscriber_id]
 
         if stream in self._clients:
-            await self._clients[stream].free_available_id(curr_subscriber.subscription_id)
+            if curr_subscriber is not None:
+                await self._clients[stream].free_available_id(curr_subscriber.subscription_id)
             await self._clients[stream].close()
             del self._clients[stream]
 
@@ -519,7 +521,8 @@ class Consumer:
 
         if stream in self._clients:
             await self._clients[stream].remove_stream(stream)
-            await self._clients[stream].free_available_id(curr_subscriber.subscription_id)
+            if curr_subscriber is not None:
+                await self._clients[stream].free_available_id(curr_subscriber.subscription_id)
             if await self._clients[stream].get_stream_count() == 0:
                 await self._clients[stream].close()
             del self._clients[stream]
