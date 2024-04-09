@@ -3,7 +3,7 @@ import json
 import signal
 import time
 
-# Set of import from rsteram needed for the various functionalities
+# Set of import from rstream needed for the various functionalities
 from rstream import (
     AMQPMessage,
     ConfirmationStatus,
@@ -26,11 +26,18 @@ messages_per_producer = 0
 producer: Producer
 consumer: Consumer
 
-
 # Load configuration file (appsettings.json)
 async def load_json_file(configuration_file: str) -> dict:
     data = open("./python_rstream/appsettings.json")
     return json.load(data)
+
+
+async def print_test_variables():
+    while True:
+        await asyncio.sleep(5)
+        # the number of confirmed messages should be the same as the total messages we sent
+        print("confirmed_count: " + str(confirmed_count))
+        print("message consumed: " + str(messages_consumed))
 
 
 # Routing instruction for SuperStream Producer
@@ -167,9 +174,6 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
         offset = message_context.offset
         print("Received message: {} from stream: {} - message offset: {}".format(msg, stream, offset))
 
-    if messages_consumed == (messages_per_producer * 3):
-        print("CONSUMED ALL MESSAGES PUBLISHED...")
-
 
 async def publish(rabbitmq_configuration: dict):
 
@@ -178,7 +182,7 @@ async def publish(rabbitmq_configuration: dict):
 
     stream_name = rabbitmq_configuration["StreamName"]
     is_super_stream_scenario = bool(rabbitmq_configuration["SuperStream"])
-    messages_per_producer = int(rabbitmq_configuration["MessagesPerProducer"])
+    messages_per_producer = int(rabbitmq_configuration["MessagesToSend"])
     producers = int(rabbitmq_configuration["Producers"])
     delay_sending_msg = int(rabbitmq_configuration["DelayDuringSendMs"])
 
@@ -228,11 +232,6 @@ async def publish(rabbitmq_configuration: dict):
         f"Sent {messages_per_producer} messages for each of the {producers} producers in {end_time - start_time:0.4f} seconds"
     )
 
-    # the number of confirmed messages should be the same as the total messages we sent
-    print("confirmed_count: " + str(confirmed_count))
-    print("messages_per_producer: " + str(messages_per_producer))
-    assert confirmed_count == (messages_per_producer * 3)
-
 
 async def consume(rabbitmq_configuration: dict):
 
@@ -265,7 +264,7 @@ async def consume(rabbitmq_configuration: dict):
     await consumer.run()
 
 
-async def close(producer_task: asyncio.Task, consumer_task: asyncio.Task):
+async def close(producer_task: asyncio.Task, consumer_task: asyncio.Task, printer_test_task: asyncio.Task):
 
     global producer
     global consumer
@@ -275,18 +274,23 @@ async def close(producer_task: asyncio.Task, consumer_task: asyncio.Task):
 
     producer_task.cancel()
     consumer_task.cancel()
+    printer_test_task.cancel()
 
 
 async def main():
 
     loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(close(producer_task, consumer_task)))
+    loop.add_signal_handler(
+        signal.SIGINT, lambda: asyncio.create_task(close(producer_task, consumer_task, printer_test_task))
+    )
 
     configuration = await load_json_file("appsettings.json")
     rabbitmq_configuration = configuration["RabbitMQ"]
 
     producer_task = asyncio.create_task(publish(rabbitmq_configuration))
     consumer_task = asyncio.create_task(consume(rabbitmq_configuration))
+
+    printer_test_task = asyncio.create_task(print_test_variables())
 
     await producer_task
     await consumer_task
