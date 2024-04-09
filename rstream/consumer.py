@@ -155,6 +155,7 @@ class Consumer:
                     connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
                 )
+
             leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(

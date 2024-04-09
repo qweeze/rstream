@@ -481,21 +481,28 @@ class Client(BaseClient):
         self,
         stream: str,
     ) -> tuple[schema.Broker, list[schema.Broker]]:
-        metadata_resp = await self.sync_request(
-            schema.Metadata(
-                self._corr_id_seq.next(),
-                streams=[stream],
-            ),
-            resp_schema=schema.MetadataResponse,
-        )
-        assert len(metadata_resp.metadata) == 1
-        metadata = metadata_resp.metadata[0]
-        assert metadata.name == stream
 
-        brokers = {broker.reference: broker for broker in metadata_resp.brokers}
-        leader = brokers[metadata.leader_ref]
-        replicas = [brokers[replica_ref] for replica_ref in metadata.replicas_refs]
-        return leader, replicas
+        while True:
+            metadata_resp = await self.sync_request(
+                schema.Metadata(
+                    self._corr_id_seq.next(),
+                    streams=[stream],
+                ),
+                resp_schema=schema.MetadataResponse,
+            )
+            assert len(metadata_resp.metadata) == 1
+            metadata = metadata_resp.metadata[0]
+            assert metadata.name == stream
+
+            if metadata.leader_ref == 65535:
+                await asyncio.sleep(1)
+                continue
+
+            brokers = {broker.reference: broker for broker in metadata_resp.brokers}
+            leader = brokers[metadata.leader_ref]
+            replicas = [brokers[replica_ref] for replica_ref in metadata.replicas_refs]
+
+            return leader, replicas
 
     async def subscribe(
         self,
