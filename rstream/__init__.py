@@ -16,7 +16,7 @@ del metadata
 
 from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
 from .compression import CompressionType  # noqa: E402
-from .constants import OffsetType  # noqa: E402
+from .constants import OffsetType  # noqa: E402; noqa: E402
 from .constants import (  # noqa: E402
     ConsumerOffsetSpecification,
     SlasMechanism,

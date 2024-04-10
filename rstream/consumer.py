@@ -155,6 +155,7 @@ class Consumer:
                     connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
                 )
+
             leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
@@ -180,7 +181,8 @@ class Consumer:
         client = await self._get_or_create_client(stream)
 
         # We can have multiple subscribers sharing same connection, so their ids must be distinct
-        subscription_id = len([s for s in self._subscribers.values() if s.client is client]) + 1
+        # subscription_id = len([s for s in self._subscribers.values() if s.client is client]) + 1
+        subscription_id = await client.get_available_id()
         reference = subscriber_name or f"{stream}_subscriber_{subscription_id}"
         decoder = decoder or (lambda x: x)
 
@@ -357,7 +359,7 @@ class Consumer:
 
         await subscriber.client.credit(subscriber.subscription_id, 1)
 
-        for (offset, message) in self._filter_messages(frame, subscriber, filter_value):
+        for offset, message in self._filter_messages(frame, subscriber, filter_value):
             message_context = MessageContext(self, subscriber.reference, offset, frame.timestamp)
 
             maybe_coro = subscriber.callback(subscriber.decoder(message), message_context)
@@ -366,6 +368,9 @@ class Consumer:
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
 
+        if frame.metadata_info.stream not in self._clients:
+            return
+        await self._maybe_clean_up_during_lost_connection(frame.metadata_info.stream)
         if self._on_close_handler is not None:
             metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
             result = self._on_close_handler(metadata_update_info)
@@ -445,12 +450,17 @@ class Consumer:
     async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
 
         curr_subscriber = None
+        curr_subscriber_id = None
         for subscriber_id in self._subscribers:
             if stream == self._subscribers[subscriber_id].stream:
                 curr_subscriber = self._subscribers[subscriber_id]
+                curr_subscriber_id = subscriber_id
+        if curr_subscriber_id is not None:
+            del self._subscribers[curr_subscriber_id]
 
-        # close previous clients and re-create a publisher (with a new client)
         if stream in self._clients:
+            if curr_subscriber is not None:
+                await self._clients[stream].free_available_id(curr_subscriber.subscription_id)
             await self._clients[stream].close()
             del self._clients[stream]
 
@@ -468,7 +478,7 @@ class Consumer:
             asyncio.create_task(
                 self.subscribe(
                     stream=curr_subscriber.stream,
-                    subscriber_name=curr_subscriber.reference,
+                    # subscriber_name=curr_subscriber.reference,
                     callback=curr_subscriber.callback,
                     decoder=curr_subscriber.decoder,
                     offset_specification=offset_specification,
@@ -501,3 +511,19 @@ class Consumer:
         if await (await self.default_client).get_stream_count() == 0:
             await (await self.default_client).close()
             self._default_client = None
+
+    async def _maybe_clean_up_during_lost_connection(self, stream: str):
+
+        curr_subscriber = None
+
+        for subscriber_id in self._subscribers:
+            if stream == self._subscribers[subscriber_id].stream:
+                curr_subscriber = self._subscribers[subscriber_id]
+
+        if stream in self._clients:
+            await self._clients[stream].remove_stream(stream)
+            if curr_subscriber is not None:
+                await self._clients[stream].free_available_id(curr_subscriber.subscription_id)
+            if await self._clients[stream].get_stream_count() == 0:
+                await self._clients[stream].close()
+            del self._clients[stream]
