@@ -127,7 +127,7 @@ async def test_offset_type_last(stream: str, consumer: Consumer, producer: Produ
         subscriber_name="test-subscriber",
     )
 
-    await wait_for(lambda: len(captured) > 0 and captured[-1] == b"4999")
+    await wait_for(lambda: len(captured) > 0 and captured[-1] == b"4999", 2)
     assert len(captured) < len(messages)
 
 
@@ -195,7 +195,7 @@ async def test_offset_type_timestamp(stream: str, consumer: Consumer, producer: 
         callback=lambda message, message_context: captured.append(bytes(message)),
         offset_specification=ConsumerOffsetSpecification(offset_type=OffsetType.TIMESTAMP, offset=now),
     )
-    await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000")
+    await wait_for(lambda: len(captured) > 0 and captured[0] >= b"5000", 2)
 
 
 async def test_offset_type_next(stream: str, consumer: Consumer, producer: Producer) -> None:
