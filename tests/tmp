@@ -1,0 +1,39 @@
+async def test_producer_connection_broke_using_send_batch(stream: str) -> None:
+
+    connection_broke = False
+    stream_disconnected = None
+    producer_broke: Producer
+
+    async def on_connection_closed(disconnection_info: DisconnectionErrorInfo) -> None:
+        nonlocal connection_broke
+        connection_broke = True
+        nonlocal producer_broke
+
+        nonlocal stream_disconnected
+        stream_disconnected = disconnection_info.streams.pop()
+
+        await producer_broke.close()
+
+    producer_broke = Producer(
+        "localhost",
+        username="guest",
+        password="guest",
+        connection_closed_handler=on_connection_closed,
+        connection_name="test-connection-batch",
+    )
+
+    await producer_broke.start()
+    asyncio.create_task(task_to_delete_connection("test-connection-batch"))
+
+    while connection_broke is False:
+        batch = []
+        for i in range(0, 1000):
+            batch.append(b"one")
+        await producer_broke.send_batch(stream, batch)
+        batch.clear()
+
+
+    await asyncio.sleep(1)
+
+    assert connection_broke is True
+    assert stream_disconnected == stream
