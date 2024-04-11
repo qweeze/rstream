@@ -120,7 +120,6 @@ class SuperStreamProducer:
         message: MessageT,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> None:
-
         logger.debug("Send() asynchronously with superstream")
         streams = await self._routing_strategy.route(message, self.super_stream_metadata)
         self._producer = await self._get_producer()

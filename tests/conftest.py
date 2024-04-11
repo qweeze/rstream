@@ -275,7 +275,6 @@ async def super_stream_consumer(pytestconfig, ssl_context):
 
 @pytest.fixture()
 async def super_stream_consumer_for_sac1(pytestconfig, ssl_context):
-
     consumer = SuperStreamConsumer(
         host=pytestconfig.getoption("rmq_host"),
         port=pytestconfig.getoption("rmq_port"),
@@ -314,7 +313,6 @@ async def super_stream_consumer_for_sac2(pytestconfig, ssl_context):
 
 @pytest.fixture()
 async def super_stream_consumer_for_sac3(pytestconfig, ssl_context):
-
     consumer = SuperStreamConsumer(
         host=pytestconfig.getoption("rmq_host"),
         port=pytestconfig.getoption("rmq_port"),
@@ -334,7 +332,6 @@ async def super_stream_consumer_for_sac3(pytestconfig, ssl_context):
 
 @pytest.fixture()
 async def super_stream_consumer_for_sac4(pytestconfig, ssl_context):
-
     consumer = SuperStreamConsumer(
         host=pytestconfig.getoption("rmq_host"),
         port=pytestconfig.getoption("rmq_port"),

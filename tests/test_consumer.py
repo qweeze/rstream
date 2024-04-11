@@ -534,7 +534,6 @@ async def test_callback_sync_request(stream: str, consumer: Consumer, producer: 
 
 
 async def test_consumer_connection_broke(stream: str) -> None:
-
     connection_broke = False
     stream_disconnected = None
     consumer_broke: Consumer
@@ -574,7 +573,6 @@ async def test_consumer_connection_broke(stream: str) -> None:
 
 
 async def test_super_stream_consumer_connection_broke(super_stream: str) -> None:
-
     connection_broke = False
     streams_disconnected: set[str] = set()
     consumer_broke: Consumer
@@ -624,7 +622,6 @@ async def test_super_stream_consumer_connection_broke(super_stream: str) -> None
 # Send a few messages to a superstream, consume, simulate a disconnection and check for reconnection
 # from offset 0
 async def test_super_stream_consumer_connection_broke_with_reconnect(super_stream: str) -> None:
-
     connection_broke = False
     streams_disconnected: set[str] = set()
     consumer_broke: Consumer
@@ -703,7 +700,6 @@ async def test_super_stream_consumer_connection_broke_with_reconnect(super_strea
 
 
 async def test_consume_filtering(stream: str, consumer: Consumer, producer_with_filtering: Producer) -> None:
-
     filters = ["1"]
 
     captured: list[bytes] = []
@@ -723,7 +719,6 @@ async def test_consume_filtering(stream: str, consumer: Consumer, producer_with_
     )
 
     for j in range(10):
-
         messages = []
         for i in range(50):
             application_properties = {
@@ -744,7 +739,6 @@ async def test_consume_filtering(stream: str, consumer: Consumer, producer_with_
 async def test_consume_filtering_match_unfiltered(
     stream: str, consumer: Consumer, producer: Producer
 ) -> None:
-
     filters = ["1"]
 
     captured: list[bytes] = []
@@ -764,7 +758,6 @@ async def test_consume_filtering_match_unfiltered(
     )
 
     for j in range(10):
-
         messages = []
         for i in range(50):
             application_properties = {
@@ -783,7 +776,6 @@ async def test_consume_filtering_match_unfiltered(
 
 
 async def test_consumer_metadata_update(consumer: Consumer) -> None:
-
     consumer_closed = False
     stream_disconnected = None
     stream = "test-stream-metadata-update"

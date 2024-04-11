@@ -77,7 +77,6 @@ class HashRoutingMurmurStrategy(RoutingStrategy):
         self.routingKeyExtractor: CB[Any] = routingKeyExtractor
 
     async def route(self, message: MessageT, metadata: Metadata) -> list[str]:
-
         logger.debug("route() Compute routing")
         streams = []
         key = await self.routingKeyExtractor(message)

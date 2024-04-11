@@ -132,7 +132,6 @@ class SuperStreamConsumer:
         return self._clients[stream]
 
     async def get_consumer(self, partition: str):
-
         return self._consumers[partition]
 
     async def subscribe(
@@ -147,7 +146,6 @@ class SuperStreamConsumer:
         consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
         filter_input: Optional[FilterConfiguration] = None,
     ):
-
         logger.debug("Superstream subscribe()")
         if offset_specification is None:
             offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
@@ -206,7 +204,6 @@ class SuperStreamConsumer:
         return consumer
 
     async def unsubscribe(self) -> None:
-
         logger.debug("unsubscribe(): unsubscribe superstream consumer unsubscribe all consumers")
         partitions = await self._super_stream_metadata.partitions()
         for partition in partitions:

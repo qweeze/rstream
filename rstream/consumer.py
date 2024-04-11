@@ -184,7 +184,6 @@ class Consumer:
         offset_type: OffsetType,
         offset: Optional[int],
     ) -> _Subscriber:
-
         logger.debug("_create_subscriber(): Create subscriber")
         client = await self._get_or_create_client(stream)
 
@@ -219,7 +218,6 @@ class Consumer:
         consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
         filter_input: Optional[FilterConfiguration] = None,
     ) -> str:
-
         logger.debug("Consumer subscribe()")
         if offset_specification is None:
             offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
@@ -368,7 +366,6 @@ class Consumer:
     async def _on_deliver(
         self, frame: schema.Deliver, subscriber: _Subscriber, filter_value: Optional[FilterConfiguration]
     ) -> None:
-
         if frame.subscription_id != subscriber.subscription_id:
             return
 
@@ -382,7 +379,6 @@ class Consumer:
                 await maybe_coro
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
-
         logger.debug("_on_metadata_update: On metadata update event triggered on producer")
         if frame.metadata_info.stream not in self._clients:
             return
@@ -401,7 +397,6 @@ class Consumer:
         reference: str,
         consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
     ) -> None:
-
         # event the consumer is not active, we need to send a ConsumerUpdateResponse
         # by protocol definition. the offsetType can't be null so we use OffsetTypeNext as default
         if consumer_update_listener is None:
@@ -465,7 +460,6 @@ class Consumer:
         return self._subscribers[subscriber_name].stream
 
     async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
-
         logging.debug("reconnect_stream")
         curr_subscriber = None
         curr_subscriber_id = None
@@ -505,7 +499,6 @@ class Consumer:
             )
 
     async def _check_if_filtering_is_supported(self) -> None:
-
         command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
         server_command_version: schema.FrameHandlerInfo = await (
             await self.default_client
@@ -526,13 +519,11 @@ class Consumer:
         )
 
     async def _close_locator_connection(self):
-
         if await (await self.default_client).get_stream_count() == 0:
             await (await self.default_client).close()
             self._default_client = None
 
     async def _maybe_clean_up_during_lost_connection(self, stream: str):
-
         curr_subscriber = None
 
         for subscriber_id in self._subscribers:

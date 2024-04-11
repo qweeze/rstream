@@ -17,7 +17,6 @@ def delete_exchange(exchange_name: str) -> int:
 
 
 def create_binding(exchange_name: str, routing_key: str, stream_name: str):
-
     data = {
         "routing_key": routing_key,
     }
