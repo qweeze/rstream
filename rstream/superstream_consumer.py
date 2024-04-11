@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 import ssl
 from collections import defaultdict
@@ -29,6 +30,8 @@ from .utils import FilterConfiguration, OnClosedErrorInfo
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Union[None, Awaitable[None]]], "Message callback type"]
+
+logger = logging.getLogger(__name__)
 
 
 class SuperStreamConsumer:
@@ -145,6 +148,7 @@ class SuperStreamConsumer:
         filter_input: Optional[FilterConfiguration] = None,
     ):
 
+        logger.debug("Superstream subscribe()")
         if offset_specification is None:
             offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
 
@@ -153,6 +157,7 @@ class SuperStreamConsumer:
                 connection_closed_handler=self._on_close_handler, connection_name="rstream-locator"
             )
 
+        logger.debug("subscribe(): Get _super_stream_metadata and partitions")
         self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self.default_client)
         partitions = await self._super_stream_metadata.partitions()
 
@@ -165,6 +170,7 @@ class SuperStreamConsumer:
             if consumer_partition is None:
                 return
 
+            logger.debug("subscribe(): subscribe to a partition")
             subscriber = await consumer_partition.subscribe(
                 stream=partition,
                 callback=callback,
@@ -179,6 +185,7 @@ class SuperStreamConsumer:
             self._subscribers[partition] = subscriber
 
     async def _create_consumer(self) -> Consumer:
+        logger.debug("_create_consumer(): creating consumer if not exists")
         consumer = Consumer(
             host=self.host,
             port=self.port,
@@ -200,6 +207,7 @@ class SuperStreamConsumer:
 
     async def unsubscribe(self) -> None:
 
+        logger.debug("unsubscribe(): unsubscribe superstream consumer unsubscribe all consumers")
         partitions = await self._super_stream_metadata.partitions()
         for partition in partitions:
             if self._consumers[partition] is None:

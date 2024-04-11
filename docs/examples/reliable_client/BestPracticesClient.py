@@ -1,7 +1,9 @@
 import asyncio
 import json
+import logging
 import signal
 import time
+from typing import Optional
 
 # Set of import from rstream needed for the various functionalities
 from rstream import (
@@ -23,8 +25,11 @@ from rstream import (
 confirmed_count = 0
 messages_consumed = 0
 messages_per_producer = 0
-producer: Producer
-consumer: Consumer
+producer: Optional[Producer] = None
+consumer: Optional[Consumer] = None
+
+logging.getLogger("uamqp").setLevel(logging.ERROR)
+
 
 # Load configuration file (appsettings.json)
 async def load_json_file(configuration_file: str) -> dict:
@@ -269,11 +274,14 @@ async def close(producer_task: asyncio.Task, consumer_task: asyncio.Task, printe
     global producer
     global consumer
 
-    await producer.close()
-    await consumer.close()
+    if producer is not None:
+        await producer.close()
+        producer_task.cancel()
 
-    producer_task.cancel()
-    consumer_task.cancel()
+    if consumer is not None:
+        await consumer.close()
+        consumer_task.cancel()
+
     printer_test_task.cancel()
 
 
@@ -287,13 +295,37 @@ async def main():
     configuration = await load_json_file("appsettings.json")
     rabbitmq_configuration = configuration["RabbitMQ"]
 
-    producer_task = asyncio.create_task(publish(rabbitmq_configuration))
-    consumer_task = asyncio.create_task(consume(rabbitmq_configuration))
+    log_type = rabbitmq_configuration["Logging"]
+    match log_type:
+        case "":
+            logging.basicConfig(level=logging.INFO)
+            logging.getLogger("rstream").setLevel(logging.INFO)
+        case "info":
+            logging.basicConfig(level=logging.INFO)
+            logging.getLogger("rstream").setLevel(logging.INFO)
+        case "debug":
+            logging.basicConfig(level=logging.DEBUG)
+            logging.getLogger("rstream").setLevel(logging.DEBUG)
+        case "error":
+            logging.basicConfig(level=logging.ERROR)
+            logging.getLogger("rstream").setLevel(logging.ERROR)
+
+    producer_task = None
+    consumer_task = None
+
+    if rabbitmq_configuration["Producers"] > 0:
+        producer_task = asyncio.create_task(publish(rabbitmq_configuration))
+    if rabbitmq_configuration["Consumers"] > 0:
+        consumer_task = asyncio.create_task(consume(rabbitmq_configuration))
 
     printer_test_task = asyncio.create_task(print_test_variables())
 
-    await producer_task
-    await consumer_task
+    if producer_task is not None:
+        await producer_task
+
+    if consumer_task is not None:
+        await consumer_task
 
 
+asyncio.run(main())
 asyncio.run(main())

@@ -227,7 +227,7 @@ class BaseClient:
         return resp
 
     async def start(self) -> None:
-        logger.info("Starting client %s:%s", self.host, self.port)
+        logger.debug("Starting client %s:%s", self.host, self.port)
         assert self._conn is None
         self._conn = Connection(self.host, self.port, self._ssl_context)
         await self._conn.open()
@@ -286,7 +286,7 @@ class BaseClient:
                                 await maybe_coro
 
                     except BaseException:
-                        logger.debug("Error while running handler %s of frame %s", handler, frame)
+                        logger.error("Error while running handler %s of frame %s", handler, frame)
         except (ConnectionClosed, socket.error):
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
@@ -329,7 +329,7 @@ class BaseClient:
         return "heartbeat_sender" in self._tasks
 
     async def close(self) -> None:
-        logger.info("Stopping client %s:%s", self.host, self.port)
+        logger.debug("Stopping client %s:%s", self.host, self.port)
 
         connection_is_broken = False
         if self.is_connection_alive() is False:
@@ -352,7 +352,7 @@ class BaseClient:
                     )
 
                 except asyncio.TimeoutError:
-                    logger.debug("timeout in client close() sync_request:")
+                    logger.error("timeout in client close() sync_request:")
                 except BaseException as exc:
                     logger.exception("exception in client close() sync_request", exc)
 
