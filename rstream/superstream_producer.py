@@ -3,6 +3,7 @@
 
 import logging
 import ssl
+from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Annotated,
@@ -13,6 +14,7 @@ from typing import (
     TypeVar,
 )
 
+from . import exceptions
 from .amqp import _MessageProtocol
 from .client import Client, ClientPool
 from .producer import ConfirmationStatus, Producer
@@ -37,6 +39,13 @@ class RouteType(Enum):
     Key = 1
 
 
+@dataclass
+class SuperStreamCreationOption:
+    n_partitions: int
+    binding_keys: Optional[list[str]] = None
+    arguments: Optional[dict[str, Any]] = None
+
+
 class SuperStreamProducer:
     def __init__(
         self,
@@ -48,6 +57,7 @@ class SuperStreamProducer:
         username: str,
         password: str,
         super_stream: str,
+        super_stream_creation_option: Optional[SuperStreamCreationOption] = None,
         routing_extractor: CB[Any],
         routing: RouteType = RouteType.Hash,
         frame_max: int = 1 * 1024 * 1024,
@@ -87,11 +97,11 @@ class SuperStreamProducer:
         self._default_client: Optional[Client] = None
         self._producer: Producer | None = None
         self._routing_strategy: RoutingStrategy
-        # self._on_close_handler = on_close_handler
         self._connection_name = connection_name
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
         self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
+        self.super_stream_creation_option = super_stream_creation_option
 
     async def _get_producer(self) -> Producer:
         logger.debug("_get_producer() Making or getting a producer")
@@ -128,9 +138,9 @@ class SuperStreamProducer:
             await self._producer.send(stream=stream, message=message, on_publish_confirm=on_publish_confirm)
 
     @property
-    def default_client(self) -> Client:
+    async def default_client(self) -> Client:
         if self._default_client is None:
-            raise ValueError("Producer is not started")
+            self._default_client = await self._pool.get(connection_name="rstream-locator")
         return self._default_client
 
     async def __aenter__(self):
@@ -148,6 +158,15 @@ class SuperStreamProducer:
         else:
             self._routing_strategy = RoutingKeyRoutingStrategy(self.routing_extractor)
 
+        if self.super_stream_creation_option is not None:
+            await self.create_super_stream(
+                self.super_stream,
+                self.super_stream_creation_option.n_partitions,
+                self.super_stream_creation_option.binding_keys,
+                self.super_stream_creation_option.arguments,
+                True,
+            )
+
     async def close(self) -> None:
         if self._default_client is not None:
             await self._default_client.close()
@@ -159,3 +178,50 @@ class SuperStreamProducer:
     async def stream_exists(self, stream: str) -> bool:
         producer = await self._get_producer()
         return await producer.stream_exists(stream)
+
+    async def create_super_stream(
+        self,
+        super_stream: str,
+        n_partitions: int = 0,
+        binding_keys: list[str] = None,
+        arguments: Optional[dict[str, Any]] = None,
+        exists_ok: bool = False,
+    ) -> None:
+        if binding_keys is not None and n_partitions != 0:
+            raise ValueError("Just one between n_partitions and binding_keys can be specified")
+
+        partitions = []
+        new_binding_key = []
+        if binding_keys is None:
+            for i in range(n_partitions):
+                partitions.append(super_stream + "-" + str(i))
+                new_binding_key.append(str(i))
+        else:
+            for i in range(len(binding_keys)):
+                new_binding_key = binding_keys
+                partitions.append(super_stream + "-" + binding_keys[i])
+
+        try:
+            await (await self.default_client).create_super_stream(
+                super_stream, partitions, new_binding_key, arguments
+            )
+        except exceptions.StreamAlreadyExists:
+            if not exists_ok:
+                raise
+        finally:
+            await self._close_locator_connection()
+
+    async def delete_super_stream(self, super_stream: str, missing_ok: bool = False) -> None:
+        try:
+            await (await self.default_client).delete_super_stream(super_stream)
+        except exceptions.StreamDoesNotExist:
+            if not missing_ok:
+                raise
+        finally:
+            await self._close_locator_connection()
+
+    async def _close_locator_connection(self):
+        if self._default_client is not None:
+            if await (await self.default_client).get_stream_count() == 0:
+                await (await self.default_client).close()
+                self._default_client = None

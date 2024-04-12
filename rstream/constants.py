@@ -45,6 +45,8 @@ class Key(enum.Enum):
     Partitions = 25
     ConsumerUpdate = 26
     CommandExchangeCommandVersion = 27
+    CommandCreateSuperStream = 29
+    CommandDeleteSuperStream = 30
     ConsumerUpdateRequest = 32794
 
 
