@@ -1,9 +1,13 @@
 # Copyright 2023 VMware, Inc. All Rights Reserved.
 # SPDX-License-Identifier: MIT
 
-from importlib import metadata
+"""
+isort:skip_file
+"""
 
-from .utils import FilterConfiguration, OnClosedErrorInfo
+from importlib import metadata  # noqa: E402
+
+from .utils import FilterConfiguration, OnClosedErrorInfo  # noqa: E402
 
 try:
     __version__ = metadata.version(__package__)
@@ -16,7 +20,6 @@ del metadata
 
 from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
 from .compression import CompressionType  # noqa: E402
-from .constants import OffsetType  # noqa: E402; noqa: E402
 from .constants import (  # noqa: E402
     ConsumerOffsetSpecification,
     SlasMechanism,
@@ -42,6 +45,8 @@ from .superstream_producer import (  # noqa: E402
     RouteType,
     SuperStreamProducer,
 )
+
+from .constants import OffsetType  # noqa: E402; noqa: E402
 
 __all__ = [
     "AMQPMessage",

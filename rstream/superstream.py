@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import abc
+import logging
 from typing import (
     Annotated,
     Any,
@@ -16,6 +17,8 @@ from .amqp import _MessageProtocol
 from .client import Client
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
+
+logger = logging.getLogger(__name__)
 
 MT = TypeVar("MT")
 CB = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
@@ -37,7 +40,7 @@ class DefaultSuperstreamMetadata(Metadata):
         self._routes: list[str] = []
 
     async def partitions(self) -> list[str]:
-
+        logger.debug("partitions() Get Partitions from server")
         if len(self._partitions) == 0:
             self._partitions = await self.client.partitions(self.super_stream)
             if len(self._partitions) <= 0:
@@ -74,7 +77,7 @@ class HashRoutingMurmurStrategy(RoutingStrategy):
         self.routingKeyExtractor: CB[Any] = routingKeyExtractor
 
     async def route(self, message: MessageT, metadata: Metadata) -> list[str]:
-
+        logger.debug("route() Compute routing")
         streams = []
         key = await self.routingKeyExtractor(message)
         key_bytes = bytes(key, "UTF-16")

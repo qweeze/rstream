@@ -153,7 +153,7 @@ class Producer:
             await self._check_if_filtering_is_supported()
 
     async def close(self) -> None:
-
+        logger.debug("Closing producer and cleaning up")
         # check if we are in a server disconnection situation:
         # in this case we need avoid other send
         # otherwise if is a normal close() we need to send the last item in batch
@@ -164,6 +164,7 @@ class Producer:
                 await asyncio.sleep(0.2)
                 break
 
+        logger.debug("close(): Stopping background ingestion task and publish pending items")
         if self.task is not None:
             for stream in self._buffered_messages:
                 await self._publish_buffered_messages(stream)
@@ -171,34 +172,39 @@ class Producer:
 
         self._close_called = True
 
+        logger.debug("close(): Deleting publishers and removing handlers")
         for publisher in list(self._publishers.values()):
             if publisher.client.is_connection_alive():
                 try:
                     await asyncio.wait_for(publisher.client.delete_publisher(publisher.id), 5)
                 except asyncio.TimeoutError:
-                    logger.debug("timeout when closing producer and deleting publisher")
+                    logger.error("timeout when closing producer and deleting publisher")
                 except BaseException as exc:
-                    logger.debug("exception in delete_publisher in Producer.close:", exc)
+                    logger.error("exception in delete_publisher in Producer.close:", exc)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
             publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
 
         self._publishers.clear()
 
+        logger.debug("close(): Cleaning up structures")
         await self._pool.close()
         self._clients.clear()
         self._waiting_for_confirm.clear()
         self._default_client = None
 
     async def _get_or_create_client(self, stream: str) -> Client:
+        logger.debug("_get_or_create_client()")
         if stream not in self._clients:
             if self._default_client is None or self._default_client.is_connection_alive() is False:
+                logger.debug("_get_or_create_client(): Creating locator connection")
                 self._default_client = await self._pool.get(
                     connection_closed_handler=self._on_connection_closed,
                     connection_name=self._connection_name,
                 )
             leader, _ = await (await self.default_client).query_leader_and_replicas(stream)
 
+            logger.debug("_get_or_create_client(): Getting/Creating new connection")
             self._clients[stream] = await self._pool.get(
                 connection_name=self._connection_name,
                 addr=Addr(leader.host, leader.port),
@@ -222,7 +228,7 @@ class Producer:
                 assert publisher.reference == publisher_name
             return publisher
         try:
-
+            logger.debug("_get_or_create_publisher(): Getting/Creating new publisher")
             client = await self._get_or_create_client(stream)
 
             # We can have multiple publishers sharing same connection, so their ids must be distinct
@@ -237,6 +243,7 @@ class Producer:
                 client=client,
             )
 
+            logger.debug("_get_or_create_publisher(): Declaring new publisher")
             await client.declare_publisher(
                 stream=stream,
                 reference=publisher.reference,
@@ -250,15 +257,15 @@ class Producer:
             publisher.sequence.set(sequence + 1)
 
         except StreamDoesNotExist as e:
-            logger.warning("Error in _get_or_create_publisher: stream does not exists anymore")
             await self._maybe_clean_up_during_lost_connection(stream)
+            logger.error("Error in _get_or_create_publisher: stream does not exists anymore", e)
             raise e
         except Exception as ex:
-            # traceback.print_exc()
-            logger.warning("error declaring publisher: " + str(ex))
             await self._maybe_clean_up_during_lost_connection(stream)
+            logger.error("error declaring publisher: ", ex)
             raise ex
 
+        logger.debug("_get_or_create_publisher(): Adding handlers")
         client.add_handler(
             schema.PublishConfirm,
             partial(self._on_publish_confirm, publisher=publisher),
@@ -284,6 +291,7 @@ class Producer:
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
+        logger.debug("Sending synchronously with _send_batch()")
 
         if len(batch) == 0:
             raise ValueError("Empty batch")
@@ -305,21 +313,22 @@ class Producer:
         sync: bool = True,
         timeout: Optional[int] = None,
     ) -> list[int]:
-
+        logger.debug("Internal _send_batch()")
         messages = []
         publishing_ids = set()
 
         async with self._lock:
+            logger.debug("_send_batch: Creating publisher")
             publisher = await self._get_or_create_publisher(stream, publisher_name=publisher_name)
 
         for item in batch:
-
             msg = RawMessage(item) if isinstance(item, bytes) else item
 
             if msg.publishing_id is None:
                 msg.publishing_id = publisher.sequence.next()
 
             if self._filter_value_extractor is None:
+                logger.debug("_send_batch: Not a Filtering scenario appending to messages list")
                 messages.append(
                     schema.Message(
                         publishing_id=msg.publishing_id,
@@ -328,6 +337,7 @@ class Producer:
                     )
                 )
             else:
+                logger.debug("_send_batch: Filtering scenario calling _filter_value_extractor")
                 value_filter: str = await self._filter_value_extractor(msg)
                 messages.append(
                     schema.Message(
@@ -338,8 +348,8 @@ class Producer:
                 )
 
         if len(messages) > 0:
-
             if self._filter_value_extractor is None:
+                logger.debug("_send_batch: Calling send_publish_frame version 1")
                 await publisher.client.send_publish_frame(
                     schema.Publish(
                         publisher_id=publisher.id,
@@ -348,6 +358,7 @@ class Producer:
                 )
 
             else:
+                logger.debug("_send_batch: Filtering scenario Calling send_publish_frame version 2")
                 await publisher.client.send_publish_frame(
                     schema.Publish(
                         publisher_id=publisher.id,
@@ -359,6 +370,7 @@ class Producer:
             publishing_ids.update([m.publishing_id for m in messages])
 
         if not sync:
+            logger.debug("_send_batch: Not sync case")
             if callback is not None:
                 if callback not in self._waiting_for_confirm[publisher.reference]:
                     self._waiting_for_confirm[publisher.reference][callback] = set()
@@ -367,6 +379,7 @@ class Producer:
 
         # this is just called in case of send_wait
         else:
+            logger.debug("_send_batch: sync case")
             future: asyncio.Future[None] = asyncio.Future()
             self._waiting_for_confirm[publisher.reference][future] = publishing_ids.copy()
             await asyncio.wait_for(future, timeout)
@@ -379,6 +392,8 @@ class Producer:
         stream: str,
         batch: list[_MessageNotification],
     ) -> list[int]:
+        logger.debug("Internal _send_batch_async()")
+
         if len(batch) == 0:
             raise ValueError("Empty batch")
 
@@ -390,9 +405,9 @@ class Producer:
         publishing_ids_callback: dict[CB[ConfirmationStatus], set[int]] = defaultdict(set)
 
         for item in batch:
-
             async with self._lock:
                 try:
+                    logger.debug("_send_batch_async: Getting or Creating publisher")
                     publisher = await self._get_or_create_publisher(
                         stream, publisher_name=item.publisher_name
                     )
@@ -400,12 +415,13 @@ class Producer:
                     raise ex
 
             if not isinstance(item.entry, ICompressionCodec):
-
+                logger.debug("_send_batch_async: Normal case not Compression case")
                 msg = RawMessage(item.entry) if isinstance(item.entry, bytes) else item.entry
 
                 if msg.publishing_id is None:
                     msg.publishing_id = publisher.sequence.next()
                 if self._filter_value_extractor is None:
+                    logger.debug("_send_batch_async: Filtering not active ingesting messages list")
                     messages.append(
                         schema.Message(
                             publishing_id=msg.publishing_id,
@@ -414,6 +430,7 @@ class Producer:
                         )
                     )
                 else:
+                    logger.debug("_send_batch_async: Filtering active ingesting messages list")
                     value_filter: str = await self._filter_value_extractor(msg)
                     messages.append(
                         schema.Message(
@@ -427,9 +444,11 @@ class Producer:
                     publishing_ids_callback[item.callback].add(msg.publishing_id)
 
             else:
+                logger.debug("_send_batch_async: Compression case")
                 compression_codec = item.entry
                 if len(messages) > 0:
                     if self._filter_value_extractor is None:
+                        logger.debug("_send_batch_async: Not a filtering case publishing frame")
                         await publisher.client.send_publish_frame(
                             schema.Publish(
                                 publisher_id=publisher.id,
@@ -437,6 +456,7 @@ class Producer:
                             ),
                         )
                     else:
+                        logger.debug("_send_batch_async: Filtering case ingesting messages list")
                         value_filter = await self._filter_value_extractor(msg)
                         messages.append(
                             schema.Message(
@@ -450,6 +470,7 @@ class Producer:
                 for _ in range(item.entry.messages_count()):
                     publishing_id = publisher.sequence.next()
 
+                logger.debug("_send_batch_async: PublishSubBatching")
                 await publisher.client.send_frame(
                     schema.PublishSubBatching(
                         publisher_id=publisher.id,
@@ -469,6 +490,7 @@ class Producer:
 
         if len(messages) > 0:
             if self._filter_value_extractor is None:
+                logger.debug("_send_batch_async: Not a Filtering case send_publish_frame v1")
                 await publisher.client.send_publish_frame(
                     schema.Publish(
                         publisher_id=publisher.id,
@@ -476,6 +498,7 @@ class Producer:
                     ),
                 )
             else:
+                logger.debug("_send_batch_async: Filtering case send_publish_frame v2")
                 await publisher.client.send_publish_frame(
                     schema.Publish(
                         publisher_id=publisher.id,
@@ -486,7 +509,6 @@ class Producer:
             publishing_ids.update([m.publishing_id for m in messages])
 
         for callback in publishing_ids_callback:
-
             if callback not in self._waiting_for_confirm[publisher.reference]:
                 self._waiting_for_confirm[publisher.reference][callback] = set()
 
@@ -501,7 +523,7 @@ class Producer:
         publisher_name: Optional[str] = None,
         timeout: Optional[int] = 5,
     ) -> int:
-
+        logger.debug("Sending synchronously with send_wait")
         publishing_ids = await self._send_batch(
             stream,
             [message],
@@ -512,7 +534,7 @@ class Producer:
         return publishing_ids[0]
 
     def _timer_completed(self, context):
-
+        logger.debug("Background ingestion task completed")
         if not context.cancelled():
             if context.exception():
                 raise context.exception()
@@ -526,9 +548,10 @@ class Producer:
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
-
+        logger.debug("Sending asynchronously with send()")
         # start the background thread to send buffered messages
         if self.task is None:
+            logger.debug("Creating background task")
             self.task = asyncio.create_task(self._timer())
             self.task.add_done_callback(self._timer_completed)
 
@@ -536,6 +559,7 @@ class Producer:
             entry=message, callback=on_publish_confirm, publisher_name=publisher_name
         )
         async with self._buffered_messages_lock:
+            logger.debug("Send(): Appending to buffer")
             self._buffered_messages[stream].append(wrapped_message)
 
         self._default_context_switch_counter += 1
@@ -552,6 +576,7 @@ class Producer:
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ):
+        logger.debug("Sending asynchronously with send_sub_entry()")
 
         if len(sub_entry_messages) == 0:
             raise ValueError("Empty batch")
@@ -561,6 +586,7 @@ class Producer:
 
         # start the background thread to send buffered messages
         if self.task is None:
+            logger.debug("Creating background task")
             self.task = asyncio.create_task(self._timer())
             self.task.add_done_callback(self._timer_completed)
 
@@ -570,37 +596,41 @@ class Producer:
             entry=compression_codec, callback=on_publish_confirm, publisher_name=publisher_name
         )
         async with self._buffered_messages_lock:
+            logger.debug("send_sub_entry(): Appending to buffer")
             self._buffered_messages[stream].append(wrapped_message)
 
         await asyncio.sleep(0)
 
     # After the timeout send the messages in _buffered_messages in batches
     async def _timer(self):
+        logger.debug("Background timer task created")
         try:
             while not self._close_called:
+                logger.debug("Background timer task looping for ingestion")
                 await asyncio.sleep(0.5)
                 for stream in self._buffered_messages:
                     try:
                         await self._publish_buffered_messages(stream)
                     except BaseException as exc:
-                        logger.debug("producer _timer exception: ", {exc})
+                        logger.error("producer _timer exception: ", {exc})
         except Exception as ex:
-            logger.warning("exception in _timer: " + str(ex))
+            logger.error("exception in _timer: " + str(ex))
 
     async def _publish_buffered_messages(self, stream: str) -> None:
-
+        logger.debug("publishing message with _publish_buffered_messages")
         async with self._buffered_messages_lock:
             if len(self._buffered_messages[stream]):
                 await self._send_batch_async(stream, self._buffered_messages[stream])
                 self._buffered_messages[stream].clear()
 
     async def _on_publish_confirm(self, frame: schema.PublishConfirm, publisher: _Publisher) -> None:
-
+        logger.debug("_on_publish_confirm callback: waiting for confirmations")
         if frame.publisher_id != publisher.id:
             return
 
         waiting = self._waiting_for_confirm[publisher.reference]
         for confirmation in list(waiting):
+            logger.debug("_on_publish_confirm: looping over confirmations")
             ids = waiting[confirmation]
             ids_to_call = ids.intersection(set(frame.publishing_ids))
 
@@ -612,12 +642,12 @@ class Producer:
                         await result
             ids.difference_update(frame.publishing_ids)
             if not ids:
+                logger.debug("_on_publish_confirm: set empty setting future result")
                 del waiting[confirmation]
                 if isinstance(confirmation, asyncio.Future):
                     confirmation.set_result(None)
 
     async def _on_publish_error(self, frame: schema.PublishError, publisher: _Publisher) -> None:
-
         if frame.publisher_id != publisher.id:
             return
 
@@ -642,7 +672,7 @@ class Producer:
                         confirmation.set_exception(exc)
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
-
+        logger.debug("_on_metadata_update: On metadata update event triggered on producer")
         async with self._lock:
             await self._maybe_clean_up_during_lost_connection(frame.metadata_info.stream)
 
@@ -652,7 +682,6 @@ class Producer:
         arguments: Optional[dict[str, Any]] = None,
         exists_ok: bool = False,
     ) -> None:
-
         async with self._lock:
             try:
                 await (await self.default_client).create_stream(stream, arguments)
@@ -681,7 +710,6 @@ class Producer:
                 await self._close_locator_connection()
 
     async def stream_exists(self, stream: str, on_close_event: bool = False) -> bool:
-
         async with self._lock:
             if on_close_event:
                 self._default_client = None
@@ -690,7 +718,7 @@ class Producer:
         return stream_exist
 
     async def _check_if_filtering_is_supported(self) -> None:
-
+        logger.debug("_check_if_filtering_is_supported")
         command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
         server_command_version: schema.FrameHandlerInfo = await (
             await self.default_client
@@ -714,24 +742,25 @@ class Producer:
         )
 
     async def _close_locator_connection(self):
-
         if await (await self.default_client).get_stream_count() == 0:
             await (await self.default_client).close()
             self._default_client = None
 
     async def _maybe_clean_up_during_lost_connection(self, stream: str):
+        logger.debug(
+            "_maybe_clean_up_during_lost_connection: Cleaning after disconnection or metaata update events"
+        )
 
         await asyncio.sleep(randrange(3))
 
         if stream in self._publishers:
-
             # try to delete the publisher if deadling
             try:
                 await asyncio.wait_for(
                     self._publishers[stream].client.delete_publisher(self._publishers[stream].id), 3
                 )
             except asyncio.TimeoutError:
-                logger.debug("Timeout deleting publisher in maybe_clean_up_during_lost_connection")
+                logger.error("Timeout deleting publisher in maybe_clean_up_during_lost_connection")
             if self._publishers[stream].client.is_connection_alive():
                 await self._publishers[stream].client.remove_stream(stream)
                 await self._publishers[stream].client.free_available_id(self._publishers[stream].id)
@@ -746,6 +775,7 @@ class Producer:
 
     # this is notified by the client when a disconnection happens in order to cleanup handlers
     async def _on_connection_closed(self, disconnection_info: OnClosedErrorInfo) -> None:
+        logger.debug("_on_connection_closed: Notification of socket disconnections")
         async with self._lock:
             for stream in disconnection_info.streams:
                 await self._maybe_clean_up_during_lost_connection(stream)

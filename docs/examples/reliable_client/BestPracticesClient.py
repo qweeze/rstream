@@ -1,7 +1,9 @@
 import asyncio
 import json
+import logging
 import signal
 import time
+from typing import Optional
 
 # Set of import from rstream needed for the various functionalities
 from rstream import (
@@ -23,8 +25,11 @@ from rstream import (
 confirmed_count = 0
 messages_consumed = 0
 messages_per_producer = 0
-producer: Producer
-consumer: Consumer
+producer: Optional[Producer] = None
+consumer: Optional[Consumer] = None
+
+logging.getLogger("uamqp").setLevel(logging.ERROR)
+
 
 # Load configuration file (appsettings.json)
 async def load_json_file(configuration_file: str) -> dict:
@@ -56,7 +61,6 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
     stream_name = rabbitmq_data["StreamName"]
 
     if bool(rabbitmq_data["SuperStream"]) is False:
-
         producer = Producer(
             host=host,
             username=username,
@@ -67,7 +71,6 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
         )
 
     else:
-
         producer = SuperStreamProducer(  # type: ignore
             host=host,
             username=username,
@@ -85,7 +88,6 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
 
 # metadata and disconnection events for consumers
 async def on_close_connection(on_closed_info: OnClosedErrorInfo) -> None:
-
     print(
         "connection has been closed from stream: "
         + str(on_closed_info.streams)
@@ -100,7 +102,8 @@ async def on_close_connection(on_closed_info: OnClosedErrorInfo) -> None:
         while True:
             try:
                 print("reconnecting stream: {}".format(stream))
-                await consumer.reconnect_stream(stream)
+                if consumer is not None:
+                    await consumer.reconnect_stream(stream)
                 break
             except Exception as ex:
                 if backoff > 32:
@@ -115,7 +118,6 @@ async def on_close_connection(on_closed_info: OnClosedErrorInfo) -> None:
 
 # Make consumers
 async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
-
     host = rabbitmq_data["Host"]
     username = rabbitmq_data["Username"]
     password = rabbitmq_data["Password"]
@@ -125,7 +127,6 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
     stream_name = rabbitmq_data["StreamName"]
 
     if bool(rabbitmq_data["SuperStream"]) is False:
-
         consumer = Consumer(
             host=host,
             username=username,
@@ -137,7 +138,6 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
         )
 
     else:
-
         consumer = SuperStreamConsumer(  # type: ignore
             host=host,
             username=username,
@@ -176,7 +176,6 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 
 
 async def publish(rabbitmq_configuration: dict):
-
     global producer
     global messages_per_producer
 
@@ -187,12 +186,13 @@ async def publish(rabbitmq_configuration: dict):
     delay_sending_msg = int(rabbitmq_configuration["DelayDuringSendMs"])
 
     producer = await make_producer(rabbitmq_configuration)  # type: ignore
-    await producer.start()
+    if producer is not None:
+        await producer.start()
 
     # create a stream if it doesn't already exist
     if not is_super_stream_scenario:
         for p in range(producers):
-            await producer.create_stream(stream_name + "-" + str(p), exists_ok=True)
+            await producer.create_stream(stream_name + "-" + str(p), exists_ok=True)  # type: ignore
 
     start_time = time.perf_counter()
 
@@ -211,7 +211,7 @@ async def publish(rabbitmq_configuration: dict):
         if not is_super_stream_scenario:
             for p in range(producers):
                 try:
-                    await producer.send(
+                    await producer.send(  # type: ignore
                         stream=stream_name + "-" + str(p),
                         message=amqp_message,
                         on_publish_confirm=_on_publish_confirm_client,
@@ -225,7 +225,7 @@ async def publish(rabbitmq_configuration: dict):
             except Exception as ex:
                 print("exception while sending " + str(ex))
 
-    await producer.close()
+    await producer.close()  # type: ignore
 
     end_time = time.perf_counter()
     print(
@@ -234,7 +234,6 @@ async def publish(rabbitmq_configuration: dict):
 
 
 async def consume(rabbitmq_configuration: dict):
-
     global consumer
 
     is_super_stream_scenario = bool(rabbitmq_configuration["SuperStream"])
@@ -246,13 +245,13 @@ async def consume(rabbitmq_configuration: dict):
     # create a stream if it doesn't already exist
     if not is_super_stream_scenario:
         for p in range(consumers):
-            await consumer.create_stream(stream_name + "-" + str(p), exists_ok=True)
+            await consumer.create_stream(stream_name + "-" + str(p), exists_ok=True)  # type: ignore
 
     offset_spec = ConsumerOffsetSpecification(OffsetType.FIRST, None)
-    await consumer.start()
+    await consumer.start()  # type: ignore
     if not is_super_stream_scenario:
         for c in range(consumers):
-            await consumer.subscribe(
+            await consumer.subscribe(  # type: ignore
                 stream=stream_name + "-" + str(c),
                 callback=on_message,
                 decoder=amqp_decoder,
@@ -261,24 +260,25 @@ async def consume(rabbitmq_configuration: dict):
     else:
         await consumer.subscribe(callback=on_message, decoder=amqp_decoder, offset_specification=offset_spec)  # type: ignore
 
-    await consumer.run()
+    await consumer.run()  # type: ignore
 
 
 async def close(producer_task: asyncio.Task, consumer_task: asyncio.Task, printer_test_task: asyncio.Task):
-
     global producer
     global consumer
 
-    await producer.close()
-    await consumer.close()
+    if producer is not None:
+        await producer.close()
+        producer_task.cancel()
 
-    producer_task.cancel()
-    consumer_task.cancel()
+    if consumer is not None:
+        await consumer.close()
+        consumer_task.cancel()
+
     printer_test_task.cancel()
 
 
 async def main():
-
     loop = asyncio.get_event_loop()
     loop.add_signal_handler(
         signal.SIGINT, lambda: asyncio.create_task(close(producer_task, consumer_task, printer_test_task))
@@ -287,13 +287,37 @@ async def main():
     configuration = await load_json_file("appsettings.json")
     rabbitmq_configuration = configuration["RabbitMQ"]
 
-    producer_task = asyncio.create_task(publish(rabbitmq_configuration))
-    consumer_task = asyncio.create_task(consume(rabbitmq_configuration))
+    # match not supported by mypy we need to fall back to if... else...
+    log_type = rabbitmq_configuration["Logging"]
+    if log_type == "":
+        logging.basicConfig(level=logging.INFO)
+        logging.getLogger("rstream").setLevel(logging.INFO)
+    elif log_type == "info":
+        logging.basicConfig(level=logging.INFO)
+        logging.getLogger("rstream").setLevel(logging.INFO)
+    elif log_type == "debug":
+        logging.basicConfig(level=logging.DEBUG)
+        logging.getLogger("rstream").setLevel(logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.ERROR)
+        logging.getLogger("rstream").setLevel(logging.ERROR)
+
+    producer_task = None
+    consumer_task = None
+
+    if rabbitmq_configuration["Producers"] > 0:
+        producer_task = asyncio.create_task(publish(rabbitmq_configuration))
+    if rabbitmq_configuration["Consumers"] > 0:
+        consumer_task = asyncio.create_task(consume(rabbitmq_configuration))
 
     printer_test_task = asyncio.create_task(print_test_variables())
 
-    await producer_task
-    await consumer_task
+    if producer_task is not None:
+        await producer_task
+
+    if consumer_task is not None:
+        await consumer_task
 
 
+asyncio.run(main())
 asyncio.run(main())

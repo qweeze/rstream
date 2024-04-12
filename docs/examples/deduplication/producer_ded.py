@@ -9,7 +9,6 @@ LOOP_2 = 1000
 
 
 async def publish():
-
     async with Producer("localhost", username="guest", password="guest") as producer:
         # create a stream if it doesn't already exist
         await producer.create_stream(STREAM, exists_ok=True)
@@ -19,7 +18,6 @@ async def publish():
 
         for j in range(LOOP_1):
             for i in range(LOOP_2):
-
                 await producer.send(
                     STREAM,
                     # just 1000 messages will be inserted as messages with the same publishing_id and publisher_name will be discarded

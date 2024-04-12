@@ -1,6 +1,7 @@
 # Copyright 2023 VMware, Inc. All Rights Reserved.
 # SPDX-License-Identifier: MIT
 
+import logging
 import ssl
 from enum import Enum
 from typing import (
@@ -27,6 +28,8 @@ CB = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
 CB_F = Annotated[Callable[[MT], Awaitable[Any]], "Message callback type"]
 
 MessageT = TypeVar("MessageT", _MessageProtocol, bytes)
+
+logger = logging.getLogger(__name__)
 
 
 class RouteType(Enum):
@@ -91,6 +94,7 @@ class SuperStreamProducer:
         self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
 
     async def _get_producer(self) -> Producer:
+        logger.debug("_get_producer() Making or getting a producer")
         if self._producer is None:
             producer = Producer(
                 host=self.host,
@@ -116,7 +120,7 @@ class SuperStreamProducer:
         message: MessageT,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> None:
-
+        logger.debug("Send() asynchronously with superstream")
         streams = await self._routing_strategy.route(message, self.super_stream_metadata)
         self._producer = await self._get_producer()
 

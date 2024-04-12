@@ -227,7 +227,7 @@ class BaseClient:
         return resp
 
     async def start(self) -> None:
-        logger.info("Starting client %s:%s", self.host, self.port)
+        logger.debug("Starting client %s:%s", self.host, self.port)
         assert self._conn is None
         self._conn = Connection(self.host, self.port, self._ssl_context)
         await self._conn.open()
@@ -237,7 +237,6 @@ class BaseClient:
         self.add_handler(schema.Close, self._on_close)
 
     async def run_queue_listener_task(self, subscriber_name: str, handler: HT[FT]) -> None:
-
         if subscriber_name not in self._frames:
             self.start_task(
                 f"run_delivery_handlers_{subscriber_name}",
@@ -245,7 +244,6 @@ class BaseClient:
             )
 
     async def _run_delivery_handlers(self, subscriber_name: str, handler: HT[FT]):
-
         while self.is_connection_alive():
             frame_entry = await self._frames[subscriber_name].get()
             try:
@@ -286,7 +284,7 @@ class BaseClient:
                                 await maybe_coro
 
                     except BaseException:
-                        logger.debug("Error while running handler %s of frame %s", handler, frame)
+                        logger.error("Error while running handler %s of frame %s", handler, frame)
         except (ConnectionClosed, socket.error):
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
@@ -329,14 +327,13 @@ class BaseClient:
         return "heartbeat_sender" in self._tasks
 
     async def close(self) -> None:
-        logger.info("Stopping client %s:%s", self.host, self.port)
+        logger.debug("Stopping client %s:%s", self.host, self.port)
 
         connection_is_broken = False
         if self.is_connection_alive() is False:
             connection_is_broken = True
 
         if self._conn is not None and self.is_connection_alive():
-
             if self.is_started:
                 try:
                     await asyncio.wait_for(
@@ -352,7 +349,7 @@ class BaseClient:
                     )
 
                 except asyncio.TimeoutError:
-                    logger.debug("timeout in client close() sync_request:")
+                    logger.error("timeout in client close() sync_request:")
                 except BaseException as exc:
                     logger.exception("exception in client close() sync_request", exc)
 
@@ -481,7 +478,6 @@ class Client(BaseClient):
         self,
         stream: str,
     ) -> tuple[schema.Broker, list[schema.Broker]]:
-
         while True:
             metadata_resp = await self.sync_request(
                 schema.Metadata(
@@ -617,7 +613,6 @@ class Client(BaseClient):
         return resp.streams
 
     async def consumer_update(self, correlation_id: int, offset_specification: OffsetSpecification) -> None:
-
         await self.send_frame(
             schema.ConsumerUpdateServerResponse(
                 correlation_id=correlation_id,
@@ -641,7 +636,6 @@ class Client(BaseClient):
     async def exchange_command_version(
         self, command_info: schema.FrameHandlerInfo
     ) -> schema.FrameHandlerInfo:
-
         command_versions_input = []
         command_versions_input.append(command_info)
         resp = await self.sync_request(

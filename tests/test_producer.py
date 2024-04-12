@@ -73,7 +73,7 @@ async def test_publishing_several_messages(stream: str, producer: Producer, cons
     for i in range(0, 100000):
         await producer.send(stream, b"one")
 
-    await wait_for(lambda: len(captured) == 100000)
+    await wait_for(lambda: len(captured) == 100000, 2)
 
 
 async def test_publishing_several_messages_different_streams(
@@ -93,8 +93,8 @@ async def test_publishing_several_messages_different_streams(
     for i in range(0, 100000):
         await producer.send(stream2, b"one")
 
-    await wait_for(lambda: len(captured_stream_1) == 100000)
-    await wait_for(lambda: len(captured_stream_2) == 100000)
+    await wait_for(lambda: len(captured_stream_1) == 100000, 2)
+    await wait_for(lambda: len(captured_stream_2) == 100000, 2)
 
 
 async def test_publishing_sequence_subbatching_nocompression(
@@ -282,7 +282,6 @@ async def test_concurrent_publish_async(stream: str, producer: Producer, consume
 
 
 async def test_send_async_confirmation(stream: str, producer: Producer) -> None:
-
     confirmed_messages: list[int] = []
     errored_messages: list[int] = []
 
@@ -305,7 +304,6 @@ async def test_send_async_confirmation(stream: str, producer: Producer) -> None:
 
 # Checks if to different sends can be registered different callbacks
 async def test_send_async_confirmation_on_different_callbacks(stream: str, producer: Producer) -> None:
-
     confirmed_messages: list[int] = []
     confirmed_messages2: list[int] = []
     errored_messages: list[int] = []
@@ -338,7 +336,6 @@ async def test_send_async_confirmation_on_different_callbacks(stream: str, produ
 
 
 async def test_send_entry_subbatch_async_confirmation(stream: str, producer: Producer) -> None:
-
     confirmed_messages: list[int] = []
     errored_messages: list[int] = []
 
@@ -437,7 +434,6 @@ async def test_publishing_sequence_superstream_binary(
 
     async def publish_with_ids(*ids):
         for _ in ids:
-
             await super_stream_producer.send(b"one")
 
     await publish_with_ids(1, 2, 3)
@@ -448,7 +444,6 @@ async def test_publishing_sequence_superstream_binary(
 async def test_publishing_sequence_superstream_with_callback(
     super_stream: str, super_stream_producer: SuperStreamProducer
 ) -> None:
-
     confirmed_messages: list[int] = []
     errored_messages: list[int] = []
 
@@ -472,7 +467,6 @@ async def test_publishing_sequence_superstream_with_callback(
 
 
 async def test_producer_connection_broke(stream: str, consumer: Consumer) -> None:
-
     producer_broke: Producer
 
     producer_broke = Producer(
@@ -505,7 +499,6 @@ async def test_producer_connection_broke(stream: str, consumer: Consumer) -> Non
 
 
 async def test_super_stream_producer_connection_broke(super_stream: str, consumer: Consumer) -> None:
-
     producer_broke: Producer
 
     super_stream_producer_broke = SuperStreamProducer(

@@ -46,7 +46,6 @@ async def consumer_update_handler_offset(is_active: bool, event_context: EventCo
 
 async def consume():
     try:
-
         print("Starting Super Stream Consumer")
         consumer = SuperStreamConsumer(
             host="localhost",

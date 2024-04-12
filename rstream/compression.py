@@ -100,7 +100,6 @@ class GzipCompressionCodec(ICompressionCodec):
     buffer: bytes = bytes()
 
     def compress(self, messages: list[MessageT]):
-
         uncompressed_data = bytes()
         for item in messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
@@ -114,7 +113,6 @@ class GzipCompressionCodec(ICompressionCodec):
         self.compressed_data_size = len(self.buffer)
 
     def uncompress(self, compressed_data: bytes, uncompressed_data_size: int) -> bytes:
-
         uncompressed_data = gzip.decompress(compressed_data)
 
         if len(uncompressed_data) != uncompressed_data_size:

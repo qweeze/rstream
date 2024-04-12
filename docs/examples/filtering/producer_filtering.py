@@ -12,7 +12,6 @@ async def filter_value_extractor(message: AMQPMessage) -> str:
 
 
 async def publish():
-
     async with Producer(
         "localhost", username="guest", password="guest", filter_value_extractor=filter_value_extractor
     ) as producer:

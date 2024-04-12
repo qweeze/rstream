@@ -133,12 +133,15 @@ class Consumer:
         self._stop_event.set()
 
     async def close(self) -> None:
+        logger.debug("Closing Consumer and clean up")
         self.stop()
 
+        logger.debug("close(): Unsubscribe subscribers")
         for subscriber in list(self._subscribers.values()):
             if subscriber.client.is_connection_alive():
                 await self.unsubscribe(subscriber.reference)
 
+        logger.debug("close(): Cleaning up structs")
         self._subscribers.clear()
 
         await self._pool.close()
@@ -149,8 +152,10 @@ class Consumer:
         await self._stop_event.wait()
 
     async def _get_or_create_client(self, stream: str) -> Client:
+        logger.debug("_get_or_create_client(): Get or create new client/connection")
         if stream not in self._clients:
             if self._default_client is None:
+                logger.debug("_get_or_create_client(): Creating locator connection")
                 self._default_client = await self._pool.get(
                     connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
@@ -158,6 +163,7 @@ class Consumer:
 
             leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
+            logger.debug("_get_or_create_client(): Getting/Creating connection")
             self._clients[stream] = await self._pool.get(
                 addr=Addr(broker.host, broker.port),
                 connection_closed_handler=self._on_close_handler,
@@ -178,6 +184,7 @@ class Consumer:
         offset_type: OffsetType,
         offset: Optional[int],
     ) -> _Subscriber:
+        logger.debug("_create_subscriber(): Create subscriber")
         client = await self._get_or_create_client(stream)
 
         # We can have multiple subscribers sharing same connection, so their ids must be distinct
@@ -211,11 +218,12 @@ class Consumer:
         consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
         filter_input: Optional[FilterConfiguration] = None,
     ) -> str:
-
+        logger.debug("Consumer subscribe()")
         if offset_specification is None:
             offset_specification = ConsumerOffsetSpecification(OffsetType.FIRST, None)
 
         async with self._lock:
+            logger.debug("subscribe(): Create subscriber")
             subscriber = await self._create_subscriber(
                 stream=stream,
                 subscriber_name=subscriber_name,
@@ -230,6 +238,7 @@ class Consumer:
                 handler=partial(self._on_deliver, subscriber=subscriber, filter_value=filter_input),
             )
 
+        logger.debug("subscribe(): Adding handlers")
         subscriber.client.add_handler(
             schema.Deliver,
             partial(self._on_deliver, subscriber=subscriber, filter_value=filter_input),
@@ -245,6 +254,7 @@ class Consumer:
         # to handle single-active-consumer
         if properties is not None:
             if "single-active-consumer" in properties:
+                logger.debug("subscribe(): Enabling SAC")
                 subscriber.client.add_handler(
                     schema.ConsumerUpdateResponse,
                     partial(
@@ -257,6 +267,7 @@ class Consumer:
                 )
 
         if filter_input is not None:
+            logger.debug("subscribe(): Filtering scenario enabled")
             await self._check_if_filtering_is_supported()
             values_to_filter = filter_input.values()
             if len(values_to_filter) <= 0:
@@ -272,6 +283,7 @@ class Consumer:
             else:
                 properties[SUBSCRIPTION_PROPERTY_MATCH_UNFILTERED] = "false"
 
+        logger.debug("subscribe(): Subscribing")
         await subscriber.client.subscribe(
             stream=stream,
             subscription_id=subscriber.subscription_id,
@@ -285,6 +297,7 @@ class Consumer:
         return subscriber.reference
 
     async def unsubscribe(self, subscriber_name: str) -> None:
+        logger.debug("unsubscribe(): UnSubscribing and removing handlers")
         subscriber = self._subscribers[subscriber_name]
         subscriber.client.remove_handler(
             schema.Deliver,
@@ -297,9 +310,9 @@ class Consumer:
         try:
             await asyncio.wait_for(subscriber.client.unsubscribe(subscriber.subscription_id), 5)
         except asyncio.TimeoutError:
-            logger.debug("timeout when closing consumer and deleting publisher")
+            logger.error("timeout when closing consumer and deleting publisher")
         except BaseException as exc:
-            logger.debug("exception in delete_publisher in Producer.close:", exc)
+            logger.error("exception in delete_publisher in Producer.close:", exc)
 
         del self._subscribers[subscriber_name]
 
@@ -353,7 +366,6 @@ class Consumer:
     async def _on_deliver(
         self, frame: schema.Deliver, subscriber: _Subscriber, filter_value: Optional[FilterConfiguration]
     ) -> None:
-
         if frame.subscription_id != subscriber.subscription_id:
             return
 
@@ -367,11 +379,12 @@ class Consumer:
                 await maybe_coro
 
     async def _on_metadata_update(self, frame: schema.MetadataUpdate) -> None:
-
+        logger.debug("_on_metadata_update: On metadata update event triggered on producer")
         if frame.metadata_info.stream not in self._clients:
             return
         await self._maybe_clean_up_during_lost_connection(frame.metadata_info.stream)
         if self._on_close_handler is not None:
+            logger.debug("_on_metadata_update: on_close_handler provided calling")
             metadata_update_info = OnClosedErrorInfo("MetaData Update", [frame.metadata_info.stream])
             result = self._on_close_handler(metadata_update_info)
             if result is not None and inspect.isawaitable(result):
@@ -384,7 +397,6 @@ class Consumer:
         reference: str,
         consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
     ) -> None:
-
         # event the consumer is not active, we need to send a ConsumerUpdateResponse
         # by protocol definition. the offsetType can't be null so we use OffsetTypeNext as default
         if consumer_update_listener is None:
@@ -448,7 +460,7 @@ class Consumer:
         return self._subscribers[subscriber_name].stream
 
     async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
-
+        logging.debug("reconnect_stream")
         curr_subscriber = None
         curr_subscriber_id = None
         for subscriber_id in self._subscribers:
@@ -473,6 +485,7 @@ class Consumer:
             if curr_subscriber is not None:
                 offset = curr_subscriber.offset
 
+        logging.debug("reconnect_stream(): Subscribing again")
         offset_specification = ConsumerOffsetSpecification(OffsetType.OFFSET, offset)
         if curr_subscriber is not None:
             asyncio.create_task(
@@ -486,7 +499,6 @@ class Consumer:
             )
 
     async def _check_if_filtering_is_supported(self) -> None:
-
         command_version_input = schema.FrameHandlerInfo(Key.Publish.value, min_version=1, max_version=2)
         server_command_version: schema.FrameHandlerInfo = await (
             await self.default_client
@@ -507,13 +519,11 @@ class Consumer:
         )
 
     async def _close_locator_connection(self):
-
         if await (await self.default_client).get_stream_count() == 0:
             await (await self.default_client).close()
             self._default_client = None
 
     async def _maybe_clean_up_during_lost_connection(self, stream: str):
-
         curr_subscriber = None
 
         for subscriber_id in self._subscribers:

@@ -125,7 +125,6 @@ async def test_routes(client: Client, stream: str) -> None:
 
 
 async def exchange_command_versions(client: Client) -> None:
-
     expected_min_version = 1
     expected_max_version = 1
     command_version_input = schema.FrameHandlerInfo(
