@@ -310,9 +310,9 @@ class Consumer:
         try:
             await asyncio.wait_for(subscriber.client.unsubscribe(subscriber.subscription_id), 5)
         except asyncio.TimeoutError:
-            logger.error("timeout when closing consumer and deleting publisher")
+            logger.warning("timeout when closing consumer and deleting publisher")
         except BaseException as exc:
-            logger.error("exception in delete_publisher in Producer.close:", exc)
+            logger.error("exception in unsubscribe of Consumer:" + str(exc))
 
         del self._subscribers[subscriber_name]
 

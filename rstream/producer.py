@@ -178,7 +178,7 @@ class Producer:
                 try:
                     await asyncio.wait_for(publisher.client.delete_publisher(publisher.id), 5)
                 except asyncio.TimeoutError:
-                    logger.error("timeout when closing producer and deleting publisher")
+                    logger.warning("timeout when closing producer and deleting publisher")
                 except BaseException as exc:
                     logger.error("exception in delete_publisher in Producer.close:", exc)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
@@ -760,7 +760,7 @@ class Producer:
                     self._publishers[stream].client.delete_publisher(self._publishers[stream].id), 3
                 )
             except asyncio.TimeoutError:
-                logger.error("Timeout deleting publisher in maybe_clean_up_during_lost_connection")
+                logger.warning("Timeout deleting publisher in maybe_clean_up_during_lost_connection")
             if self._publishers[stream].client.is_connection_alive():
                 await self._publishers[stream].client.remove_stream(stream)
                 await self._publishers[stream].client.free_available_id(self._publishers[stream].id)

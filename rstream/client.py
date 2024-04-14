@@ -349,7 +349,7 @@ class BaseClient:
                     )
 
                 except asyncio.TimeoutError:
-                    logger.error("timeout in client close() sync_request:")
+                    logger.warning("timeout in client close() sync_request:")
                 except BaseException as exc:
                     logger.exception("exception in client close() sync_request", exc)
 
