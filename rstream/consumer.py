@@ -312,7 +312,7 @@ class Consumer:
         except asyncio.TimeoutError:
             logger.warning("timeout when closing consumer and deleting publisher")
         except BaseException as exc:
-            logger.error("exception in unsubscribe of Consumer:" + str(exc))
+            logger.warning("exception in unsubscribe of Consumer:" + str(exc))
 
         del self._subscribers[subscriber_name]
 

@@ -54,6 +54,21 @@ async def test_create_super_stream_already_exists(
         pytest.fail("Unexpected error")
 
 
+async def test_create_and_delete_severalsuper_stream(
+    super_stream: str, super_stream_producer: SuperStreamProducer
+) -> None:
+    await super_stream_producer.create_super_stream("test-super-stream1", n_partitions=3)
+    await super_stream_producer.create_super_stream(
+        "test-super-stream2", n_partitions=0, binding_keys=["0", "1", "2"]
+    )
+    await super_stream_producer.delete_super_stream("test-super-stream1")
+    await super_stream_producer.create_super_stream("test-super-stream1", n_partitions=3, exists_ok=True)
+
+    await super_stream_producer.create_super_stream("test-super-stream2", n_partitions=3, exists_ok=True)
+    await super_stream_producer.delete_super_stream("test-super-stream2")
+    await super_stream_producer.delete_super_stream("test-super-stream1")
+
+
 async def test_delete_stream_doesnt_exist(producer: Producer) -> None:
     with pytest.raises(exceptions.StreamDoesNotExist):
         await producer.delete_stream("not-existing-stream")

@@ -180,7 +180,7 @@ class Producer:
                 except asyncio.TimeoutError:
                     logger.warning("timeout when closing producer and deleting publisher")
                 except BaseException as exc:
-                    logger.error("exception in delete_publisher in Producer.close:", exc)
+                    logger.exception("exception in delete_publisher in Producer.close:", exc)
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
             publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
@@ -258,11 +258,11 @@ class Producer:
 
         except StreamDoesNotExist as e:
             await self._maybe_clean_up_during_lost_connection(stream)
-            logger.error("Error in _get_or_create_publisher: stream does not exists anymore", e)
+            logger.exception("Error in _get_or_create_publisher: stream does not exists anymore", e)
             raise e
         except Exception as ex:
             await self._maybe_clean_up_during_lost_connection(stream)
-            logger.error("error declaring publisher: ", ex)
+            logger.exception("error declaring publisher: ", ex)
             raise ex
 
         logger.debug("_get_or_create_publisher(): Adding handlers")
@@ -612,9 +612,9 @@ class Producer:
                     try:
                         await self._publish_buffered_messages(stream)
                     except BaseException as exc:
-                        logger.error("producer _timer exception: ", {exc})
+                        logger.exception("producer _timer exception: ", {exc})
         except Exception as ex:
-            logger.error("exception in _timer: " + str(ex))
+            logger.exception("exception in _timer: " + str(ex))
 
     async def _publish_buffered_messages(self, stream: str) -> None:
         logger.debug("publishing message with _publish_buffered_messages")
@@ -691,7 +691,7 @@ class Producer:
             finally:
                 await self._close_locator_connection()
 
-    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
+    async def clean_up_publishers(self, stream: str):
         if stream in self._publishers:
             publisher = self._publishers[stream]
             await publisher.client.delete_publisher(publisher.id)
@@ -699,6 +699,9 @@ class Producer:
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
             publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
             del self._publishers[stream]
+
+    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
+        await self.clean_up_publishers(stream)
 
         async with self._lock:
             try:

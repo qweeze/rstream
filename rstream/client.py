@@ -187,7 +187,7 @@ class BaseClient:
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
-                logger.debug("TCP connection closed")
+                logger.warning("TCP connection closed")
             else:
                 logger.exception("TCP connection closed")
 
@@ -200,7 +200,7 @@ class BaseClient:
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
-                logger.debug("TCP connection closed")
+                logger.warning("TCP connection closed")
             else:
                 logger.exception("TCP connection closed")
 
@@ -284,7 +284,7 @@ class BaseClient:
                                 await maybe_coro
 
                     except BaseException:
-                        logger.error("Error while running handler %s of frame %s", handler, frame)
+                        logger.exception("Error while running handler %s of frame %s", handler, frame)
         except (ConnectionClosed, socket.error):
             self._is_not_closed = False
             if self._connection_closed_handler is not None:

@@ -17,9 +17,9 @@ from rstream import (
     Producer,
     RouteType,
     SuperStreamConsumer,
+    SuperStreamCreationOption,
     SuperStreamProducer,
     amqp_decoder,
-    SuperStreamCreationOption,
 )
 
 # global variables needed by the test

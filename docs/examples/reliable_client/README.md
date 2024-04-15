@@ -28,3 +28,18 @@ After this the client can try to reconnect.
 
 As you can see in the example the Consumer and Superstream consumers take a on_close_handler callback which inside it is
 checking the stream which has been disconnected and then using the reconnect_stream in order to
+
+### Creation of super-stream
+The SuperStreamProducer class takes in input a field: super_stream_creation_option of type
+
+```
+class SuperStreamCreationOption:
+    n_partitions: int
+    binding_keys: Optional[list[str]] = None
+    arguments: Optional[dict[str, Any]] = None
+```
+
+If you want to create simple partitions you can specify the n_partitions field and leave to None the binding_keys field.
+Otherwise if you want to create the partitions based on the binding_keys you can specify this field and leave to 0 the n_partitions field
+If the super_stream specified in the super_stream field doesn't exist and super_stream_creation_option is set then it will create the super stream.
+See: https://github.com/qweeze/rstream/issues/156 for more info

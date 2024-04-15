@@ -3,6 +3,7 @@
 
 import logging
 import ssl
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -102,6 +103,8 @@ class SuperStreamProducer:
             self._connection_name = "rstream-producer"
         self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
         self.super_stream_creation_option = super_stream_creation_option
+        # is containing partitions name for every stream in case of CREATE/DELETE superstream
+        self._partitions: dict[str, list] = defaultdict(list)
 
     async def _get_producer(self) -> Producer:
         logger.debug("_get_producer() Making or getting a producer")
@@ -183,27 +186,29 @@ class SuperStreamProducer:
         self,
         super_stream: str,
         n_partitions: int = 0,
-        binding_keys: list[str] = None,
+        binding_keys: Optional[list[str]] = None,
         arguments: Optional[dict[str, Any]] = None,
         exists_ok: bool = False,
     ) -> None:
         if binding_keys is not None and n_partitions != 0:
             raise ValueError("Just one between n_partitions and binding_keys can be specified")
 
-        partitions = []
         new_binding_key = []
+        if super_stream in self._partitions:
+            del self._partitions[super_stream]
+
         if binding_keys is None:
             for i in range(n_partitions):
-                partitions.append(super_stream + "-" + str(i))
+                self._partitions[super_stream].append(super_stream + "-" + str(i))
                 new_binding_key.append(str(i))
         else:
             for i in range(len(binding_keys)):
                 new_binding_key = binding_keys
-                partitions.append(super_stream + "-" + binding_keys[i])
+                self._partitions[super_stream].append(super_stream + "-" + binding_keys[i])
 
         try:
             await (await self.default_client).create_super_stream(
-                super_stream, partitions, new_binding_key, arguments
+                super_stream, self._partitions[super_stream], new_binding_key, arguments
             )
         except exceptions.StreamAlreadyExists:
             if not exists_ok:
@@ -212,6 +217,10 @@ class SuperStreamProducer:
             await self._close_locator_connection()
 
     async def delete_super_stream(self, super_stream: str, missing_ok: bool = False) -> None:
+        producer = await self._get_producer()
+        for partition in self._partitions[super_stream]:
+            await producer.clean_up_publishers(partition)
+
         try:
             await (await self.default_client).delete_super_stream(super_stream)
         except exceptions.StreamDoesNotExist:
@@ -219,6 +228,7 @@ class SuperStreamProducer:
                 raise
         finally:
             await self._close_locator_connection()
+            del self._partitions[super_stream]
 
     async def _close_locator_connection(self):
         if self._default_client is not None:
