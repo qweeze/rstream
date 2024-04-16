@@ -7,13 +7,15 @@ Super stream example
 
 Step 1: Create the super stream (routing keys are necessary for binding keys resolution strategy):
 
-The stream is automatically created by the SuperStreamProducer constructor if it doesn't exist
+The stream is automatically created by the SuperStreamProducer/SuperStreamConsumer constructor if it doesn't exist
 
 You can specify the numer of the partitions using this struct (in line 23 of super_stream_producer.py):
 
 super_stream_creation_opt = SuperStreamCreationOption(n_partitions=3)
 
 and passing this struct to the SuperStreamProducer constructor (line 31)
+
+Same for SuperStreamConsumer
 
 Step 2: Run the Super stream producer (with hash strategy):
 

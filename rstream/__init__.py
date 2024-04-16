@@ -44,8 +44,9 @@ from .superstream_consumer import (  # noqa: E402
 from .superstream_producer import (  # noqa: E402
     RouteType,
     SuperStreamProducer,
-    SuperStreamCreationOption,
 )
+
+from .superstream import SuperStreamCreationOption  # noqa: E402; noqa: E402
 
 from .constants import OffsetType  # noqa: E402; noqa: E402
 

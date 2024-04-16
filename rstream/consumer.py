@@ -425,10 +425,13 @@ class Consumer:
             finally:
                 await self._close_locator_connection()
 
-    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
+    async def clean_up_subscribers(self, stream: str):
         for subscriber in list(self._subscribers.values()):
             if subscriber.stream == stream:
                 del self._subscribers[subscriber.reference]
+
+    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
+        await self.clean_up_subscribers(stream)
 
         async with self._lock:
             try:
