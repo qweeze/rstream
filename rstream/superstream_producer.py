@@ -154,13 +154,6 @@ class SuperStreamProducer:
         await self.close()
 
     async def start(self) -> None:
-        self._default_client = await self._pool.get(connection_name="rstream-locator")
-        self.super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self._default_client)
-        if self.routing == RouteType.Hash:
-            self._routing_strategy = HashRoutingMurmurStrategy(self.routing_extractor)
-        else:
-            self._routing_strategy = RoutingKeyRoutingStrategy(self.routing_extractor)
-
         if self.super_stream_creation_option is not None:
             await self.create_super_stream(
                 self.super_stream,
@@ -169,6 +162,12 @@ class SuperStreamProducer:
                 self.super_stream_creation_option.arguments,
                 True,
             )
+        self._default_client = await self._pool.get(connection_name="rstream-locator")
+        self.super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self._default_client)
+        if self.routing == RouteType.Hash:
+            self._routing_strategy = HashRoutingMurmurStrategy(self.routing_extractor)
+        else:
+            self._routing_strategy = RoutingKeyRoutingStrategy(self.routing_extractor)
 
     async def close(self) -> None:
         if self._default_client is not None:

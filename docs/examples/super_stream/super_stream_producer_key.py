@@ -18,6 +18,12 @@ async def routing_extractor(message: AMQPMessage) -> str:
 
 async def publish():
     # SuperStreamProducer wraps a Producer
+    # Struct used to pass information to the SuperStreamProducer
+    # in order to create a superstream
+    super_stream_creation_opt = SuperStreamCreationOption(
+        n_partitions=0, binding_keys=["key1", "key2", "key3"]
+    )
+
     async with SuperStreamProducer(
         "localhost",
         username="guest",

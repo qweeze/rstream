@@ -4,10 +4,11 @@ import time
 from rstream import (
     AMQPMessage,
     RouteType,
+    SuperStreamCreationOption,
     SuperStreamProducer,
 )
 
-SUPER_STREAM = "invoices"
+SUPER_STREAM = "invoices3"
 MESSAGES = 1000000
 
 
@@ -17,14 +18,18 @@ async def routing_extractor(message: AMQPMessage) -> str:
 
 
 async def publish():
+    # Struct used to pass information to the SuperStreamProducer
+    # in order to create a superstream
+    super_stream_creation_opt = SuperStreamCreationOption(n_partitions=3)
     # SuperStreamProducer wraps a Producer
     async with SuperStreamProducer(
-        "localhost",
+        host="localhost",
         username="guest",
         password="guest",
         routing_extractor=routing_extractor,
-        routing=RouteType.Hash,
         super_stream=SUPER_STREAM,
+        super_stream_creation_option=super_stream_creation_opt,
+        routing=RouteType.Hash,
     ) as super_stream_producer:
         # Sending a million messages
 
