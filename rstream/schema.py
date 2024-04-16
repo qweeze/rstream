@@ -172,6 +172,20 @@ class DeleteResponse(Frame, is_response=True):
 
 
 @dataclass
+class DeleteSuperStream(Frame):
+    key = Key.CommandDeleteSuperStream
+    correlation_id: int = field(metadata={"type": T.uint32})
+    super_stream: str = field(metadata={"type": T.string})
+
+
+@dataclass
+class DeleteSuperStreamResponse(Frame, is_response=True):
+    key = Key.CommandDeleteSuperStream
+    correlation_id: int = field(metadata={"type": T.uint32})
+    response_code: int = field(metadata={"type": T.uint16})
+
+
+@dataclass
 class DeclarePublisher(Frame):
     key = Key.DeclarePublisher
     correlation_id: int = field(metadata={"type": T.uint32})
@@ -581,6 +595,23 @@ class ConsumerUpdateServerResponse(Frame, is_response=True):
     correlation_id: int = field(metadata={"type": T.uint32})
     response_code: int = field(metadata={"type": T.uint16})
     offset_specification: OffsetSpecification
+
+
+@dataclass
+class CreateSuperStream(Frame):
+    key = Key.CommandCreateSuperStream
+    correlation_id: int = field(metadata={"type": T.uint32})
+    super_stream: str = field(metadata={"type": T.string})
+    partitions: list[str] = field(metadata={"type": [T.string]})
+    binding_keys: list[str] = field(metadata={"type": [T.string]})
+    arguments: list[Property]
+
+
+@dataclass
+class CreateSuperStreamResponse(Frame, is_response=True):
+    key = Key.CommandCreateSuperStream
+    correlation_id: int = field(metadata={"type": T.uint32})
+    response_code: int = field(metadata={"type": T.uint16})
 
 
 def is_struct(obj: Any) -> bool:

@@ -17,6 +17,7 @@ from rstream import (
     Producer,
     RouteType,
     SuperStreamConsumer,
+    SuperStreamCreationOption,
     SuperStreamProducer,
     amqp_decoder,
 )
@@ -71,6 +72,7 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
         )
 
     else:
+        super_stream_creation_opt = SuperStreamCreationOption(n_partitions=3)
         producer = SuperStreamProducer(  # type: ignore
             host=host,
             username=username,
@@ -79,6 +81,7 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
             vhost=vhost,
             load_balancer_mode=load_balancer,
             super_stream=stream_name,
+            super_stream_creation_option=super_stream_creation_opt,
             routing=RouteType.Hash,
             routing_extractor=routing_extractor,
         )
@@ -138,6 +141,7 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
         )
 
     else:
+        super_stream_creation_opt = SuperStreamCreationOption(n_partitions=3)
         consumer = SuperStreamConsumer(  # type: ignore
             host=host,
             username=username,
@@ -146,6 +150,7 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
             vhost=vhost,
             load_balancer_mode=load_balancer,
             super_stream=stream_name,
+            super_stream_creation_option=super_stream_creation_opt,
             on_close_handler=on_close_connection,
         )
 
@@ -319,5 +324,4 @@ async def main():
         await consumer_task
 
 
-asyncio.run(main())
 asyncio.run(main())

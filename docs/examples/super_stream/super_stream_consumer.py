@@ -1,6 +1,5 @@
 import asyncio
 import signal
-from typing import Optional
 
 from rstream import (
     AMQPMessage,
@@ -8,6 +7,7 @@ from rstream import (
     MessageContext,
     OffsetType,
     SuperStreamConsumer,
+    SuperStreamCreationOption,
     amqp_decoder,
 )
 
@@ -21,8 +21,15 @@ async def on_message(msg: AMQPMessage, message_context: MessageContext):
 
 
 async def consume():
+    super_stream_creation_opt = SuperStreamCreationOption(n_partitions=3)
     consumer = SuperStreamConsumer(
-        host="localhost", port=5552, vhost="/", username="guest", password="guest", super_stream="invoices"
+        host="localhost",
+        port=5552,
+        vhost="/",
+        username="guest",
+        password="guest",
+        super_stream="invoices",
+        super_stream_creation_option=super_stream_creation_opt,
     )
 
     loop = asyncio.get_event_loop()

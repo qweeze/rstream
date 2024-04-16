@@ -13,11 +13,6 @@ from rstream import (
 )
 from rstream.client import Client
 
-from .http_requests import (
-    create_binding,
-    create_exchange,
-    delete_exchange,
-)
 from .util import (
     filter_value_extractor,
     routing_extractor,
@@ -156,39 +151,15 @@ async def producer_with_filtering(pytestconfig, ssl_context):
 
 @pytest.fixture()
 async def super_stream(client: Client):
-    # create an exchange to connect the 3 supersteams
-    super_stream = "test-super-stream"
-    status_code = create_exchange(exchange_name=super_stream)
-    assert status_code == 201 or status_code == 204
-
-    await client.create_stream(super_stream + "-0")
-    await client.create_stream(super_stream + "-1")
-    await client.create_stream(super_stream + "-2")
-
-    # create binding with exchange
-    status_code = create_binding(
-        exchange_name=super_stream, routing_key="key1", stream_name=super_stream + "-0"
+    await client.create_super_stream(
+        "test-super-stream",
+        ["test-super-stream-0", "test-super-stream-1", "test-super-stream-2"],
+        ["key1", "key2", "key3"],
     )
-    assert status_code == 201 or status_code == 204
-    status_code = create_binding(
-        exchange_name=super_stream, routing_key="key2", stream_name=super_stream + "-1"
-    )
-    assert status_code == 201 or status_code == 204
-    status_code = create_binding(
-        exchange_name=super_stream, routing_key="key3", stream_name=super_stream + "-2"
-    )
-    assert status_code == 201 or status_code == 204
-
     try:
         yield "test-super-stream"
-    #
     finally:
-        await client.delete_stream(super_stream + "-0")
-        await client.delete_stream(super_stream + "-1")
-        await client.delete_stream(super_stream + "-2")
-
-        status_code = delete_exchange(exchange_name=super_stream)
-        assert status_code == 201 or status_code == 204
+        await client.delete_super_stream("test-super-stream")
 
 
 @pytest.fixture()

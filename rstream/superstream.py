@@ -3,11 +3,13 @@
 
 import abc
 import logging
+from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
     Awaitable,
     Callable,
+    Optional,
     TypeVar,
 )
 
@@ -91,3 +93,10 @@ class HashRoutingMurmurStrategy(RoutingStrategy):
         streams.append(stream)
 
         return streams
+
+
+@dataclass
+class SuperStreamCreationOption:
+    n_partitions: int
+    binding_keys: Optional[list[str]] = None
+    arguments: Optional[dict[str, Any]] = None

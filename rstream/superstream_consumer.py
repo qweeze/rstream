@@ -18,6 +18,7 @@ from typing import (
     Union,
 )
 
+from . import exceptions
 from .amqp import AMQPMessage
 from .client import Addr, Client, ClientPool
 from .constants import (
@@ -25,7 +26,10 @@ from .constants import (
     OffsetType,
 )
 from .consumer import Consumer, EventContext, MessageContext
-from .superstream import DefaultSuperstreamMetadata
+from .superstream import (
+    DefaultSuperstreamMetadata,
+    SuperStreamCreationOption,
+)
 from .utils import FilterConfiguration, OnClosedErrorInfo
 
 MT = TypeVar("MT")
@@ -49,6 +53,7 @@ class SuperStreamConsumer:
         load_balancer_mode: bool = False,
         max_retries: int = 20,
         super_stream: str,
+        super_stream_creation_option: Optional[SuperStreamCreationOption] = None,
         connection_name: str = None,
         on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
     ):
@@ -86,10 +91,14 @@ class SuperStreamConsumer:
         if self._connection_name is None:
             self._connection_name = "rstream-consumer"
 
+        self.super_stream_creation_option = super_stream_creation_option
+        # is containing partitions name for every stream in case of CREATE/DELETE superstream
+        self._partitions: list = []
+
     @property
-    def default_client(self) -> Client:
+    async def default_client(self) -> Client:
         if self._default_client is None:
-            raise ValueError("Consumer is not started")
+            self._default_client = await self._pool.get(connection_name="rstream-locator")
         return self._default_client
 
     async def __aenter__(self) -> SuperStreamConsumer:
@@ -100,6 +109,14 @@ class SuperStreamConsumer:
         await self.close()
 
     async def start(self) -> None:
+        if self.super_stream_creation_option is not None:
+            await self.create_super_stream(
+                self.super_stream,
+                self.super_stream_creation_option.n_partitions,
+                self.super_stream_creation_option.binding_keys,
+                self.super_stream_creation_option.arguments,
+                True,
+            )
         self._default_client = None
 
     def stop(self) -> None:
@@ -120,7 +137,7 @@ class SuperStreamConsumer:
 
     async def _get_or_create_client(self, stream: str) -> Client:
         if stream not in self._clients:
-            leader, replicas = await self.default_client.query_leader_and_replicas(stream)
+            leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
             broker = random.choice(replicas) if replicas else leader
             self._clients[stream] = await self._pool.get(
                 addr=Addr(broker.host, broker.port),
@@ -156,7 +173,7 @@ class SuperStreamConsumer:
             )
 
         logger.debug("subscribe(): Get _super_stream_metadata and partitions")
-        self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self.default_client)
+        self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self._default_client)
         partitions = await self._super_stream_metadata.partitions()
 
         for partition in partitions:
@@ -219,3 +236,62 @@ class SuperStreamConsumer:
     async def stream_exists(self, stream: str) -> bool:
         stream_exist = await self._consumers[stream].stream_exists(stream)
         return stream_exist
+
+    async def create_super_stream(
+        self,
+        super_stream: str,
+        n_partitions: int = 0,
+        binding_keys: Optional[list[str]] = None,
+        arguments: Optional[dict[str, Any]] = None,
+        exists_ok: bool = False,
+    ) -> None:
+        if binding_keys is not None and n_partitions != 0:
+            raise ValueError("Just one between n_partitions and binding_keys can be specified")
+
+        new_binding_key = []
+        partitions = []
+
+        if binding_keys is None:
+            for i in range(n_partitions):
+                partitions.append(super_stream + "-" + str(i))
+                new_binding_key.append(str(i))
+        else:
+            for i in range(len(binding_keys)):
+                new_binding_key = binding_keys
+                partitions.append(super_stream + "-" + binding_keys[i])
+
+        try:
+            await (await self.default_client).create_super_stream(
+                super_stream, partitions, new_binding_key, arguments
+            )
+        except exceptions.StreamAlreadyExists:
+            if not exists_ok:
+                raise
+        finally:
+            await self._close_locator_connection()
+            if super_stream == self.super_stream:
+                self._partitions = partitions
+
+    async def delete_super_stream(self, super_stream: str, missing_ok: bool = False) -> None:
+        # if we are deleting the super_stream connected to the SuperstreamConsumer
+        # clean up the subscribers
+        if super_stream == self.super_stream:
+            for partition in self._partitions:
+                if partition in self._consumers:
+                    consumer = self._consumers[partition]
+                    await consumer.clean_up_subscribers(partition)
+                self._partitions = []
+
+        try:
+            await (await self.default_client).delete_super_stream(super_stream)
+        except exceptions.StreamDoesNotExist:
+            if not missing_ok:
+                raise
+        finally:
+            await self._close_locator_connection()
+
+    async def _close_locator_connection(self):
+        if self._default_client is not None:
+            if await (await self.default_client).get_stream_count() == 0:
+                await (await self.default_client).close()
+                self._default_client = None

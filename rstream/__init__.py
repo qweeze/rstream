@@ -46,6 +46,8 @@ from .superstream_producer import (  # noqa: E402
     SuperStreamProducer,
 )
 
+from .superstream import SuperStreamCreationOption  # noqa: E402; noqa: E402
+
 from .constants import OffsetType  # noqa: E402; noqa: E402
 
 __all__ = [
@@ -70,4 +72,5 @@ __all__ = [
     "OnClosedErrorInfo",
     "SlasMechanism",
     "FilterConfiguration",
+    "SuperStreamCreationOption",
 ]

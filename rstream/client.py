@@ -187,7 +187,7 @@ class BaseClient:
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
-                logger.debug("TCP connection closed")
+                logger.warning("TCP connection closed")
             else:
                 logger.exception("TCP connection closed")
 
@@ -200,7 +200,7 @@ class BaseClient:
         except socket.error:
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
-                logger.debug("TCP connection closed")
+                logger.warning("TCP connection closed")
             else:
                 logger.exception("TCP connection closed")
 
@@ -284,7 +284,7 @@ class BaseClient:
                                 await maybe_coro
 
                     except BaseException:
-                        logger.error("Error while running handler %s of frame %s", handler, frame)
+                        logger.exception("Error while running handler %s of frame %s", handler, frame)
         except (ConnectionClosed, socket.error):
             self._is_not_closed = False
             if self._connection_closed_handler is not None:
@@ -349,7 +349,7 @@ class BaseClient:
                     )
 
                 except asyncio.TimeoutError:
-                    logger.error("timeout in client close() sync_request:")
+                    logger.warning("timeout in client close() sync_request:")
                 except BaseException as exc:
                     logger.exception("exception in client close() sync_request", exc)
 
@@ -452,6 +452,27 @@ class Client(BaseClient):
             resp_schema=schema.CreateResponse,
         )
 
+    async def create_super_stream(
+        self,
+        super_stream: str,
+        partitions: list[str],
+        binding_keys: list[str],
+        arguments: Optional[dict[str, Any]] = None,
+    ) -> None:
+        if arguments is None:
+            arguments = {}
+
+        await self.sync_request(
+            schema.CreateSuperStream(
+                self._corr_id_seq.next(),
+                super_stream=super_stream,
+                partitions=partitions,
+                binding_keys=binding_keys,
+                arguments=[schema.Property(key, str(val)) for key, val in arguments.items()],
+            ),
+            resp_schema=schema.CreateSuperStreamResponse,
+        )
+
     async def delete_stream(self, stream: str) -> None:
         await self.sync_request(
             schema.Delete(
@@ -459,6 +480,15 @@ class Client(BaseClient):
                 stream=stream,
             ),
             resp_schema=schema.DeleteResponse,
+        )
+
+    async def delete_super_stream(self, super_stream: str) -> None:
+        await self.sync_request(
+            schema.DeleteSuperStream(
+                self._corr_id_seq.next(),
+                super_stream=super_stream,
+            ),
+            resp_schema=schema.DeleteSuperStreamResponse,
         )
 
     async def stream_exists(self, stream: str) -> bool:

@@ -310,9 +310,9 @@ class Consumer:
         try:
             await asyncio.wait_for(subscriber.client.unsubscribe(subscriber.subscription_id), 5)
         except asyncio.TimeoutError:
-            logger.error("timeout when closing consumer and deleting publisher")
+            logger.warning("timeout when closing consumer and deleting publisher")
         except BaseException as exc:
-            logger.error("exception in delete_publisher in Producer.close:", exc)
+            logger.warning("exception in unsubscribe of Consumer:" + str(exc))
 
         del self._subscribers[subscriber_name]
 
@@ -425,10 +425,13 @@ class Consumer:
             finally:
                 await self._close_locator_connection()
 
-    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
+    async def clean_up_subscribers(self, stream: str):
         for subscriber in list(self._subscribers.values()):
             if subscriber.stream == stream:
                 del self._subscribers[subscriber.reference]
+
+    async def delete_stream(self, stream: str, missing_ok: bool = False) -> None:
+        await self.clean_up_subscribers(stream)
 
         async with self._lock:
             try:
