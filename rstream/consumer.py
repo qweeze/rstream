@@ -80,6 +80,7 @@ class Consumer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
+        max_subscribers_by_connection: int = 256,
         on_close_handler: Optional[CB_CONN[OnClosedErrorInfo]] = None,
         connection_name: str = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
@@ -108,6 +109,7 @@ class Consumer:
         self._sasl_configuration_mechanism = sasl_configuration_mechanism
         if self._connection_name is None:
             self._connection_name = "rstream-consumer"
+        self._max_subscribers_by_connection = max_subscribers_by_connection
 
     @property
     async def default_client(self) -> Client:
@@ -127,6 +129,7 @@ class Consumer:
             connection_closed_handler=self._on_close_handler,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
+            max_clients_by_connections=self._max_subscribers_by_connection,
         )
 
     def stop(self) -> None:
@@ -159,6 +162,7 @@ class Consumer:
                 self._default_client = await self._pool.get(
                     connection_closed_handler=self._on_close_handler,
                     connection_name=self._connection_name,
+                    max_clients_by_connections=self._max_subscribers_by_connection,
                 )
 
             leader, replicas = await (await self.default_client).query_leader_and_replicas(stream)
@@ -169,6 +173,7 @@ class Consumer:
                 connection_closed_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 stream=stream,
+                max_clients_by_connections=self._max_subscribers_by_connection,
             )
 
             await self._close_locator_connection()

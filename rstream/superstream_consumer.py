@@ -52,6 +52,7 @@ class SuperStreamConsumer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
+        max_subscribers_by_connection: int = 256,
         super_stream: str,
         super_stream_creation_option: Optional[SuperStreamCreationOption] = None,
         connection_name: str = None,
@@ -94,11 +95,15 @@ class SuperStreamConsumer:
         self.super_stream_creation_option = super_stream_creation_option
         # is containing partitions name for every stream in case of CREATE/DELETE superstream
         self._partitions: list = []
+        self._max_subscribers_by_connection = max_subscribers_by_connection
 
     @property
     async def default_client(self) -> Client:
         if self._default_client is None:
-            self._default_client = await self._pool.get(connection_name="rstream-locator")
+            self._default_client = await self._pool.get(
+                connection_name="rstream-locator",
+                max_clients_by_connections=self._max_subscribers_by_connection,
+            )
         return self._default_client
 
     async def __aenter__(self) -> SuperStreamConsumer:
@@ -144,6 +149,7 @@ class SuperStreamConsumer:
                 connection_closed_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 stream=stream,
+                max_clients_by_connections=self._max_subscribers_by_connection,
             )
 
         return self._clients[stream]
@@ -214,6 +220,7 @@ class SuperStreamConsumer:
             max_retries=self.max_retries,
             on_close_handler=self._on_close_handler,
             connection_name=self._connection_name,
+            max_subscribers_by_connection=self._max_subscribers_by_connection,
         )
 
         await consumer.start()

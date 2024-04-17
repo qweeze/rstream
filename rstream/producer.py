@@ -82,10 +82,10 @@ class Producer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
+        max_publishers_by_connection=256,
         default_batch_publishing_delay: float = 3,
         default_context_switch_value: int = 1000,
         connection_name: str = None,
-        # on_close_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
         filter_value_extractor: Optional[CB_F[Any]] = None,
     ):
@@ -123,6 +123,7 @@ class Producer:
         self._connection_name = connection_name
         self._filter_value_extractor: Optional[CB_F[Any]] = filter_value_extractor
         self.publisher_id = 0
+        self._max_publishers_by_connection = max_publishers_by_connection
 
         if self._connection_name is None:
             self._connection_name = "rstream-producer"
@@ -146,6 +147,7 @@ class Producer:
             connection_closed_handler=self._on_connection_closed,
             connection_name=self._connection_name,
             sasl_configuration_mechanism=self._sasl_configuration_mechanism,
+            max_clients_by_connections=self._max_publishers_by_connection,
         )
 
         # Check if the filtering is supported by the server
@@ -201,6 +203,7 @@ class Producer:
                 self._default_client = await self._pool.get(
                     connection_closed_handler=self._on_connection_closed,
                     connection_name=self._connection_name,
+                    max_clients_by_connections=self._max_publishers_by_connection,
                 )
             leader, _ = await (await self.default_client).query_leader_and_replicas(stream)
 
@@ -211,6 +214,7 @@ class Producer:
                 connection_closed_handler=self._on_connection_closed,
                 stream=stream,
                 sasl_configuration_mechanism=self._sasl_configuration_mechanism,
+                max_clients_by_connections=self._max_publishers_by_connection,
             )
 
             await self._close_locator_connection()
