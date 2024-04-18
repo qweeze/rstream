@@ -108,8 +108,8 @@ class BaseClient:
 
         self._streams: list[str] = []
         # used to assing publish_ids and subscribe_ids
-        self._available_client_ids: list[bool] = [True for i in range(max_clients_by_connections + 1)]
-        self._current_id = 1
+        self._available_client_ids: list[bool] = [True for i in range(max_clients_by_connections)]
+        self._current_id = 0
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -164,13 +164,13 @@ class BaseClient:
             self._streams.remove(stream)
 
     async def get_available_id(self) -> int:
-        if self._current_id <= self._max_clients_by_connections:
+        if self._current_id < self._max_clients_by_connections:
             publishing_subscribing_id = self._current_id
             self._available_client_ids[publishing_subscribing_id] = False
             self._current_id = self._current_id + 1
             return publishing_subscribing_id
         else:
-            self._current_id = 1
+            self._current_id = 0
             for publishing_subscribing_id in range(self._current_id, self._max_clients_by_connections):
                 if self._available_client_ids[publishing_subscribing_id] is True:
                     self._available_client_ids[publishing_subscribing_id] = False
@@ -746,7 +746,7 @@ class ClientPool:
         # check if at least one client of desired_addr is connected
         if desired_addr in self._clients:
             for client in self._clients[desired_addr]:
-                if client.is_connection_alive() is True and await client.get_count_available_ids() > 1:
+                if client.is_connection_alive() is True and await client.get_count_available_ids() > 0:
                     if stream is not None:
                         client.add_stream(stream)
                     return client
