@@ -60,6 +60,8 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
     vhost = rabbitmq_data["Virtualhost"]
     load_balancer = bool(rabbitmq_data["LoadBalancer"])
     stream_name = rabbitmq_data["StreamName"]
+    max_publishers_by_connection = rabbitmq_data["MaxPublishersByConnection"]
+    producers = rabbitmq_data["Producers"]
 
     if bool(rabbitmq_data["SuperStream"]) is False:
         producer = Producer(
@@ -69,16 +71,18 @@ async def make_producer(rabbitmq_data: dict) -> Producer | SuperStreamProducer:
             port=port,
             vhost=vhost,
             load_balancer_mode=load_balancer,
+            max_publishers_by_connection=max_publishers_by_connection,
         )
 
     else:
-        super_stream_creation_opt = SuperStreamCreationOption(n_partitions=3)
+        super_stream_creation_opt = SuperStreamCreationOption(n_partitions=int(producers))
         producer = SuperStreamProducer(  # type: ignore
             host=host,
             username=username,
             password=password,
             port=port,
             vhost=vhost,
+            max_publishers_by_connection=max_publishers_by_connection,
             load_balancer_mode=load_balancer,
             super_stream=stream_name,
             super_stream_creation_option=super_stream_creation_opt,
@@ -128,6 +132,8 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
     vhost = rabbitmq_data["Virtualhost"]
     load_balancer = bool(rabbitmq_data["LoadBalancer"])
     stream_name = rabbitmq_data["StreamName"]
+    n_producers = rabbitmq_data["Producers"]
+    max_subscribers_by_connection = rabbitmq_data["MaxSubscribersByConnection"]
 
     if bool(rabbitmq_data["SuperStream"]) is False:
         consumer = Consumer(
@@ -138,10 +144,11 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
             vhost=vhost,
             load_balancer_mode=load_balancer,
             on_close_handler=on_close_connection,
+            max_subscribers_by_connection=max_subscribers_by_connection,
         )
 
     else:
-        super_stream_creation_opt = SuperStreamCreationOption(n_partitions=3)
+        super_stream_creation_opt = SuperStreamCreationOption(n_partitions=int(n_producers))
         consumer = SuperStreamConsumer(  # type: ignore
             host=host,
             username=username,
@@ -152,6 +159,7 @@ async def make_consumer(rabbitmq_data: dict) -> Consumer | SuperStreamConsumer:
             super_stream=stream_name,
             super_stream_creation_option=super_stream_creation_opt,
             on_close_handler=on_close_connection,
+            max_subscribers_by_connection=max_subscribers_by_connection,
         )
 
     return consumer
