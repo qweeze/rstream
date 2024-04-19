@@ -8,6 +8,7 @@ import ssl
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
+from random import randrange
 from typing import (
     Annotated,
     Any,
@@ -469,6 +470,7 @@ class Consumer:
 
     async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
         logging.debug("reconnect_stream")
+        await asyncio.sleep(randrange(3))
         curr_subscriber = None
         curr_subscriber_id = None
         for subscriber_id in self._subscribers:
