@@ -470,7 +470,6 @@ class Consumer:
 
     async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
         logging.debug("reconnect_stream")
-        await asyncio.sleep(randrange(3))
         curr_subscriber = None
         curr_subscriber_id = None
         for subscriber_id in self._subscribers:

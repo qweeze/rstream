@@ -164,19 +164,12 @@ class BaseClient:
             self._streams.remove(stream)
 
     async def get_available_id(self) -> int:
-        if self._current_id < self._max_clients_by_connections:
-            publishing_subscribing_id = self._current_id
-            self._available_client_ids[publishing_subscribing_id] = False
-            self._current_id = self._current_id + 1
-            return publishing_subscribing_id
-        else:
-            self._current_id = 0
-            for publishing_subscribing_id in range(self._current_id, self._max_clients_by_connections):
-                if self._available_client_ids[publishing_subscribing_id] is True:
-                    self._available_client_ids[publishing_subscribing_id] = False
-                    self._current_id = publishing_subscribing_id
-                    return publishing_subscribing_id
-            return self._current_id
+        for publishing_subscribing_id in range(0, self._max_clients_by_connections):
+            if self._available_client_ids[publishing_subscribing_id] is True:
+                self._available_client_ids[publishing_subscribing_id] = False
+                self._current_id = publishing_subscribing_id
+                return publishing_subscribing_id
+        return self._current_id
 
     async def get_count_available_ids(self):
         count = 0
