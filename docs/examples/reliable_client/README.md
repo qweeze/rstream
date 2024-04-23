@@ -43,3 +43,8 @@ If you want to create simple partitions you can specify the n_partitions field a
 Otherwise if you want to create the partitions based on the binding_keys you can specify this field and leave to 0 the n_partitions field
 If the super_stream specified in the super_stream field doesn't exist and super_stream_creation_option is set then it will create the super stream.
 See: https://github.com/qweeze/rstream/issues/156 for more info
+
+### Management of connections
+You can specify the parameters: MaxPublishersByConnection and MaxSubscribersByConnection in appsettings.json to speficy how many maximum publishers and subscribers can 
+share a connection.
+These parameters are then passed to the Producer and Consumer constructors
