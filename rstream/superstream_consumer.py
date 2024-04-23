@@ -52,6 +52,7 @@ class SuperStreamConsumer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
+        max_subscribers_by_connection: int = 256,
         super_stream: str,
         super_stream_creation_option: Optional[SuperStreamCreationOption] = None,
         connection_name: str = None,
@@ -83,7 +84,7 @@ class SuperStreamConsumer:
         self.heartbeat = heartbeat
         self.load_balancer_mode = load_balancer_mode
         self.max_retries = max_retries
-        self._consumers: dict[str, Consumer] = {}
+        self._consumer: Optional[Consumer] = None
         self._stop_event = asyncio.Event()
         self._subscribers: dict[str, str] = defaultdict(str)
         self._on_close_handler = on_close_handler
@@ -94,11 +95,15 @@ class SuperStreamConsumer:
         self.super_stream_creation_option = super_stream_creation_option
         # is containing partitions name for every stream in case of CREATE/DELETE superstream
         self._partitions: list = []
+        self._max_subscribers_by_connection = max_subscribers_by_connection
 
     @property
     async def default_client(self) -> Client:
         if self._default_client is None:
-            self._default_client = await self._pool.get(connection_name="rstream-locator")
+            self._default_client = await self._pool.get(
+                connection_name="rstream-locator",
+                max_clients_by_connections=self._max_subscribers_by_connection,
+            )
         return self._default_client
 
     async def __aenter__(self) -> SuperStreamConsumer:
@@ -123,9 +128,8 @@ class SuperStreamConsumer:
         self._stop_event.set()
 
     async def close(self) -> None:
-        for partition in self._consumers:
-            consumer = self._consumers[partition]
-            await consumer.close()
+        if self._consumer is not None:
+            await self._consumer.close()
 
         self.stop()
         await self._pool.close()
@@ -144,12 +148,10 @@ class SuperStreamConsumer:
                 connection_closed_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 stream=stream,
+                max_clients_by_connections=self._max_subscribers_by_connection,
             )
 
         return self._clients[stream]
-
-    async def get_consumer(self, partition: str):
-        return self._consumers[partition]
 
     async def subscribe(
         self,
@@ -176,12 +178,10 @@ class SuperStreamConsumer:
         self._super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self._default_client)
         partitions = await self._super_stream_metadata.partitions()
 
+        if self._consumer is None:
+            self._consumer = await self._create_consumer()
         for partition in partitions:
-            if partition not in self._consumers.keys():
-                consumer = await self._create_consumer()
-                self._consumers[partition] = consumer
-
-            consumer_partition: Optional[Consumer] = self._consumers.get(partition)
+            consumer_partition: Optional[Consumer] = self._consumer
             if consumer_partition is None:
                 return
 
@@ -214,6 +214,7 @@ class SuperStreamConsumer:
             max_retries=self.max_retries,
             on_close_handler=self._on_close_handler,
             connection_name=self._connection_name,
+            max_subscribers_by_connection=self._max_subscribers_by_connection,
         )
 
         await consumer.start()
@@ -224,17 +225,18 @@ class SuperStreamConsumer:
         logger.debug("unsubscribe(): unsubscribe superstream consumer unsubscribe all consumers")
         partitions = await self._super_stream_metadata.partitions()
         for partition in partitions:
-            if self._consumers[partition] is None:
-                self._consumers[partition] = await self._create_consumer()
-
-            consumer = self._consumers[partition]
-            await consumer.unsubscribe(self._subscribers[partition])
+            consumer = self._consumer
+            if consumer is not None:
+                await consumer.unsubscribe(self._subscribers[partition])
 
     async def reconnect_stream(self, stream: str, offset: Optional[int] = None) -> None:
-        await self._consumers[stream].reconnect_stream(stream, offset)
+        if self._consumer is not None:
+            await self._consumer.reconnect_stream(stream, offset)
 
     async def stream_exists(self, stream: str) -> bool:
-        stream_exist = await self._consumers[stream].stream_exists(stream)
+        stream_exist = False
+        if self._consumer is not None:
+            stream_exist = await self._consumer.stream_exists(stream)
         return stream_exist
 
     async def create_super_stream(
@@ -277,10 +279,10 @@ class SuperStreamConsumer:
         # clean up the subscribers
         if super_stream == self.super_stream:
             for partition in self._partitions:
-                if partition in self._consumers:
-                    consumer = self._consumers[partition]
+                consumer = self._consumer
+                if consumer is not None:
                     await consumer.clean_up_subscribers(partition)
-                self._partitions = []
+            self._partitions = []
 
         try:
             await (await self.default_client).delete_super_stream(super_stream)

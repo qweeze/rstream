@@ -69,6 +69,7 @@ class BaseClient:
         frame_max: int,
         heartbeat: int,
         connection_name: Optional[str] = "",
+        max_clients_by_connections=256,
         connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
     ):
@@ -103,10 +104,12 @@ class BaseClient:
 
         self._frames: dict[str, asyncio.Queue] = defaultdict(asyncio.Queue)
         self._is_not_closed: bool = True
+        self._max_clients_by_connections = max_clients_by_connections
 
         self._streams: list[str] = []
-        self._available_ids: list[bool] = [True for i in range(257)]
-        self._current_id = 1
+        # used to assing publish_ids and subscribe_ids
+        self._available_client_ids: list[bool] = [True for i in range(max_clients_by_connections)]
+        self._current_id = 0
 
     def start_task(self, name: str, coro: Awaitable[None]) -> None:
         assert name not in self._tasks
@@ -161,22 +164,22 @@ class BaseClient:
             self._streams.remove(stream)
 
     async def get_available_id(self) -> int:
-        if self._current_id <= 256:
-            publishing_id = self._current_id
-            self._available_ids[publishing_id] = False
-            self._current_id = self._current_id + 1
-            return publishing_id
-        else:
-            self._current_id = 1
-            for publishing_id in range(self._current_id, 257):
-                if self._available_ids[publishing_id] is True:
-                    self._available_ids[publishing_id] = False
-                    self._current_id = publishing_id
-                    return publishing_id
-            return self._current_id
+        for publishing_subscribing_id in range(0, self._max_clients_by_connections):
+            if self._available_client_ids[publishing_subscribing_id] is True:
+                self._available_client_ids[publishing_subscribing_id] = False
+                self._current_id = publishing_subscribing_id
+                return publishing_subscribing_id
+        return self._current_id
 
-    async def free_available_id(self, publishing_id):
-        self._available_ids[publishing_id] = True
+    async def get_count_available_ids(self):
+        count = 0
+        for slot in self._available_client_ids:
+            if slot is True:
+                count = count + 1
+        return count
+
+    async def free_available_id(self, publishing_subscribing_id):
+        self._available_client_ids[publishing_subscribing_id] = True
 
     async def send_publish_frame(self, frame: schema.Publish, version: int = 1) -> None:
         logger.debug("Sending frame: %s", frame)
@@ -712,7 +715,7 @@ class ClientPool:
 
         self._frame_max = frame_max
         self._heartbeat = heartbeat
-        self._clients: dict[Addr, Client] = {}
+        self._clients: dict[Addr, list[Client]] = defaultdict(list)
 
     async def get(
         self,
@@ -721,6 +724,7 @@ class ClientPool:
         connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         stream: Optional[str] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
+        max_clients_by_connections: int = 256,
     ) -> Client:
         """Get a client according to `addr` parameter
 
@@ -732,26 +736,40 @@ class ClientPool:
         """
         desired_addr = addr or self.addr
 
-        if desired_addr not in self._clients or self._clients[desired_addr].is_connection_alive() is False:
-            if addr and self.load_balancer_mode:
-                self._clients[desired_addr] = await self._resolve_broker(
+        # check if at least one client of desired_addr is connected
+        if desired_addr in self._clients:
+            for client in self._clients[desired_addr]:
+                if client.is_connection_alive() is True and await client.get_count_available_ids() > 0:
+                    if stream is not None:
+                        client.add_stream(stream)
+                    return client
+
+        if addr and self.load_balancer_mode:
+            self._clients[desired_addr].append(
+                await self._resolve_broker(
                     addr=desired_addr,
                     connection_closed_handler=connection_closed_handler,
                     connection_name=connection_name,
                     sasl_configuration_mechanism=sasl_configuration_mechanism,
+                    max_clients_by_connections=max_clients_by_connections,
                 )
-            else:
-                self._clients[desired_addr] = await self.new(
+            )
+        else:
+            self._clients[desired_addr].append(
+                await self.new(
                     addr=desired_addr,
                     connection_closed_handler=connection_closed_handler,
                     connection_name=connection_name,
                     sasl_configuration_mechanism=sasl_configuration_mechanism,
+                    max_clients_by_connections=max_clients_by_connections,
                 )
+            )
 
         if stream is not None:
-            self._clients[desired_addr].add_stream(stream)
-        assert self._clients[desired_addr].is_started
-        return self._clients[desired_addr]
+            self._clients[desired_addr][len(self._clients[desired_addr]) - 1].add_stream(stream)
+
+        assert self._clients[desired_addr][len(self._clients[desired_addr]) - 1].is_started
+        return self._clients[desired_addr][len(self._clients[desired_addr]) - 1]
 
     async def _resolve_broker(
         self,
@@ -759,6 +777,7 @@ class ClientPool:
         addr: Addr,
         connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
+        max_clients_by_connections: int = 256,
     ) -> Client:
         desired_host, desired_port = addr.host, str(addr.port)
 
@@ -770,6 +789,7 @@ class ClientPool:
                 connection_closed_handler=connection_closed_handler,
                 connection_name=connection_name,
                 sasl_configuration_mechanism=sasl_configuration_mechanism,
+                max_clients_by_connections=max_clients_by_connections,
             )
 
             assert client.server_properties is not None
@@ -795,6 +815,7 @@ class ClientPool:
         addr: Addr,
         connection_closed_handler: Optional[CB[OnClosedErrorInfo]] = None,
         sasl_configuration_mechanism: SlasMechanism = SlasMechanism.MechanismPlain,
+        max_clients_by_connections: int = 256,
     ) -> Client:
         host, port = addr
         client = Client(
@@ -806,6 +827,7 @@ class ClientPool:
             connection_name=connection_name,
             connection_closed_handler=connection_closed_handler,
             sasl_configuration_mechanism=sasl_configuration_mechanism,
+            max_clients_by_connections=max_clients_by_connections,
         )
         await client.start()
         await client.authenticate(
@@ -816,7 +838,8 @@ class ClientPool:
         return client
 
     async def close(self) -> None:
-        for client in list(self._clients.values()):
-            await client.close()
+        for addr in self._clients.values():
+            for client in addr:
+                await client.close()
 
         self._clients.clear()

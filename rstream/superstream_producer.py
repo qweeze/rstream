@@ -57,6 +57,7 @@ class SuperStreamProducer:
         heartbeat: int = 60,
         load_balancer_mode: bool = False,
         max_retries: int = 20,
+        max_publishers_by_connection=256,
         default_batch_publishing_delay: float = 0.2,
         connection_name: str = None,
         filter_value_extractor: Optional[CB_F[Any]] = None,
@@ -97,6 +98,7 @@ class SuperStreamProducer:
         self.super_stream_creation_option = super_stream_creation_option
         # is containing partitions name for every stream in case of CREATE/DELETE superstream (to clean up publishers)
         self._partitions: list = []
+        self._max_publishers_by_connection = max_publishers_by_connection
 
     async def _get_producer(self) -> Producer:
         logger.debug("_get_producer() Making or getting a producer")
@@ -112,9 +114,9 @@ class SuperStreamProducer:
                 heartbeat=self.heartbeat,
                 load_balancer_mode=self.load_balancer_mode,
                 default_batch_publishing_delay=self.default_batch_publishing_delay,
-                # on_close_handler=self._on_close_handler,
                 connection_name=self._connection_name,
                 filter_value_extractor=self._filter_value_extractor,
+                max_publishers_by_connection=self._max_publishers_by_connection,
             )
             await producer.start()
             self._producer = producer
@@ -154,7 +156,9 @@ class SuperStreamProducer:
                 self.super_stream_creation_option.arguments,
                 True,
             )
-        self._default_client = await self._pool.get(connection_name="rstream-locator")
+        self._default_client = await self._pool.get(
+            connection_name="rstream-locator", max_clients_by_connections=self._max_publishers_by_connection
+        )
         self.super_stream_metadata = DefaultSuperstreamMetadata(self.super_stream, self._default_client)
         if self.routing == RouteType.Hash:
             self._routing_strategy = HashRoutingMurmurStrategy(self.routing_extractor)
