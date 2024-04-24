@@ -168,9 +168,9 @@ class Producer:
 
         logger.debug("close(): Stopping background ingestion task and publish pending items")
         if self.task is not None:
+            self.task.cancel()
             for stream in self._buffered_messages:
                 await self._publish_buffered_messages(stream)
-            self.task.cancel()
 
         self._close_called = True
 
