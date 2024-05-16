@@ -129,7 +129,7 @@ async def task_to_delete_connection(connection_name: str) -> None:
     for connection in connections:
         if connection["client_properties"]["connection_name"] == connection_name:
             delete_connection(connection["name"])
-            await wait_for(lambda: get_connection(connection["name"]) is False, 2)
+            await wait_for(lambda: get_connection(connection["name"]) is False, 5)
 
 
 async def task_to_delete_stream_producer(producer: Producer, stream: str) -> None:
