@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Optional, Protocol, cast
 
-#import uamqp
+# import uamqp
 
 from ._pyamqp.message import Message
 from ._pyamqp._encode import encode_payload
 from ._pyamqp._decode import decode_payload
-
 
 
 class _MessageProtocol(Protocol):
@@ -33,7 +32,15 @@ class AMQPMessage(Message, _MessageProtocol):
 
 def amqp_decoder(data: bytes) -> AMQPMessage:
     message = decode_payload(buffer=memoryview(data))
-    return AMQPMessage(message)
+    returned_amqp_message = AMQPMessage(
+        value=message.value,
+        application_properties=message.application_properties,
+        properties=message.properties,
+        message_annotations=message.message_annotations,
+        footer=message.footer,
+        header=message.header,
+        delivery_annotations=message.delivery_annotations,
+        data=message.data,
+    )
 
-
-
+    return returned_amqp_message
