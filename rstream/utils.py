@@ -6,7 +6,7 @@ import itertools
 from dataclasses import dataclass
 from typing import Any, Callable, Generator, Optional
 
-from .amqp import AMQPMessage, _MessageProtocol
+from .amqp import Message, _MessageProtocol
 
 
 @dataclass
@@ -54,7 +54,7 @@ class FilterConfiguration:
     def __init__(
         self,
         values_to_filter: list[str],
-        predicate: Optional[Callable[[AMQPMessage], bool]] = None,
+        predicate: Optional[Callable[[Message], bool]] = None,
         match_unfiltered: bool = False,
     ):
         self._values_to_filter = values_to_filter
@@ -64,7 +64,7 @@ class FilterConfiguration:
     def values(self) -> list[str]:
         return self._values_to_filter
 
-    def post_filler(self) -> Optional[Callable[[AMQPMessage], bool]]:
+    def post_filler(self) -> Optional[Callable[[Message], bool]]:
         return self._predicate
 
     def match_unfiltered(self) -> bool:

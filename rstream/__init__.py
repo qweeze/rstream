@@ -19,6 +19,7 @@ except metadata.PackageNotFoundError:
 del metadata
 
 from .amqp import AMQPMessage, amqp_decoder  # noqa: E402
+from ._pyamqp.message import Properties
 from .compression import CompressionType  # noqa: E402
 from .constants import (  # noqa: E402
     ConsumerOffsetSpecification,
@@ -56,6 +57,7 @@ __all__ = [
     "Consumer",
     "RawMessage",
     "Producer",
+    "Properties",
     "OffsetType",
     "ConsumerOffsetSpecification",
     "ConfirmationStatus",
