@@ -775,39 +775,6 @@ files = [
 ]
 
 [[package]]
-name = "uamqp"
-version = "1.6.4"
-description = "AMQP 1.0 Client Library for Python"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "uamqp-1.6.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:a03f90b280ad4f2fad2f6d4c74f483da3727888e35ede52004d13b75f7f4078b"},
-    {file = "uamqp-1.6.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bac44c5bbda91ca11d4ee2ef36685cd4e97a6279a74bfa9efe163938192abbb1"},
-    {file = "uamqp-1.6.4-cp310-cp310-win32.whl", hash = "sha256:ca01bfb103a020e789663a1a4b75a19577c5632f25dd3c469c9e97def61f90a3"},
-    {file = "uamqp-1.6.4-cp310-cp310-win_amd64.whl", hash = "sha256:ce5dfc751ccc8956a22a269848709203e69b20aa61ed38cd32db4abc4970d2db"},
-    {file = "uamqp-1.6.4-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:e00c79c7d4c21cc4a4d6cf41d279496053f276530f858a747a2343070e96c98c"},
-    {file = "uamqp-1.6.4-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ff847e87f68e0801433f0561f12b8b2884cfdae99cee35122f9b58b26d921961"},
-    {file = "uamqp-1.6.4-cp311-cp311-win32.whl", hash = "sha256:a4213146256da9e9c9c15de149359da6fddf8939aa40d7aab4bab1ba009b9809"},
-    {file = "uamqp-1.6.4-cp311-cp311-win_amd64.whl", hash = "sha256:d29ae7ec33b4729a9c68e67717da26d355d6e2f82dd0748ba20579caf0e7e9a1"},
-    {file = "uamqp-1.6.4-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:61c4f591adbd8c8214c02386ebd9207a180c48ff30bd64fd2df0ab12ed47f831"},
-    {file = "uamqp-1.6.4-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:313f8e6e40cd9b0f0c6fa1c381361fc355686da567222b6d47665694795ec968"},
-    {file = "uamqp-1.6.4-cp37-cp37m-win32.whl", hash = "sha256:cadf0c43cca07be5580115720c56434fe966d42d8b26635b55f6a9fedb93d5ea"},
-    {file = "uamqp-1.6.4-cp37-cp37m-win_amd64.whl", hash = "sha256:5d58b7352ebee51160d5add21cafda7fccfbfcc1d7084adaaca4864b296525d1"},
-    {file = "uamqp-1.6.4-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:8a8e17acafc4d9331b176fca6a46098c411ebe6024041e8c91233394d89f2bca"},
-    {file = "uamqp-1.6.4-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:41e10eb1e008671c5f8d1970be6977769f7710238530e6c7f017ee7ceb102487"},
-    {file = "uamqp-1.6.4-cp38-cp38-win32.whl", hash = "sha256:78ae6e6ac954786fd70471dd7da404dfa530302dcfdd70c6da6dcdef64c2013d"},
-    {file = "uamqp-1.6.4-cp38-cp38-win_amd64.whl", hash = "sha256:ea0d51e35eeeada4f22325ea12adb3f2569b63d63c0f1381c843b5ef34e71a67"},
-    {file = "uamqp-1.6.4-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:376e5636c0b1d6e2c69390d30d95cabfb35a4fca11562a6324d30e248214707a"},
-    {file = "uamqp-1.6.4-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:916f8fc33b9cf1c4d2020aa94e4b91fbff54bd5d679dffe1f111601c2d441376"},
-    {file = "uamqp-1.6.4-cp39-cp39-win32.whl", hash = "sha256:a3c2d5e97ff5159acdf88dbbb0f8effabd493be07e5b8d1d785162c9080c40a9"},
-    {file = "uamqp-1.6.4-cp39-cp39-win_amd64.whl", hash = "sha256:4de3b9011f4c3f8a69868cec0a7c3f40912215fe2a44bd8563bcb2dbb89db9a7"},
-    {file = "uamqp-1.6.4.tar.gz", hash = "sha256:2183332435ef7882fad22724e3f2f63d3fd5a51c7f0c635d63487948b02e3749"},
-]
-
-[package.dependencies]
-certifi = ">=2017.4.17"
-
-[[package]]
 name = "urllib3"
 version = "2.0.2"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -838,4 +805,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "6b32b6be930a4d0562955c30def757d7a6412deae6be3b49fcf3ee7814960df8"
+content-hash = "bd3ce85ab4e4fb564a1b55cd350fd909261649aba9e091c424ba7e28b20ecc0e"
