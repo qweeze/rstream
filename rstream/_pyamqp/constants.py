@@ -3,6 +3,8 @@
 # Licensed under the MIT License. See License.txt in the project root for
 # license information.
 # --------------------------------------------------------------------------
+# type: ignore
+
 import struct
 from collections import namedtuple
 from enum import Enum

@@ -3,8 +3,14 @@
 # Licensed under the MIT License. See License.txt in the project root for
 # license information.
 # --------------------------------------------------------------------------
+# type: ignore
+
+"""
+isort:skip_file
+"""
 
 import sys
+
 # TODO: fix mypy errors for _code/_definition/__defaults__ (issue #26500)
 from collections import namedtuple
 from typing import NamedTuple, Optional
@@ -513,7 +519,7 @@ if _CAN_ADD_DOCSTRING:
 
 EndFrame = namedtuple("EndFrame", ["error"])
 EndFrame._code = 0x00000017  # type: ignore # pylint:disable=protected-access
-EndFrame._definition = (FIELD("error", ObjDefinition.error, False, None, False),)  # type: ignore # pylint:disable=protected-access
+EndFrame._definition = (FIELD("error", ObjDefinition.error, False, None, False),)  # type: ignore # pylint:disable=protected-access  # noqa: E501
 if _CAN_ADD_DOCSTRING:
     EndFrame.__doc__ = """
     END performative. End the Session.
@@ -528,7 +534,7 @@ if _CAN_ADD_DOCSTRING:
 
 CloseFrame = namedtuple("CloseFrame", ["error"])
 CloseFrame._code = 0x00000018  # type: ignore # pylint:disable=protected-access
-CloseFrame._definition = (FIELD("error", ObjDefinition.error, False, None, False),)  # type: ignore # pylint:disable=protected-access
+CloseFrame._definition = (FIELD("error", ObjDefinition.error, False, None, False),)  # type: ignore # pylint:disable=protected-access  # noqa: E501
 if _CAN_ADD_DOCSTRING:
     CloseFrame.__doc__ = """
     CLOSE performative. Signal a Connection close.
@@ -545,7 +551,7 @@ if _CAN_ADD_DOCSTRING:
 
 SASLMechanism = namedtuple("SASLMechanism", ["sasl_server_mechanisms"])
 SASLMechanism._code = 0x00000040  # type: ignore # pylint:disable=protected-access
-SASLMechanism._definition = (FIELD("sasl_server_mechanisms", AMQPTypes.symbol, True, None, True),)  # type: ignore # pylint:disable=protected-access
+SASLMechanism._definition = (FIELD("sasl_server_mechanisms", AMQPTypes.symbol, True, None, True),)  # type: ignore # pylint:disable=protected-access  # noqa: E501
 if _CAN_ADD_DOCSTRING:
     SASLMechanism.__doc__ = """
     Advertise available sasl mechanisms.
@@ -594,7 +600,7 @@ if _CAN_ADD_DOCSTRING:
 
 SASLChallenge = namedtuple("SASLChallenge", ["challenge"])
 SASLChallenge._code = 0x00000042  # type: ignore # pylint:disable=protected-access
-SASLChallenge._definition = (FIELD("challenge", AMQPTypes.binary, True, None, False),)  # type: ignore # pylint:disable=protected-access
+SASLChallenge._definition = (FIELD("challenge", AMQPTypes.binary, True, None, False),)  # type: ignore # pylint:disable=protected-access  # noqa: E501
 if _CAN_ADD_DOCSTRING:
     SASLChallenge.__doc__ = """
     Security mechanism challenge.
@@ -608,7 +614,7 @@ if _CAN_ADD_DOCSTRING:
 
 SASLResponse = namedtuple("SASLResponse", ["response"])
 SASLResponse._code = 0x00000043  # type: ignore # pylint:disable=protected-access
-SASLResponse._definition = (FIELD("response", AMQPTypes.binary, True, None, False),)  # type: ignore # pylint:disable=protected-access
+SASLResponse._definition = (FIELD("response", AMQPTypes.binary, True, None, False),)  # type: ignore # pylint:disable=protected-access  # noqa: E501
 if _CAN_ADD_DOCSTRING:
     SASLResponse.__doc__ = """
     Security mechanism response.

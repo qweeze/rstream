@@ -4,6 +4,7 @@
 # license information.
 # --------------------------------------------------------------------------
 # pylint: disable=redefined-builtin, import-error
+# type: ignore
 
 import logging
 import struct
@@ -243,10 +244,7 @@ def decode_payload(buffer: memoryview) -> Message:
         elif descriptor == 116:
             message["application_properties"] = value
         elif descriptor == 117:
-            #try:
-            #    cast(List, message["data"]).append(value)
-            #except KeyError:
-            message["data"] = value
+            message["body"] = value
         elif descriptor == 118:
             try:
                 cast(List, message["sequence"]).append(value)

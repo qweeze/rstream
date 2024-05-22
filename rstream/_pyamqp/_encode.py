@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------
 # pylint: disable=too-many-lines
 # pylint: disable=unused-argument
+# type: ignore
+
 # TODO: fix mypy errors for _code/_definition/__defaults__ (issue #26500)
 import calendar
 import struct
@@ -44,8 +46,6 @@ try:
     from typing import TypeAlias  # type: ignore
 except ImportError:
     from typing_extensions import TypeAlias
-
-
 
 
 if TYPE_CHECKING:
@@ -934,7 +934,6 @@ def encode_payload(output: bytearray, payload: Message) -> bytes:
         )
 
     if payload[5]:  # data
-        #for item_value in payload[5]:
         encode_value(
             output,
             {

@@ -426,7 +426,7 @@ async def test_publishing_sequence_superstream(
     async def publish_with_ids(*ids):
         for publishing_id in ids:
             amqp_message = AMQPMessage(
-                body="a:{}".format(publishing_id),
+                body=bytes("a:{}".format(publishing_id), "utf-8"),
             )
 
             await super_stream_producer.send(amqp_message)
@@ -449,9 +449,7 @@ async def test_publishing_sequence_superstream_key_routing(
 
     async def publish_with_ids(*ids):
         for publishing_id in ids:
-            amqp_message = AMQPMessage(
-                body="a:{}".format(publishing_id),
-            )
+            amqp_message = AMQPMessage(body=bytes("a:{}".format(publishing_id), "utf-8"))
             # will send to super_stream with routing key of 'key1'
             await super_stream_key_routing_producer.send(amqp_message)
 
@@ -486,9 +484,7 @@ async def test_publishing_sequence_superstream_with_callback(
 
     async def publish_with_ids(*ids):
         for publishing_id in ids:
-            amqp_message = AMQPMessage(
-                body="a:{}".format(publishing_id),
-            )
+            amqp_message = AMQPMessage(body=bytes("a:{}".format(publishing_id), "utf-8"))
             await super_stream_producer.send(
                 amqp_message,
                 on_publish_confirm=partial(
@@ -569,7 +565,7 @@ async def test_super_stream_producer_connection_broke(super_stream: str, consume
     count = 0
     while True:
         amqp_message = AMQPMessage(
-            body="hello: {}".format(count),
+            body=bytes("hello: {}".format(count), "utf-8"),
             application_properties={"id": "{}".format(count)},
         )
 

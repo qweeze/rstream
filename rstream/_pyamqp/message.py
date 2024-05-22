@@ -3,8 +3,12 @@
 # Licensed under the MIT License. See License.txt in the project root for
 # license information.
 # --------------------------------------------------------------------------
+# type: ignore
 
-from dataclasses import dataclass
+"""
+isort:skip_file
+"""
+
 # TODO: fix mypy errors for _code/_definition/__defaults__ (issue #26500)
 from typing import (
     TYPE_CHECKING,
@@ -35,7 +39,7 @@ if TYPE_CHECKING:
         message_annotations: Optional[Dict[Union[str, bytes], Any]]
         properties: Optional["Properties"]
         application_properties: Optional[Dict[Union[str, bytes], Any]]
-        data: Optional[bytes]
+        body: Optional[bytes]
         sequence: Optional[List[Any]]
         value: Optional[Any]
         footer: Optional[Dict[Any, Any]]
@@ -201,7 +205,7 @@ class Message(NamedTuple):
     message_annotations: Optional[Dict[Union[str, bytes], Any]] = None
     properties: Optional[Properties] = None
     application_properties: Optional[Dict[Union[str, bytes], Any]] = None
-    data: Optional[bytes] = None
+    body: Optional[bytes] = None
     sequence: Optional[List[Any]] = None
     value: Optional[Any] = None
     footer: Optional[Dict[Any, Any]] = None
@@ -214,7 +218,7 @@ Message._definition = (  # type: ignore # pylint:disable=protected-access
     (0x00000072, FIELD("message_annotations", FieldDefinition.annotations, False, None, False)),
     (0x00000073, FIELD("properties", Properties, False, None, False)),
     (0x00000074, FIELD("application_properties", AMQPTypes.map, False, None, False)),
-    (0x00000075, FIELD("data", AMQPTypes.binary, False, None, True)),
+    (0x00000075, FIELD("body", AMQPTypes.binary, False, None, True)),
     (0x00000076, FIELD("sequence", AMQPTypes.list, False, None, False)),
     (0x00000077, FIELD("value", None, False, None, False)),
     (0x00000078, FIELD("footer", FieldDefinition.annotations, False, None, False)),
