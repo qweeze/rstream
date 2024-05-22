@@ -934,17 +934,17 @@ def encode_payload(output: bytearray, payload: Message) -> bytes:
         )
 
     if payload[5]:  # data
-        for item_value in payload[5]:
-            encode_value(
-                output,
-                {
-                    TYPE: AMQPTypes.described,
-                    VALUE: (
-                        {TYPE: AMQPTypes.ulong, VALUE: 0x00000075},
-                        {TYPE: AMQPTypes.binary, VALUE: item_value},
-                    ),
-                },
-            )
+        #for item_value in payload[5]:
+        encode_value(
+            output,
+            {
+                TYPE: AMQPTypes.described,
+                VALUE: (
+                    {TYPE: AMQPTypes.ulong, VALUE: 0x00000075},
+                    {TYPE: AMQPTypes.binary, VALUE: payload[5]},
+                ),
+            },
+        )
 
     if payload[6]:  # sequence
         for item_value in payload[6]:

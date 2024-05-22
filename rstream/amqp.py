@@ -23,11 +23,11 @@ class AMQPMessage(Message, _MessageProtocol):
 
     def __bytes__(self) -> bytes:
         returned_value = bytearray()
-        encode_payload(output=returned_value, payload=self)
-        return bytes(returned_value)
+        ret = encode_payload(output=returned_value, payload=self)
+        return bytes(ret)
 
     def __str__(self) -> str:
-        return str(self.value)
+        return str(self.data)
 
 
 def amqp_decoder(data: bytes) -> AMQPMessage:
@@ -40,6 +40,7 @@ def amqp_decoder(data: bytes) -> AMQPMessage:
         footer=message.footer,
         header=message.header,
         delivery_annotations=message.delivery_annotations,
+        sequence=message.sequence,
         data=message.data,
     )
 
