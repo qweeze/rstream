@@ -38,7 +38,7 @@ async def publish():
         # run slowly several messages in order to test with sac
         for i in range(1000000):
             amqp_message = AMQPMessage(
-                body="message_:{}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
                 properties=uamqp.message.MessageProperties(message_id=i),
             )
             await producer.send(message=amqp_message)

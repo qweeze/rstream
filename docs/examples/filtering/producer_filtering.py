@@ -26,7 +26,7 @@ async def publish():
                 "region": "New York",
             }
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
                 application_properties=application_properties,
             )
             # send is asynchronous
@@ -43,7 +43,7 @@ async def publish():
                 "region": "California",
             }
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
                 application_properties=application_properties,
             )
             # send is asynchronous

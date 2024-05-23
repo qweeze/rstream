@@ -36,7 +36,7 @@ async def publish():
         for i in range(MESSAGES):
             application_properties = {"region": "New York", "id": "{}".format(i)}
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
                 application_properties=application_properties,
             )
             # send is asynchronous
@@ -51,7 +51,7 @@ async def publish():
         for i in range(MESSAGES):
             application_properties = {"region": "California", "id": "{}".format(i)}
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
                 application_properties=application_properties,
             )
             # send is asynchronous

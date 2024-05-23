@@ -36,7 +36,7 @@ async def publish():
         # Sending a million messages
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
                 application_properties={"id": "{}".format(i)},
             )
             await super_stream_producer.send(amqp_message)
