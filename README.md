@@ -56,7 +56,7 @@ The client supports two codecs to store the messages to the server:
 By default you should use `AMQP 1.0` codec:
 ```python
    amqp_message = AMQPMessage(
-    body="hello: {}".format(i),
+    body=bytes("hello: {}".format(i), "utf-8"),
   )
 ```
  
@@ -287,7 +287,7 @@ This one:
 ```python
  for i in range(1_000_000):
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
             )
             # send is asynchronous
             await producer.send(stream=STREAM, message=amqp_message)
