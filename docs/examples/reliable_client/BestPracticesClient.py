@@ -217,7 +217,7 @@ async def publish(rabbitmq_configuration: dict):
             return
 
         amqp_message = AMQPMessage(
-            body="hello: {}".format(i),
+            body=bytes("hello: {}".format(i), "utf-8"),
             application_properties={"id": "{}".format(i)},
         )
         # send is asynchronous

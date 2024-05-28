@@ -34,7 +34,7 @@ async def publish():
             messages = []
             for i in range(BATCH):
                 amqp_message = AMQPMessage(
-                    body="hello: {}".format(i),
+                    body=bytes("hello: {}".format(i), "utf-8"),
                 )
                 messages.append(amqp_message)
             # send_batch is synchronous. will wait till termination

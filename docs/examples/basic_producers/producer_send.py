@@ -17,7 +17,7 @@ async def publish():
 
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
             )
             # send is asynchronous
             await producer.send(stream=STREAM, message=amqp_message)

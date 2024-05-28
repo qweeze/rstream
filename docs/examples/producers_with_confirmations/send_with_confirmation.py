@@ -32,7 +32,7 @@ async def publish():
         # sending a million of messages in AMQP format
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
             )
             # send is asynchronous - also confirmation is taken asynchronously by _on_publish_confirm_client callback
             # you can specify different callbacks for different messages.

@@ -14,7 +14,7 @@ async def publish():
         # sending a thousand of messages in AMQP format
         for i in range(MESSAGES):
             amqp_message = AMQPMessage(
-                body="hello: {}".format(i),
+                body=bytes("hello: {}".format(i), "utf-8"),
             )
             # send is synchronous. It will also wait synchronously for the confirmation to arrive from the server
             # it is really very slow and send() + callback for asynchronous confirmation should be used instead.

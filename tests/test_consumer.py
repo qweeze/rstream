@@ -7,7 +7,6 @@ import time
 from functools import partial
 
 import pytest
-import uamqp
 
 from rstream import (
     AMQPMessage,
@@ -18,6 +17,7 @@ from rstream import (
     OffsetType,
     OnClosedErrorInfo,
     Producer,
+    Properties,
     RouteType,
     SuperStreamConsumer,
     SuperStreamProducer,
@@ -345,8 +345,8 @@ async def test_consume_superstream_with_sac_all_active(
 
     for i in range(10000):
         amqp_message = AMQPMessage(
-            body="a:{}".format(i),
-            properties=uamqp.message.MessageProperties(message_id=i),
+            body=bytes("a:{}".format(i), "utf-8"),
+            properties=Properties(message_id=str(i)),
         )
         await super_stream_producer_for_sac.send(amqp_message)
 
@@ -390,8 +390,8 @@ async def test_consume_superstream_with_sac_one_non_active(
 
     for i in range(10000):
         amqp_message = AMQPMessage(
-            body="a:{}".format(i),
-            properties=uamqp.message.MessageProperties(message_id=i),
+            body=bytes("a:{}".format(i), "utf-8"),
+            properties=Properties(message_id=str(i)),
         )
         await super_stream_producer_for_sac.send(amqp_message)
 
@@ -437,8 +437,8 @@ async def test_consume_superstream_with_callback_next(
 
     for i in range(10000):
         amqp_message = AMQPMessage(
-            body="a:{}".format(i),
-            properties=uamqp.message.MessageProperties(message_id=i),
+            body=bytes("a:{}".format(i), "utf-8"),
+            properties=Properties(message_id=str(i)),
         )
         await super_stream_producer_for_sac.send(amqp_message)
 
@@ -479,8 +479,8 @@ async def test_consume_superstream_with_callback_first(
 
     for i in range(10000):
         amqp_message = AMQPMessage(
-            body="a:{}".format(i),
-            properties=uamqp.message.MessageProperties(message_id=i),
+            body=bytes("a:{}".format(i), "utf-8"),
+            properties=Properties(message_id=str(i)),
         )
         await super_stream_producer_for_sac.send(amqp_message)
 
@@ -521,8 +521,8 @@ async def test_consume_superstream_with_callback_offset(
 
     for i in range(10000):
         amqp_message = AMQPMessage(
-            body="a:{}".format(i),
-            properties=uamqp.message.MessageProperties(message_id=i),
+            body=bytes("a:{}".format(i), "utf-8"),
+            properties=Properties(message_id=str(i)),
         )
         await super_stream_producer_for_sac.send(amqp_message)
 
