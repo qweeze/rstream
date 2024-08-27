@@ -319,6 +319,12 @@ class Consumer:
         except BaseException as exc:
             logger.warning("exception in unsubscribe of Consumer:" + str(exc))
 
+        stream = subscriber.stream
+
+        if stream in self._clients:
+            await self._clients[stream].remove_stream(stream)
+            await self._clients[stream].free_available_id(subscriber.subscription_id)
+
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
