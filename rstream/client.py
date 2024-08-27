@@ -246,10 +246,6 @@ class BaseClient:
                 self._run_delivery_handlers(subscriber_name, handler),
             )
 
-    async def destroy_queue_listener_task(self, subscriber_name: str) -> None:
-        if subscriber_name in self._frames:
-            self.stop_task(f"run_delivery_handlers_{subscriber_name}")
-
     async def _run_delivery_handlers(self, subscriber_name: str, handler: HT[FT]):
         while self.is_connection_alive():
             frame_entry = await self._frames[subscriber_name].get()

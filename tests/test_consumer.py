@@ -261,6 +261,28 @@ async def test_consume_with_resubscribe(stream: str, consumer: Consumer, produce
     assert captured == [b"one", b"two"]
 
 
+async def test_consume_with_resubscribe_msg(stream: str, consumer: Consumer, producer: Producer) -> None:
+    captured: list[bytes] = []
+    subscriber_name = await consumer.subscribe(
+        stream, callback=lambda message, message_context: captured.append(bytes(message))
+    )
+    for i in range(100):
+        await producer.send_wait(stream, b"one")
+    await wait_for(lambda: len(captured) >= 100)
+
+    await consumer.unsubscribe(subscriber_name)
+    await consumer.subscribe(
+        stream,
+        subscriber_name=subscriber_name,
+        callback=lambda message, message_context: captured.append(bytes(message)),
+        offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
+    )
+
+    for i in range(100):
+        await producer.send_wait(stream, b"two")
+    await wait_for(lambda: len(captured) >= 200)
+
+
 async def test_consume_superstream_with_resubscribe(
     super_stream: str, super_stream_consumer: SuperStreamConsumer, super_stream_producer: SuperStreamProducer
 ) -> None:
