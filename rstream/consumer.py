@@ -325,6 +325,8 @@ class Consumer:
             await self._clients[stream].remove_stream(stream)
             await self._clients[stream].free_available_id(subscriber.subscription_id)
 
+        subscriber.client.destroy_queue_listener_task(subscriber_name)
+
         del self._subscribers[subscriber_name]
 
     async def query_offset(self, stream: str, subscriber_name: str) -> int:
