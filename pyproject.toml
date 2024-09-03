@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "rstream"
-version = "0.20.2"
+version = "0.20.3"
 description = "A python client for RabbitMQ Streams"
-authors = ["George Fortunatov <qweeeze@gmail.com>", "Daniele Palaia <dpalaia@vmware.com>"]
+authors = ["George Fortunatov <qweeeze@gmail.com>", "Daniele Palaia <dpalaia@vmware.com>", "Gabriele Santomaggio <g.santomaggio@gmail.com>"]
 readme = "README.md"
 homepage = "https://github.com/qweeze/rstream"
 repository = "https://github.com/qweeze/rstream"
