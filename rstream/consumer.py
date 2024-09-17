@@ -304,6 +304,8 @@ class Consumer:
     async def unsubscribe(self, subscriber_name: str) -> None:
         logger.debug("unsubscribe(): UnSubscribing and removing handlers")
         subscriber = self._subscribers[subscriber_name]
+
+        await subscriber.client.stop_queue_listener_task(subscriber_name=subscriber_name)
         subscriber.client.remove_handler(
             schema.Deliver,
             name=subscriber.reference,
