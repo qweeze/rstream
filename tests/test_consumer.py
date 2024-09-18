@@ -242,66 +242,74 @@ async def test_offset_type_next(stream: str, consumer: Consumer, producer: Produ
 
 
 async def test_consume_with_resubscribe(stream: str, consumer: Consumer, producer: Producer) -> None:
-    captured: list[bytes] = []
+    captured_by_first_consumer: list[bytes] = []
     subscriber_name = await consumer.subscribe(
-        stream, callback=lambda message, message_context: captured.append(bytes(message))
+        stream, callback=lambda message, message_context: captured_by_first_consumer.append(bytes(message))
     )
     await producer.send_wait(stream, b"one")
-    await wait_for(lambda: len(captured) >= 1)
+    await wait_for(lambda: len(captured_by_first_consumer) >= 1)
+    assert captured_by_first_consumer == [b"one"]
 
     await consumer.unsubscribe(subscriber_name)
+
+    captured_by_second_consumer: list[bytes] = []
     await consumer.subscribe(
         stream,
-        callback=lambda message, message_context: captured.append(bytes(message)),
+        callback=lambda message, message_context: captured_by_second_consumer.append(bytes(message)),
         offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
     )
 
     await producer.send_wait(stream, b"two")
-    await wait_for(lambda: len(captured) >= 2)
-    assert captured == [b"one", b"two"]
+    await asyncio.sleep(1)
+    await wait_for(lambda: len(captured_by_second_consumer) >= 1)
+    assert captured_by_second_consumer == [b"two"]
 
 
 async def test_consume_with_resubscribe_msg(stream: str, consumer: Consumer, producer: Producer) -> None:
-    captured: list[bytes] = []
+    captured_by_first_consumer: list[bytes] = []
     subscriber_name = await consumer.subscribe(
-        stream, callback=lambda message, message_context: captured.append(bytes(message))
+        stream, callback=lambda message, message_context: captured_by_first_consumer.append(bytes(message))
     )
     for i in range(100):
         await producer.send_wait(stream, b"one")
-    await wait_for(lambda: len(captured) >= 100)
+    await wait_for(lambda: len(captured_by_first_consumer) >= 100)
 
     await consumer.unsubscribe(subscriber_name)
+
+    captured_by_second_consumer: list[bytes] = []
     await consumer.subscribe(
         stream,
         subscriber_name=subscriber_name,
-        callback=lambda message, message_context: captured.append(bytes(message)),
+        callback=lambda message, message_context: captured_by_second_consumer.append(bytes(message)),
         offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
     )
 
     for i in range(100):
         await producer.send_wait(stream, b"two")
-    await wait_for(lambda: len(captured) >= 200)
+    await wait_for(lambda: len(captured_by_second_consumer) >= 100)
 
 
 async def test_consume_superstream_with_resubscribe(
     super_stream: str, super_stream_consumer: SuperStreamConsumer, super_stream_producer: SuperStreamProducer
 ) -> None:
-    captured: list[bytes] = []
+    captured_by_first_consumer: list[bytes] = []
     await super_stream_consumer.subscribe(
-        callback=lambda message, message_context: captured.append(bytes(message))
+        callback=lambda message, message_context: captured_by_first_consumer.append(bytes(message))
     )
     await super_stream_producer.send(b"one")
-    await wait_for(lambda: len(captured) >= 1)
+    await wait_for(lambda: len(captured_by_first_consumer) >= 1)
 
     await super_stream_consumer.unsubscribe()
+
+    captured_by_second_consumer: list[bytes] = []
     await super_stream_consumer.subscribe(
-        callback=lambda message, message_context: captured.append(bytes(message)),
+        callback=lambda message, message_context: captured_by_second_consumer.append(bytes(message)),
         offset_specification=ConsumerOffsetSpecification(OffsetType.NEXT, None),
     )
 
     await super_stream_producer.send(b"two")
-    await wait_for(lambda: len(captured) >= 2)
-    assert captured == [b"one", b"two"]
+    await wait_for(lambda: len(captured_by_second_consumer) >= 1)
+    assert captured_by_second_consumer == [b"two"]
 
 
 async def test_consume_with_restart(stream: str, consumer: Consumer, producer: Producer) -> None:
