@@ -220,7 +220,9 @@ class Consumer:
         initial_credit: int = 10,
         properties: Optional[dict[str, Any]] = None,
         subscriber_name: Optional[str] = None,
-        consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
+        consumer_update_listener: Optional[
+            Callable[[bool, EventContext], Awaitable[OffsetSpecification]]
+        ] = None,
         filter_input: Optional[FilterConfiguration] = None,
     ) -> str:
         logger.debug("Consumer subscribe()")
@@ -408,7 +410,9 @@ class Consumer:
         frame: schema.ConsumerUpdateResponse,
         subscriber: _Subscriber,
         reference: str,
-        consumer_update_listener: Optional[Callable[[bool, EventContext], Awaitable[Any]]] = None,
+        consumer_update_listener: Optional[
+            Callable[[bool, EventContext], Awaitable[OffsetSpecification]]
+        ] = None,
     ) -> None:
         # event the consumer is not active, we need to send a ConsumerUpdateResponse
         # by protocol definition. the offsetType can't be null so we use OffsetTypeNext as default
@@ -420,6 +424,8 @@ class Consumer:
             is_active = bool(frame.active)
             event_context = EventContext(self, subscriber.reference, reference)
             offset_specification = await consumer_update_listener(is_active, event_context)
+            subscriber.offset_type = OffsetType(offset_specification.offset_type)
+            subscriber.offset = offset_specification.offset
             await subscriber.client.consumer_update(frame.correlation_id, offset_specification)
 
     async def create_stream(
