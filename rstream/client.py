@@ -272,6 +272,9 @@ class BaseClient:
                 if not self.is_connection_alive():
                     break
 
+                # reset heartbeat time when we receive any response from the socket
+                self._last_heartbeat = time.monotonic()
+
                 logger.debug("Received frame: %s", frame)
 
                 _key = frame.key, frame.corr_id
