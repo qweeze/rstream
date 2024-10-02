@@ -46,10 +46,6 @@ async def consumer_update_handler_first(is_active: bool, event_context: EventCon
     return OffsetSpecification(OffsetType.FIRST, 0)
 
 
-async def consumer_update_handler_offset(is_active: bool, event_context: EventContext) -> OffsetSpecification:
-    return OffsetSpecification(OffsetType.OFFSET, 10)
-
-
 async def on_publish_confirm_client_callback(
     confirmation: ConfirmationStatus, confirmed_messages: list[int], errored_messages: list[int]
 ) -> None:
