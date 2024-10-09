@@ -414,6 +414,9 @@ class Consumer:
             Callable[[bool, EventContext], Awaitable[OffsetSpecification]]
         ] = None,
     ) -> None:
+        if frame.subscription_id != subscriber.subscription_id:
+            return
+
         # event the consumer is not active, we need to send a ConsumerUpdateResponse
         # by protocol definition. the offsetType can't be null so we use OffsetTypeNext as default
         if consumer_update_listener is None:
