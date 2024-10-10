@@ -249,6 +249,8 @@ class BaseClient:
 
     async def stop_queue_listener_task(self, subscriber_name: str) -> None:
         await self.stop_task(name=f"run_delivery_handlers_{subscriber_name}")
+        while not self._frames[subscriber_name].empty():
+            self._frames[subscriber_name].get_nowait()
 
     async def _run_delivery_handlers(self, subscriber_name: str, handler: HT[FT]):
         while self.is_connection_alive():
