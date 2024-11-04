@@ -181,8 +181,8 @@ class Producer:
                     await asyncio.wait_for(publisher.client.delete_publisher(publisher.id), 5)
                 except asyncio.TimeoutError:
                     logger.warning("timeout when closing producer and deleting publisher")
-                except BaseException as exc:
-                    logger.exception("exception in delete_publisher in Producer.close:", exc)
+                except BaseException:
+                    logger.exception("exception in delete_publisher in Producer.close")
             publisher.client.remove_handler(schema.PublishConfirm, publisher.reference)
             publisher.client.remove_handler(schema.PublishError, publisher.reference)
             publisher.client.remove_handler(schema.MetadataUpdate, publisher.reference)
@@ -262,11 +262,11 @@ class Producer:
 
         except StreamDoesNotExist as e:
             await self._maybe_clean_up_during_lost_connection(stream)
-            logger.exception("Error in _get_or_create_publisher: stream does not exists anymore", e)
+            logger.exception("Error in _get_or_create_publisher: stream does not exists anymore")
             raise e
         except Exception as ex:
             await self._maybe_clean_up_during_lost_connection(stream)
-            logger.exception("error declaring publisher: ", ex)
+            logger.exception("error declaring publisher")
             raise ex
 
         logger.debug("_get_or_create_publisher(): Adding handlers")
@@ -615,10 +615,10 @@ class Producer:
                 for stream in self._buffered_messages:
                     try:
                         await self._publish_buffered_messages(stream)
-                    except BaseException as exc:
-                        logger.exception("producer _timer exception: ", {exc})
-        except Exception as ex:
-            logger.exception("exception in _timer: " + str(ex))
+                    except BaseException:
+                        logger.exception("producer _timer exception")
+        except Exception:
+            logger.exception("exception in _timer")
 
     async def _publish_buffered_messages(self, stream: str) -> None:
         logger.debug("publishing message with _publish_buffered_messages")
