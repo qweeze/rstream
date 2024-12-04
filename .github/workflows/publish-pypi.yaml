@@ -35,6 +35,10 @@ jobs:
           poetry build
       # retrieve your distributions here
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.12.2
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          attestations: false
+
 
             
