@@ -11,6 +11,7 @@ jobs:
       id-token: write
     uses: ./.github/workflows/publish-pypi.yaml
     with:
+      attestations: false
       pypi_repository_url: https://test.pypi.org/legacy/
     secrets:
       pypi_api_login: __token__
