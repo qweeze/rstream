@@ -11,5 +11,5 @@ jobs:
     with:
       pypi_repository_url: https://test.pypi.org/legacy/
     secrets:
-      pypi_api_login: ${{ secrets.PYPI_LOGIN }}
-      pypi_api_password: ${{ secrets.PYPI_PASSWORD }}
+      pypi_api_login: __token__
+      pypi_api_password: ${{ secrets.PYPI_TOKEN }}
