@@ -12,6 +12,8 @@ jobs:
     uses: ./.github/workflows/publish-pypi.yaml
     with:
       pypi_repository_url: https://upload.pypi.org/legacy/
+      verbose: true
+      attestations: false 
     secrets:
       pypi_api_login: __token__
       pypi_api_password: ${{ secrets.PYPI_TOKEN }}
