@@ -7,6 +7,8 @@ on:
 
 jobs:
   call-publish-pypi:
+    permissions:
+      id-token: write
     uses: ./.github/workflows/publish-pypi.yaml
     with:
       pypi_repository_url: https://test.pypi.org/legacy/
