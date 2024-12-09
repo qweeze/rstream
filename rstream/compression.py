@@ -7,7 +7,7 @@ import gzip
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypeVar
+from typing import Sequence, TypeVar
 
 from .amqp import _MessageProtocol
 from .utils import RawMessage
@@ -25,7 +25,7 @@ class CompressionType(Enum):
 
 class ICompressionCodec(abc.ABC):
     @abc.abstractmethod
-    def compress(self, messages: list[MessageT]):
+    def compress(self, messages: Sequence[MessageT]):
         pass
 
     @abc.abstractmethod
@@ -60,7 +60,7 @@ class NoneCompressionCodec(ICompressionCodec):
     message_count: int = 0
     buffer: bytes = bytes()
 
-    def compress(self, messages: list[MessageT]):
+    def compress(self, messages: Sequence[MessageT]):
         uncompressed_data = bytes()
         for item in messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
@@ -99,7 +99,7 @@ class GzipCompressionCodec(ICompressionCodec):
     message_count: int = 0
     buffer: bytes = bytes()
 
-    def compress(self, messages: list[MessageT]):
+    def compress(self, messages: Sequence[MessageT]):
         uncompressed_data = bytes()
         for item in messages:
             msg = RawMessage(item) if isinstance(item, bytes) else item
@@ -152,7 +152,7 @@ class StreamCompressionCodecs:
 
 class CompressionHelper:
     @staticmethod
-    def compress(messages: list[MessageT], compression_type: CompressionType) -> ICompressionCodec:
+    def compress(messages: Sequence[MessageT], compression_type: CompressionType) -> ICompressionCodec:
         codec = StreamCompressionCodecs.get_compression_codec(compression_type=compression_type)
         codec.compress(messages=messages)
         return codec
