@@ -19,6 +19,7 @@ from typing import (
     Generic,
     NoReturn,
     Optional,
+    Sequence,
     TypeVar,
     Union,
 )
@@ -291,7 +292,7 @@ class Producer:
     async def send_batch(
         self,
         stream: str,
-        batch: list[MessageT],
+        batch: Sequence[MessageT],
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
     ) -> list[int]:
@@ -311,7 +312,7 @@ class Producer:
     async def _send_batch(
         self,
         stream: str,
-        batch: list[MessageT],
+        batch: Sequence[MessageT],
         publisher_name: Optional[str] = None,
         callback: Optional[CB[ConfirmationStatus]] = None,
         sync: bool = True,
@@ -575,7 +576,7 @@ class Producer:
     async def send_sub_entry(
         self,
         stream: str,
-        sub_entry_messages: list[MessageT],
+        sub_entry_messages: Sequence[MessageT],
         compression_type: CompressionType = CompressionType.No,
         publisher_name: Optional[str] = None,
         on_publish_confirm: Optional[CB[ConfirmationStatus]] = None,
