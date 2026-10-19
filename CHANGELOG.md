@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.1 - 2026-10-19
+
+- [Release 1.1.1](https://github.com/rabbitmq-community/rstream/releases/tag/v1.1.1)
+
+### Fixed
+- Close the client on `authenticate()` failure to prevent a socket/task leak in `ClientPool` by @Gsantomaggio in [#279](https://github.com/rabbitmq-community/rstream/pull/279)
+
 ## 1.1.0 - 2026-09-09
 
 - [Release 1.1.0](https://github.com/rabbitmq-community/rstream/releases/tag/v1.1.0)
